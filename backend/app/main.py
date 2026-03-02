@@ -5,7 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import analytics, audit, auth, employees, export_data, import_data, org
+from app.routers import (
+    analytics, audit, auth, availability, dashboard, employees, export_data,
+    finance, hrms_sync, import_data, integration, org, timesheets, utilisation,
+)
 
 
 @asynccontextmanager
@@ -36,6 +39,13 @@ app.include_router(analytics.router)
 app.include_router(import_data.router)
 app.include_router(export_data.router)
 app.include_router(audit.router)
+app.include_router(timesheets.router)
+app.include_router(hrms_sync.router)
+app.include_router(finance.router)
+app.include_router(utilisation.router)
+app.include_router(dashboard.router)
+app.include_router(availability.router)
+app.include_router(integration.router)
 
 
 @app.get("/health")

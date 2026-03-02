@@ -1,50 +1,87 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { useAuthStore } from "@/store/authStore"
-import { getAuditLog } from "@/api/audit"
 import type { AuditEntry } from "@/types/api"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronUp } from "lucide-react"
 
-export function AuditLogTable() {
-  const user = useAuthStore((s) => s.user)
-  const [entries, setEntries] = useState<AuditEntry[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
-  const pageSize = 20
+interface AuditLogTableProps {
+  entries: AuditEntry[]
+  total: number
+  loading: boolean
+}
 
-  useEffect(() => {
-    if (!user) return
-    setLoading(true)
-    getAuditLog(user.branch_location_id, page, pageSize)
-      .then((res) => {
-        setEntries(res.entries)
-        setTotal(res.total)
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [user, page])
+const ACTION_COLORS: Record<string, string> = {
+  CREATE: "bg-green-100 text-green-700",
+  UPDATE: "bg-blue-100 text-blue-700",
+  DELETE: "bg-red-100 text-red-700",
+  IMPORT: "bg-purple-100 text-purple-700",
+  SYNC: "bg-cyan-100 text-cyan-700",
+  EXPORT: "bg-amber-100 text-amber-700",
+  UPLOAD: "bg-indigo-100 text-indigo-700",
+  APPROVE: "bg-emerald-100 text-emerald-700",
+  REJECT: "bg-rose-100 text-rose-700",
+  LOCK: "bg-orange-100 text-orange-700",
+  COMPUTE: "bg-teal-100 text-teal-700",
+  SKILL_TAG: "bg-violet-100 text-violet-700",
+}
 
-  const totalPages = Math.ceil(total / pageSize)
+function MetadataToggle({ entry }: { entry: AuditEntry }) {
+  const [expanded, setExpanded] = useState(false)
+  const hasMetadata =
+    (entry.old_value && Object.keys(entry.old_value).length > 0) ||
+    (entry.new_value && Object.keys(entry.new_value).length > 0)
 
-  const actionColor = (action: string) => {
-    switch (action) {
-      case "CREATE": return "bg-green-100 text-green-700"
-      case "UPDATE": return "bg-blue-100 text-blue-700"
-      case "DELETE": return "bg-red-100 text-red-700"
-      case "IMPORT": return "bg-purple-100 text-purple-700"
-      default: return "bg-gray-100 text-gray-700"
-    }
-  }
+  if (!hasMetadata) return null
 
+  return (
+    <div className="mt-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 px-2 text-xs text-muted-foreground"
+        onClick={() => setExpanded(!expanded)}
+      >
+        {expanded ? (
+          <ChevronUp className="mr-1 h-3 w-3" />
+        ) : (
+          <ChevronDown className="mr-1 h-3 w-3" />
+        )}
+        {expanded ? "Hide details" : "Show details"}
+      </Button>
+      {expanded && (
+        <div className="mt-1.5 space-y-1.5 text-xs">
+          {entry.old_value && Object.keys(entry.old_value).length > 0 && (
+            <div className="rounded bg-red-50 px-3 py-2">
+              <span className="font-medium text-red-600">Previous: </span>
+              <code className="text-red-700">
+                {JSON.stringify(entry.old_value, null, 2)}
+              </code>
+            </div>
+          )}
+          {entry.new_value && Object.keys(entry.new_value).length > 0 && (
+            <div className="rounded bg-green-50 px-3 py-2">
+              <span className="font-medium text-green-600">Updated: </span>
+              <code className="text-green-700">
+                {JSON.stringify(entry.new_value, null, 2)}
+              </code>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function AuditLogTable({ entries, total, loading }: AuditLogTableProps) {
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Audit Log</CardTitle>
-          <span className="text-sm text-muted-foreground">{total} entries</span>
+          <CardTitle>Activity</CardTitle>
+          <span className="text-sm text-muted-foreground">
+            {total} {total === 1 ? "entry" : "entries"}
+          </span>
         </div>
       </CardHeader>
       <CardContent>
@@ -54,54 +91,34 @@ export function AuditLogTable() {
           </div>
         ) : entries.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
-            No audit entries yet
+            No audit entries found
           </p>
         ) : (
-          <>
-            <div className="space-y-2">
-              {entries.map((entry) => (
-                <div key={entry.id} className="flex items-start gap-3 rounded-lg border px-4 py-3">
-                  <Badge className={`${actionColor(entry.action)} text-[10px] shrink-0 mt-0.5`}>
-                    {entry.action}
-                  </Badge>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm">{entry.description}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      by {entry.changed_by_name} ·{" "}
-                      {new Date(entry.timestamp).toLocaleString()}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="text-[10px] shrink-0">
-                    {entry.entity_type}
-                  </Badge>
+          <div className="space-y-2">
+            {entries.map((entry) => (
+              <div
+                key={entry.id}
+                className="flex items-start gap-3 rounded-lg border px-4 py-3"
+              >
+                <Badge
+                  className={`${ACTION_COLORS[entry.action] || "bg-gray-100 text-gray-700"} text-[10px] shrink-0 mt-0.5`}
+                >
+                  {entry.action}
+                </Badge>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm">{entry.description}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    by {entry.changed_by_name} &middot;{" "}
+                    {new Date(entry.timestamp).toLocaleString()}
+                  </p>
+                  <MetadataToggle entry={entry} />
                 </div>
-              ))}
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page === 1}
-                  onClick={() => setPage(page - 1)}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(page + 1)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                <Badge variant="outline" className="text-[10px] shrink-0">
+                  {entry.entity_type}
+                </Badge>
               </div>
-            )}
-          </>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>

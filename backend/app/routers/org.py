@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends
 
 from app.middleware.auth_middleware import CurrentUser, get_current_user
+from app.models.department import Department
+from app.models.employee import Employee
+from app.models.project import Project
 from app.services.org_tree_service import (
     build_full_org_tree,
     get_branch_subtree,
@@ -43,3 +46,27 @@ async def get_trace(
     user: CurrentUser = Depends(get_current_user),
 ):
     return await trace_path(from_id, to_id)
+
+
+@router.get("/projects")
+async def list_projects(user: CurrentUser = Depends(get_current_user)):
+    """List all active projects accessible from the user's branch."""
+    dept_ids = [
+        str(d.id)
+        for d in await Department.find(
+            Department.location_id == user.branch_location_id
+        ).to_list()
+    ]
+    projects = await Project.find(
+        {"department_id": {"$in": dept_ids}, "status": "ACTIVE"}
+    ).to_list()
+    return [{"id": str(p.id), "name": p.name} for p in projects]
+
+
+@router.get("/employees")
+async def list_employees(user: CurrentUser = Depends(get_current_user)):
+    """List all employees in the user's branch."""
+    employees = await Employee.find(
+        Employee.location_id == user.branch_location_id
+    ).to_list()
+    return [{"id": str(e.id), "name": e.name} for e in employees]

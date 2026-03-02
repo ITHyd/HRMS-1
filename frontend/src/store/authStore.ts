@@ -5,6 +5,7 @@ interface AuthUser {
   branch_location_id: string
   branch_code: string
   name: string
+  role: string
 }
 
 interface AuthState {

@@ -166,7 +166,7 @@ async def get_branch_analytics(location_id: str):
     ).to_list()
 
     project_ids = {ep.project_id for ep in emp_projs}
-    projects_list = await Project.find({"_id": {"$in": [ObjectId(pid) for pid in project_ids]}}).to_list() if project_ids else []
+    projects_list = await Project.find({"_id": {"$in": [ObjectId(pid) for pid in project_ids if ObjectId.is_valid(pid)]}}).to_list() if project_ids else []
     proj_map = {str(p.id): p for p in projects_list}
 
     proj_member_count = defaultdict(int)

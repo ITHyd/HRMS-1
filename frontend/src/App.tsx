@@ -5,6 +5,11 @@ import { OrgChartPage } from "@/pages/OrgChartPage"
 import { AnalyticsPage } from "@/pages/AnalyticsPage"
 import { ImportPage } from "@/pages/ImportPage"
 import { AuditPage } from "@/pages/AuditPage"
+import { TimesheetPage } from "@/pages/TimesheetPage"
+import { FinancePage } from "@/pages/FinancePage"
+import { DashboardPage } from "@/pages/DashboardPage"
+import { AvailabilityPage } from "@/pages/AvailabilityPage"
+import { IntegrationPage } from "@/pages/IntegrationPage"
 import { useAuthStore } from "@/store/authStore"
 
 function App() {
@@ -15,6 +20,11 @@ function App() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<OrgChartPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/timesheets" element={<TimesheetPage />} />
+          <Route path="/finance" element={<FinancePage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/availability" element={<AvailabilityPage />} />
+          <Route path="/integrations" element={<IntegrationPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/audit" element={<AuditPage />} />
         </Route>

@@ -8,6 +8,7 @@ class User(Document):
     employee_id: str
     branch_location_id: str
     name: str
+    role: str = "branch_head"  # branch_head | admin | pm | finance | employee
 
     class Settings:
         name = "users"

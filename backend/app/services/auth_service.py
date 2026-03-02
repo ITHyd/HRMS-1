@@ -26,6 +26,7 @@ async def authenticate_user(email: str, password: str) -> dict | None:
         "employee_id": user.employee_id,
         "branch_location_id": user.branch_location_id,
         "name": user.name,
+        "role": user.role,
     }
     access_token = create_access_token(token_data)
 
@@ -36,4 +37,5 @@ async def authenticate_user(email: str, password: str) -> dict | None:
         "branch_location_id": user.branch_location_id,
         "branch_code": branch_code,
         "name": user.name,
+        "role": user.role,
     }

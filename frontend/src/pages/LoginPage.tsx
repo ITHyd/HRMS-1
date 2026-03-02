@@ -26,6 +26,7 @@ export function LoginPage() {
         branch_location_id: res.branch_location_id,
         branch_code: res.branch_code,
         name: res.name,
+        role: res.role || "branch_head",
       })
       navigate("/")
     } catch {

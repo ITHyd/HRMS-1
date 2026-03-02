@@ -34,8 +34,7 @@ function flattenTree(
   parentId?: string
 ) {
   for (const node of nodes) {
-    const isExpanded =
-      options.expandedNodeIds.has(node.id) || node.is_own_branch
+    const isExpanded = options.expandedNodeIds.has(node.id)
     const childCount = countDescendants(node)
 
     rfNodes.push({

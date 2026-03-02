@@ -27,20 +27,35 @@ export function EmployeeDrawer() {
   const [employee, setEmployee] = useState<EmployeeDetail | null>(null)
   const [chain, setChain] = useState<Record<string, unknown>[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!selectedId || !isOpen) return
     setLoading(true)
-    Promise.all([
-      getEmployee(selectedId),
-      getReportingChain(selectedId),
-    ])
-      .then(([emp, chainRes]) => {
+    setError(null)
+    setEmployee(null)
+    setChain([])
+
+    const loadEmployee = async () => {
+      try {
+        const emp = await getEmployee(selectedId)
         setEmployee(emp)
-        setChain(chainRes.chain)
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
+      } catch (err) {
+        console.error("Failed to load employee:", err)
+        setError(`Failed to load employee details`)
+      }
+
+      try {
+        const chainRes = await getReportingChain(selectedId)
+        setChain(chainRes.chain || [])
+      } catch (err) {
+        console.error("Failed to load chain:", err)
+      }
+
+      setLoading(false)
+    }
+
+    loadEmployee()
   }, [selectedId, isOpen])
 
   if (!isOpen) return null
@@ -54,6 +69,10 @@ export function EmployeeDrawer() {
       {loading ? (
         <div className="flex h-full items-center justify-center">
           <div className="animate-spin h-6 w-6 rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      ) : error ? (
+        <div className="flex h-full items-center justify-center p-6">
+          <p className="text-sm text-destructive">{error}</p>
         </div>
       ) : employee ? (
         <>

@@ -6,8 +6,10 @@ Usage: cd backend && python -m seed.seed_data
 """
 
 import asyncio
+import calendar
+import random
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date as date_type
 from pathlib import Path
 
 from pymongo import AsyncMongoClient
@@ -26,8 +28,23 @@ from app.models.project import Project
 from app.models.employee_project import EmployeeProject
 from app.models.audit_log import AuditLog
 from app.models.user import User
+from app.models.timesheet_entry import TimesheetEntry
+from app.models.timesheet_period_lock import TimesheetPeriodLock
+from app.models.capacity_config import CapacityConfig
+from app.models.finance_billable import FinanceBillable
+from app.models.finance_upload_log import FinanceUploadLog
+from app.models.utilisation_snapshot import UtilisationSnapshot
+from app.models.skill_catalog import SkillCatalog
+from app.models.employee_skill import EmployeeSkill
+from app.models.integration_config import IntegrationConfig
 
-ALL_MODELS = [Employee, ReportingRelationship, Location, Department, Project, EmployeeProject, AuditLog, User]
+ALL_MODELS = [
+    Employee, ReportingRelationship, Location, Department, Project, EmployeeProject,
+    AuditLog, User,
+    TimesheetEntry, TimesheetPeriodLock, CapacityConfig,
+    FinanceBillable, FinanceUploadLog, UtilisationSnapshot,
+    SkillCatalog, EmployeeSkill, IntegrationConfig,
+]
 
 
 def date(y, m, d):
@@ -422,10 +439,405 @@ async def seed():
 
     print(f"Created {len(users_data)} user accounts.")
 
+    # ── Phase 1 Module Seed Data ──
+
+    # ── Capacity Config (one per branch) ──
+    branch_ids = {"HYD": HYD, "BLR": BLR, "LON": LON, "SYD": SYD}
+    capacity_configs = []
+    for code, loc_id in branch_ids.items():
+        cc = CapacityConfig(
+            branch_location_id=loc_id,
+            standard_hours_per_week=40,
+            standard_hours_per_day=8,
+            working_days_per_week=5,
+            bench_threshold_percent=30,
+            partial_billing_threshold=70,
+            effective_from=date(2025, 1, 1),
+            created_by="system",
+            updated_at=now,
+        )
+        await cc.insert()
+        capacity_configs.append(cc)
+    print(f"Created {len(capacity_configs)} capacity configs.")
+
+    # ── Build employee -> location mapping and employee -> project assignments mapping ──
+    # Fetch all employees from DB to get their location_id and name
+    all_employees_db = await Employee.find_all().to_list()
+    emp_id_to_location = {str(e.id): e.location_id for e in all_employees_db}
+    emp_id_to_name = {str(e.id): e.name for e in all_employees_db}
+
+    # Build employee_id -> list of (project_id, role) from assignments
+    emp_projects = {}
+    for emp_id, proj_name, role in assignments:
+        pid = project_ids[proj_name]
+        if emp_id not in emp_projects:
+            emp_projects[emp_id] = []
+        emp_projects[emp_id].append((pid, role))
+
+    # Group employees by branch location
+    branch_employees = {}
+    for eid, loc_id in emp_id_to_location.items():
+        if loc_id not in branch_employees:
+            branch_employees[loc_id] = []
+        branch_employees[loc_id].append(eid)
+
+    # ── Helper: get working days in a month ──
+    def get_working_days(year, month):
+        """Return list of date objects for weekdays (Mon-Fri) in the given month."""
+        num_days = calendar.monthrange(year, month)[1]
+        days = []
+        for day in range(1, num_days + 1):
+            d = date_type(year, month, day)
+            if d.weekday() < 5:  # Mon=0 .. Fri=4
+                days.append(d)
+        return days
+
+    # ── Determine past 3 months for timesheets, past 2 for finance/utilisation ──
+    # Current date is now (March 2026), so past 3 months = Dec 2025, Jan 2026, Feb 2026
+    today = now.date() if hasattr(now, 'date') else now
+    past_months_3 = []
+    past_months_2 = []
+    ref = today.replace(day=1)
+    for i in range(3, 0, -1):
+        # Go back i months from current month
+        m = ref.month - i
+        y = ref.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        past_months_3.append((y, m))
+    past_months_2 = past_months_3[1:]  # last 2 of the 3
+
+    # ── Timesheet Entries (past 3 months) ──
+    random.seed(42)  # Reproducibility
+    timesheet_entries = []
+
+    for year, month in past_months_3:
+        period = f"{year:04d}-{month:02d}"
+        working_days = get_working_days(year, month)
+
+        for loc_id, emp_list in branch_employees.items():
+            for eid in emp_list:
+                proj_list = emp_projects.get(eid, [])
+
+                if proj_list:
+                    # Employee has project assignments - distribute 7-8 hours across projects
+                    for wd in working_days:
+                        total_day_hours = random.choice([7.0, 7.5, 8.0])
+                        n_projects = len(proj_list)
+
+                        if n_projects == 1:
+                            hours_split = [total_day_hours]
+                        else:
+                            # Distribute hours: give majority to first project, rest spread
+                            base = total_day_hours / n_projects
+                            hours_split = []
+                            remaining = total_day_hours
+                            for j in range(n_projects - 1):
+                                h = round(random.uniform(base * 0.5, base * 1.5), 1)
+                                h = min(h, remaining - 0.5 * (n_projects - j - 1))
+                                h = max(h, 0.5)
+                                hours_split.append(h)
+                                remaining -= h
+                            hours_split.append(round(remaining, 1))
+
+                        for idx, (pid, role) in enumerate(proj_list):
+                            is_billable = random.random() < 0.70
+                            entry = TimesheetEntry(
+                                employee_id=eid,
+                                project_id=pid,
+                                date=wd,
+                                hours=hours_split[idx],
+                                is_billable=is_billable,
+                                description=f"Work on {role} tasks",
+                                status="approved",
+                                submitted_at=datetime(year, month, min(wd.day + 1, working_days[-1].day), tzinfo=timezone.utc),
+                                approved_by="system",
+                                approved_at=datetime(year, month, min(wd.day + 2, working_days[-1].day), tzinfo=timezone.utc),
+                                source="hrms_sync",
+                                sync_batch_id=f"seed-sync-{period}",
+                                period=period,
+                                branch_location_id=loc_id,
+                                created_at=now,
+                                updated_at=now,
+                            )
+                            timesheet_entries.append(entry)
+                else:
+                    # Bench employee - minimal hours, non-billable
+                    first_proj_id = list(project_ids.values())[0]  # placeholder project
+                    for wd in working_days:
+                        bench_hours = round(random.uniform(4.0, 6.0), 1)
+                        entry = TimesheetEntry(
+                            employee_id=eid,
+                            project_id=first_proj_id,
+                            date=wd,
+                            hours=bench_hours,
+                            is_billable=False,
+                            description="Internal / Admin tasks",
+                            status="approved",
+                            submitted_at=datetime(year, month, min(wd.day + 1, working_days[-1].day), tzinfo=timezone.utc),
+                            approved_by="system",
+                            approved_at=datetime(year, month, min(wd.day + 2, working_days[-1].day), tzinfo=timezone.utc),
+                            source="hrms_sync",
+                            sync_batch_id=f"seed-sync-{period}",
+                            period=period,
+                            branch_location_id=loc_id,
+                            created_at=now,
+                            updated_at=now,
+                        )
+                        timesheet_entries.append(entry)
+
+    # Bulk insert timesheet entries in batches
+    BATCH_SIZE = 500
+    for i in range(0, len(timesheet_entries), BATCH_SIZE):
+        batch = timesheet_entries[i : i + BATCH_SIZE]
+        await TimesheetEntry.insert_many(batch)
+    print(f"Created {len(timesheet_entries)} timesheet entries across {len(past_months_3)} months.")
+
+    # ── Finance Billable (past 2 months) ──
+    random.seed(42)  # Reset seed for reproducibility
+    finance_records = []
+
+    # Also create a single upload log for the seed batch
+    for year, month in past_months_2:
+        period = f"{year:04d}-{month:02d}"
+
+        for loc_id, emp_list in branch_employees.items():
+            for eid in emp_list:
+                proj_list = emp_projects.get(eid, [])
+
+                if proj_list:
+                    # Has projects: 60% fully_billed, 30% partially_billed, 10% non_billable
+                    roll = random.random()
+                    if roll < 0.60:
+                        billable_status = "fully_billed"
+                    elif roll < 0.90:
+                        billable_status = "partially_billed"
+                    else:
+                        billable_status = "non_billable"
+
+                    # Approximate billable hours from timesheet data
+                    # ~22 working days * 7.5 avg hours = 165 total hours
+                    if billable_status == "fully_billed":
+                        billable_hours = round(random.uniform(140, 170), 1)
+                    elif billable_status == "partially_billed":
+                        billable_hours = round(random.uniform(80, 139), 1)
+                    else:
+                        billable_hours = 0.0
+
+                    primary_pid = proj_list[0][0]  # first assigned project
+                else:
+                    billable_status = "non_billable"
+                    billable_hours = 0.0
+                    primary_pid = None
+
+                fb = FinanceBillable(
+                    employee_id=eid,
+                    period=period,
+                    billable_status=billable_status,
+                    billable_hours=billable_hours,
+                    project_id=primary_pid,
+                    branch_location_id=loc_id,
+                    upload_batch_id="seed-batch-1",
+                    version=1,
+                    created_at=now,
+                )
+                finance_records.append(fb)
+
+    for i in range(0, len(finance_records), BATCH_SIZE):
+        batch = finance_records[i : i + BATCH_SIZE]
+        await FinanceBillable.insert_many(batch)
+    print(f"Created {len(finance_records)} finance billable records across {len(past_months_2)} months.")
+
+    # Create one FinanceUploadLog for the seed batch
+    upload_log = FinanceUploadLog(
+        batch_id="seed-batch-1",
+        period=f"{past_months_2[-1][0]:04d}-{past_months_2[-1][1]:02d}",
+        branch_location_id=HYD,
+        uploaded_by="system",
+        filename="seed_data_import.csv",
+        total_rows=len(finance_records),
+        valid_count=len(finance_records),
+        error_count=0,
+        duplicate_count=0,
+        version=1,
+        errors=[],
+        uploaded_at=now,
+    )
+    await upload_log.insert()
+    print("Created 1 finance upload log.")
+
+    # ── Utilisation Snapshots (past 2 months) ──
+    # Pre-compute from timesheet entries
+    # Build aggregation: (employee_id, period) -> {total_hours, billable_hours, non_billable_hours}
+    ts_agg = {}
+    for entry in timesheet_entries:
+        key = (entry.employee_id, entry.period)
+        if key not in ts_agg:
+            ts_agg[key] = {"total": 0.0, "billable": 0.0, "non_billable": 0.0}
+        ts_agg[key]["total"] += entry.hours
+        if entry.is_billable:
+            ts_agg[key]["billable"] += entry.hours
+        else:
+            ts_agg[key]["non_billable"] += entry.hours
+
+    # Build fast lookup for finance billable status: (employee_id, period) -> status
+    fin_status_lookup = {}
+    for fr in finance_records:
+        fin_status_lookup[(fr.employee_id, fr.period)] = fr.billable_status
+
+    utilisation_records = []
+    for year, month in past_months_2:
+        period = f"{year:04d}-{month:02d}"
+        working_days = get_working_days(year, month)
+        capacity_hours = len(working_days) * 8.0  # standard 8 hrs/day
+
+        for loc_id, emp_list in branch_employees.items():
+            for eid in emp_list:
+                key = (eid, period)
+                agg = ts_agg.get(key, {"total": 0.0, "billable": 0.0, "non_billable": 0.0})
+
+                total_logged = round(agg["total"], 1)
+                billable_h = round(agg["billable"], 1)
+                non_billable_h = round(agg["non_billable"], 1)
+
+                util_pct = round((total_logged / capacity_hours) * 100, 1) if capacity_hours > 0 else 0.0
+                bill_pct = round((billable_h / capacity_hours) * 100, 1) if capacity_hours > 0 else 0.0
+
+                # Classification based on billable percent thresholds
+                if bill_pct >= 70:
+                    classification = "fully_billed"
+                elif bill_pct >= 30:
+                    classification = "partially_billed"
+                else:
+                    classification = "bench"
+
+                fin_status = fin_status_lookup.get((eid, period))
+
+                snap = UtilisationSnapshot(
+                    employee_id=eid,
+                    employee_name=emp_id_to_name.get(eid, "Unknown"),
+                    period=period,
+                    branch_location_id=loc_id,
+                    total_hours_logged=total_logged,
+                    billable_hours=billable_h,
+                    non_billable_hours=non_billable_h,
+                    capacity_hours=capacity_hours,
+                    utilisation_percent=util_pct,
+                    billable_percent=bill_pct,
+                    classification=classification,
+                    finance_billable_status=fin_status,
+                    computed_at=now,
+                )
+                utilisation_records.append(snap)
+
+    for i in range(0, len(utilisation_records), BATCH_SIZE):
+        batch = utilisation_records[i : i + BATCH_SIZE]
+        await UtilisationSnapshot.insert_many(batch)
+    print(f"Created {len(utilisation_records)} utilisation snapshots across {len(past_months_2)} months.")
+
+    # ── Period Locks (lock the oldest month) ──
+    period_locks = []
+    oldest_period = f"{past_months_3[0][0]:04d}-{past_months_3[0][1]:02d}"
+    for code, loc_id in branch_ids.items():
+        # Lock the oldest month
+        lock = TimesheetPeriodLock(
+            period=oldest_period,
+            branch_location_id=loc_id,
+            is_locked=True,
+            locked_by="system",
+            locked_at=now,
+        )
+        await lock.insert()
+        period_locks.append(lock)
+
+    # Create unlocked entries for remaining months
+    for year, month in past_months_3[1:]:
+        period = f"{year:04d}-{month:02d}"
+        for code, loc_id in branch_ids.items():
+            lock = TimesheetPeriodLock(
+                period=period,
+                branch_location_id=loc_id,
+                is_locked=False,
+            )
+            await lock.insert()
+            period_locks.append(lock)
+
+    print(f"Created {len(period_locks)} period locks ({oldest_period} locked, others unlocked).")
+
+    # ── Phase 2 Module Seed Data ──
+
+    # ── Skill Catalog ──
+    skill_catalog_data = [
+        {"name": "python", "category": "language", "display_name": "Python"},
+        {"name": "javascript", "category": "language", "display_name": "JavaScript"},
+        {"name": "typescript", "category": "language", "display_name": "TypeScript"},
+        {"name": "java", "category": "language", "display_name": "Java"},
+        {"name": "csharp", "category": "language", "display_name": "C#"},
+        {"name": "react", "category": "framework", "display_name": "React"},
+        {"name": "angular", "category": "framework", "display_name": "Angular"},
+        {"name": "dotnet", "category": "framework", "display_name": ".NET"},
+        {"name": "spring", "category": "framework", "display_name": "Spring Boot"},
+        {"name": "aws", "category": "cloud", "display_name": "AWS"},
+        {"name": "azure", "category": "cloud", "display_name": "Azure"},
+        {"name": "gcp", "category": "cloud", "display_name": "Google Cloud"},
+        {"name": "docker", "category": "tool", "display_name": "Docker"},
+        {"name": "kubernetes", "category": "tool", "display_name": "Kubernetes"},
+        {"name": "terraform", "category": "tool", "display_name": "Terraform"},
+        {"name": "banking", "category": "domain", "display_name": "Banking & Finance"},
+        {"name": "healthcare", "category": "domain", "display_name": "Healthcare"},
+        {"name": "ecommerce", "category": "domain", "display_name": "E-Commerce"},
+        {"name": "leadership", "category": "soft_skill", "display_name": "Leadership"},
+        {"name": "agile", "category": "soft_skill", "display_name": "Agile/Scrum"},
+    ]
+    for sk in skill_catalog_data:
+        await SkillCatalog(**sk).insert()
+    print(f"Created {len(skill_catalog_data)} skill catalog entries.")
+
+    # ── Employee Skills ──
+    # Fetch all users for added_by reference
+    users = await User.find_all().to_list()
+    proficiencies = ["beginner", "intermediate", "advanced", "expert"]
+    skill_count = 0
+    for emp_obj in all_employees_db:
+        num_skills = random.randint(2, 4)
+        chosen = random.sample(skill_catalog_data, num_skills)
+        for sk in chosen:
+            await EmployeeSkill(
+                employee_id=str(emp_obj.id),
+                skill_name=sk["name"],
+                proficiency=random.choice(proficiencies),
+                added_by=str(users[0].id),
+                added_at=datetime.now(timezone.utc),
+            ).insert()
+            skill_count += 1
+    print(f"Created {skill_count} employee skill tags.")
+
+    # ── Integration Configs ──
+    for itype, iname in [("hrms", "HRMS Connector"), ("finance", "Finance Data Feed"), ("dynamics", "Dynamics 365 Export")]:
+        await IntegrationConfig(
+            integration_type=itype,
+            name=iname,
+            status="active",
+            config={"endpoint": f"https://api.example.com/{itype}", "version": "1.0"},
+            created_by=str(users[0].id),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        ).insert()
+    print("Created 3 integration configs.")
+
     print("\nSeed data complete!")
     print(f"   Total employees: {len(employees)}")
     print(f"   Locations: 4 (HYD, BLR, LON, SYD)")
     print(f"   Projects: {len(project_ids)}")
+    print(f"   Capacity configs: {len(capacity_configs)}")
+    print(f"   Timesheet entries: {len(timesheet_entries)}")
+    print(f"   Finance billable records: {len(finance_records)}")
+    print(f"   Utilisation snapshots: {len(utilisation_records)}")
+    print(f"   Period locks: {len(period_locks)}")
+    print(f"   Skill catalog entries: {len(skill_catalog_data)}")
+    print(f"   Employee skill tags: {skill_count}")
+    print(f"   Integration configs: 3")
     print(f"   Login credentials:")
     print(f"     HYD: vikram.patel@company.com / demo123")
     print(f"     BLR: kavitha.rao@company.com / demo123")

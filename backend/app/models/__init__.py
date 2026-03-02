@@ -6,6 +6,20 @@ from app.models.project import Project
 from app.models.employee_project import EmployeeProject
 from app.models.audit_log import AuditLog
 from app.models.user import User
+from app.models.timesheet_entry import TimesheetEntry
+from app.models.timesheet_period_lock import TimesheetPeriodLock
+from app.models.timesheet_edit_history import TimesheetEditHistory
+from app.models.hrms_sync_log import HrmsSyncLog
+from app.models.finance_billable import FinanceBillable
+from app.models.finance_upload_log import FinanceUploadLog
+from app.models.capacity_config import CapacityConfig
+from app.models.employee_capacity_override import EmployeeCapacityOverride
+from app.models.utilisation_snapshot import UtilisationSnapshot
+from app.models.employee_skill import EmployeeSkill
+from app.models.skill_catalog import SkillCatalog
+from app.models.integration_config import IntegrationConfig
+from app.models.sync_log import SyncLog
+from app.models.dynamics_export import DynamicsExport
 
 __all__ = [
     "Employee",
@@ -16,4 +30,18 @@ __all__ = [
     "EmployeeProject",
     "AuditLog",
     "User",
+    "TimesheetEntry",
+    "TimesheetPeriodLock",
+    "TimesheetEditHistory",
+    "HrmsSyncLog",
+    "FinanceBillable",
+    "FinanceUploadLog",
+    "CapacityConfig",
+    "EmployeeCapacityOverride",
+    "UtilisationSnapshot",
+    "EmployeeSkill",
+    "SkillCatalog",
+    "IntegrationConfig",
+    "SyncLog",
+    "DynamicsExport",
 ]

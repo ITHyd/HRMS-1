@@ -19,8 +19,8 @@ async def validate_csv(file_content: bytes, branch_location_id: str):
     required_fields = {"name", "email", "designation", "department_id", "level", "manager_email", "location_id", "join_date"}
 
     rows = []
-    existing_emails = {e.email async for e in Employee.find(Employee.is_active == True)}
     all_employees = await Employee.find(Employee.is_active == True).to_list()
+    existing_emails = {e.email for e in all_employees}
     email_to_id = {e.email: str(e.id) for e in all_employees}
 
     row_emails = {}
