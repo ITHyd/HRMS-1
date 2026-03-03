@@ -38,12 +38,13 @@ export interface AuditEntry {
   id: string
   action: string
   entity_type: string
+  entity_label: string
   entity_id: string
   changed_by: string
   changed_by_name: string
   timestamp: string
-  old_value?: Record<string, unknown>
-  new_value?: Record<string, unknown>
+  old_value?: Record<string, string>
+  new_value?: Record<string, string>
   description: string
 }
 

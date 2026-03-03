@@ -24,15 +24,38 @@ const ACTION_COLORS: Record<string, string> = {
   LOCK: "bg-orange-100 text-orange-700",
   COMPUTE: "bg-teal-100 text-teal-700",
   SKILL_TAG: "bg-violet-100 text-violet-700",
+  ASSIGN: "bg-sky-100 text-sky-700",
+}
+
+function DetailsPanel({ label, data, color }: { label: string; data: Record<string, string>; color: "green" | "red" }) {
+  const entries = Object.entries(data)
+  if (entries.length === 0) return null
+
+  const bgClass = color === "green" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+  const labelClass = color === "green" ? "text-green-700" : "text-red-700"
+
+  return (
+    <div className={`rounded-md border px-3 py-2 ${bgClass}`}>
+      <p className={`text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${labelClass}`}>{label}</p>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+        {entries.map(([key, value]) => (
+          <div key={key} className="flex items-baseline gap-1.5 text-xs">
+            <span className="text-muted-foreground shrink-0">{key}:</span>
+            <span className="font-medium truncate">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function MetadataToggle({ entry }: { entry: AuditEntry }) {
   const [expanded, setExpanded] = useState(false)
-  const hasMetadata =
+  const hasData =
     (entry.old_value && Object.keys(entry.old_value).length > 0) ||
     (entry.new_value && Object.keys(entry.new_value).length > 0)
 
-  if (!hasMetadata) return null
+  if (!hasData) return null
 
   return (
     <div className="mt-2">
@@ -50,27 +73,30 @@ function MetadataToggle({ entry }: { entry: AuditEntry }) {
         {expanded ? "Hide details" : "Show details"}
       </Button>
       {expanded && (
-        <div className="mt-1.5 space-y-1.5 text-xs">
+        <div className="mt-1.5 space-y-1.5">
           {entry.old_value && Object.keys(entry.old_value).length > 0 && (
-            <div className="rounded bg-red-50 px-3 py-2">
-              <span className="font-medium text-red-600">Previous: </span>
-              <code className="text-red-700">
-                {JSON.stringify(entry.old_value, null, 2)}
-              </code>
-            </div>
+            <DetailsPanel label="Previous" data={entry.old_value} color="red" />
           )}
           {entry.new_value && Object.keys(entry.new_value).length > 0 && (
-            <div className="rounded bg-green-50 px-3 py-2">
-              <span className="font-medium text-green-600">Updated: </span>
-              <code className="text-green-700">
-                {JSON.stringify(entry.new_value, null, 2)}
-              </code>
-            </div>
+            <DetailsPanel label={entry.old_value && Object.keys(entry.old_value).length > 0 ? "Updated" : "Details"} data={entry.new_value} color="green" />
           )}
         </div>
       )}
     </div>
   )
+}
+
+function formatTimestamp(ts: string): string {
+  const d = new Date(ts)
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }) + ", " + d.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  })
 }
 
 export function AuditLogTable({ entries, total, loading }: AuditLogTableProps) {
@@ -108,13 +134,12 @@ export function AuditLogTable({ entries, total, loading }: AuditLogTableProps) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">{entry.description}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    by {entry.changed_by_name} &middot;{" "}
-                    {new Date(entry.timestamp).toLocaleString()}
+                    by {entry.changed_by_name} &middot; {formatTimestamp(entry.timestamp)}
                   </p>
                   <MetadataToggle entry={entry} />
                 </div>
                 <Badge variant="outline" className="text-[10px] shrink-0">
-                  {entry.entity_type}
+                  {entry.entity_label || entry.entity_type}
                 </Badge>
               </div>
             ))}

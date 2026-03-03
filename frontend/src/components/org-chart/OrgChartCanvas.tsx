@@ -6,21 +6,29 @@ import {
   useReactFlow,
   type NodeTypes,
   type EdgeTypes,
+  type Node,
+  type Edge,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 
 import { EmployeeNode } from "./EmployeeNode"
+import { DepartmentGroupNode } from "./DepartmentGroupNode"
 import { ReportingEdge } from "./ReportingEdge"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import { useAuthStore } from "@/store/authStore"
 import { getFullOrgTree } from "@/api/org"
 import { tracePath } from "@/api/org"
-import { transformOrgTree, collectIdsUpToDepth } from "@/lib/orgTreeTransform"
-import { LOCATION_COLORS } from "@/lib/constants"
-import { Maximize, Minimize } from "lucide-react"
+import {
+  transformOrgTree,
+  collectIdsUpToDepth,
+  computeFocusedNodeIds,
+} from "@/lib/orgTreeTransform"
+import { LOCATION_COLORS, DEPARTMENT_COLORS } from "@/lib/constants"
+import { Maximize, Minimize, X, UserRoundSearch } from "lucide-react"
 
 const nodeTypes: NodeTypes = {
   employeeNode: EmployeeNode,
+  departmentGroupNode: DepartmentGroupNode,
 }
 
 const edgeTypes: EdgeTypes = {
@@ -33,6 +41,7 @@ export function OrgChartCanvas() {
   const treeData = useOrgChartStore((s) => s.treeData)
   const setTreeData = useOrgChartStore((s) => s.setTreeData)
   const expandedNodeIds = useOrgChartStore((s) => s.expandedNodeIds)
+  const expandedDeptGroups = useOrgChartStore((s) => s.expandedDeptGroups)
   const expandBranch = useOrgChartStore((s) => s.expandBranch)
   const setLoading = useOrgChartStore((s) => s.setLoading)
   const isLoading = useOrgChartStore((s) => s.isLoading)
@@ -40,6 +49,9 @@ export function OrgChartCanvas() {
   const setHighlightedPath = useOrgChartStore((s) => s.setHighlightedPath)
   const traceMode = useOrgChartStore((s) => s.traceMode)
   const clearTrace = useOrgChartStore((s) => s.clearTrace)
+  const focusedEmployeeId = useOrgChartStore((s) => s.focusedEmployeeId)
+  const exitFocus = useOrgChartStore((s) => s.exitFocus)
+  const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
   const initialized = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -56,7 +68,6 @@ export function OrgChartCanvas() {
   useEffect(() => {
     const handleChange = () => {
       setIsFullscreen(!!document.fullscreenElement)
-      // Re-fit the view after viewport size changes
       setTimeout(() => fitView({ padding: 0.05, duration: 300 }), 200)
     }
     document.addEventListener("fullscreenchange", handleChange)
@@ -72,7 +83,6 @@ export function OrgChartCanvas() {
         const data = await getFullOrgTree()
         setTreeData(data)
 
-        // Auto-expand only first 3 levels
         if (!initialized.current) {
           const initialIds = collectIdsUpToDepth(data.nodes, 2)
           expandBranch(initialIds)
@@ -96,8 +106,74 @@ export function OrgChartCanvas() {
       branchLocationId: user.branch_location_id,
       branchHeadEmployeeId: user.employee_id,
       expandedNodeIds,
+      expandedDeptGroups,
     })
-  }, [treeData, expandedNodeIds, user])
+  }, [treeData, expandedNodeIds, expandedDeptGroups, user])
+
+  // Compute focused node IDs when focus mode is active
+  const focusedNodeIds = useMemo(() => {
+    if (!focusedEmployeeId || !treeData) return null
+    return computeFocusedNodeIds(
+      treeData.nodes,
+      treeData.secondary_edges,
+      focusedEmployeeId
+    )
+  }, [focusedEmployeeId, treeData])
+
+  // Style nodes with focus opacity
+  const styledNodes = useMemo((): Node[] => {
+    if (!focusedNodeIds) return nodes
+
+    return nodes.map((node) => {
+      let isFocused = focusedNodeIds.has(node.id)
+
+      // For department group nodes, check if the group's parent is the focused person
+      // or if any of its employees are in the focused set
+      if (!isFocused && node.type === "departmentGroupNode") {
+        const data = node.data as Record<string, unknown>
+        const parentId = data.parentId as string
+        const employeeIds = data.employeeIds as string[]
+        if (focusedNodeIds.has(parentId)) {
+          isFocused = true
+        } else if (employeeIds?.some((eid) => focusedNodeIds.has(eid))) {
+          isFocused = true
+        }
+      }
+
+      return {
+        ...node,
+        style: {
+          ...node.style,
+          opacity: isFocused ? 1 : 0.15,
+          transition: "opacity 0.3s ease",
+        },
+      }
+    })
+  }, [nodes, focusedNodeIds])
+
+  // Style edges with focus opacity
+  const styledEdges = useMemo((): Edge[] => {
+    if (!focusedNodeIds) return edges
+
+    const visibleNodeIds = new Set<string>()
+    for (const node of styledNodes) {
+      if ((node.style?.opacity as number) > 0.5) {
+        visibleNodeIds.add(node.id)
+      }
+    }
+
+    return edges.map((edge) => ({
+      ...edge,
+      style: {
+        ...edge.style,
+        opacity:
+          visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+            ? 1
+            : 0.08,
+        transition: "opacity 0.3s ease",
+      },
+    }))
+  }, [edges, focusedNodeIds, styledNodes])
 
   // Handle trace mode completion
   useEffect(() => {
@@ -113,10 +189,31 @@ export function OrgChartCanvas() {
 
   // Auto-fit on data change
   useEffect(() => {
-    if (nodes.length > 0) {
+    if (nodes.length > 0 && !focusedEmployeeId) {
       setTimeout(() => fitView({ padding: 0.05, duration: 300 }), 100)
     }
   }, [nodes.length])
+
+  // Focus mode: fit view to focused nodes
+  useEffect(() => {
+    if (focusedEmployeeId && focusedNodeIds && nodes.length > 0) {
+      const focusedNodes = nodes.filter(
+        (n) =>
+          focusedNodeIds.has(n.id) ||
+          (n.type === "departmentGroupNode" &&
+            focusedNodeIds.has((n.data as Record<string, unknown>).parentId as string))
+      )
+      if (focusedNodes.length > 0) {
+        setTimeout(() => {
+          fitView({
+            nodes: focusedNodes,
+            padding: 0.3,
+            duration: 500,
+          })
+        }, 100)
+      }
+    }
+  }, [focusedEmployeeId, focusedNodeIds, nodes, fitView])
 
   // "My Branch" button event
   useEffect(() => {
@@ -137,6 +234,13 @@ export function OrgChartCanvas() {
     return () => window.removeEventListener("focus-my-branch", handleFocusBranch)
   }, [nodes, user, setCenter])
 
+  // Click on canvas background exits focus mode
+  const handlePaneClick = useCallback(() => {
+    if (focusedEmployeeId) {
+      exitFocus()
+    }
+  }, [focusedEmployeeId, exitFocus])
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -144,6 +248,11 @@ export function OrgChartCanvas() {
       </div>
     )
   }
+
+  // Get focused employee name for the overlay
+  const focusedEmployeeName = focusedEmployeeId
+    ? (nodes.find((n) => n.id === focusedEmployeeId)?.data as Record<string, unknown>)?.name as string
+    : null
 
   return (
     <div ref={containerRef} className="h-full w-full bg-white">
@@ -154,6 +263,34 @@ export function OrgChartCanvas() {
       >
         {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
       </button>
+
+      {/* Focus mode overlay */}
+      {focusedEmployeeId && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+          <div className="bg-white border border-blue-200 rounded-lg shadow-md px-4 py-2 flex items-center gap-3">
+            <UserRoundSearch className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-800">
+              Focused on {focusedEmployeeName || "employee"}
+            </span>
+            <button
+              onClick={() => {
+                selectEmployee(focusedEmployeeId)
+              }}
+              className="cursor-pointer text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded-md transition-colors"
+            >
+              View Details
+            </button>
+            <button
+              onClick={() => exitFocus()}
+              className="cursor-pointer text-gray-400 hover:text-gray-600 transition-colors"
+              title="Exit focus"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {traceMode.active && traceMode.fromId && !traceMode.toId && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm text-blue-700 shadow">
           Click on another employee to trace the reporting path
@@ -170,20 +307,25 @@ export function OrgChartCanvas() {
         </div>
       )}
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={styledNodes}
+        edges={styledEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        onPaneClick={handlePaneClick}
         fitView
         minZoom={0.1}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
-        {/* Clean white background — no dots or lines */}
         <Controls position="bottom-right" />
         <MiniMap
           position="bottom-left"
           nodeColor={(node) => {
+            if (node.type === "departmentGroupNode") {
+              const data = node.data as Record<string, unknown>
+              const dept = data?.department as string
+              return DEPARTMENT_COLORS[dept] || "#94a3b8"
+            }
             const data = node.data as Record<string, unknown>
             const code = data?.locationCode as string
             return LOCATION_COLORS[code] || "#d1d5db"

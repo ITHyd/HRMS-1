@@ -254,7 +254,8 @@ async def list_employees(
         filters["is_active"] = is_active
 
     if search:
-        employees = await Employee.find(
+        # Find by name/email/designation
+        name_matches = await Employee.find(
             {"$and": [
                 filters,
                 {"$or": [
@@ -264,6 +265,29 @@ async def list_employees(
                 ]},
             ]}
         ).to_list()
+
+        # Also find by skill name
+        skill_records = await EmployeeSkill.find(
+            {"skill_name": {"$regex": search, "$options": "i"}}
+        ).to_list()
+        skill_emp_ids = list({es.employee_id for es in skill_records})
+
+        if skill_emp_ids:
+            skill_matches = await Employee.find(
+                {"_id": {"$in": [ObjectId(eid) for eid in skill_emp_ids if ObjectId.is_valid(eid)]},
+                 **filters}
+            ).to_list()
+        else:
+            skill_matches = []
+
+        # Merge and deduplicate
+        seen: set[str] = set()
+        employees: list = []
+        for emp in name_matches + skill_matches:
+            eid = str(emp.id)
+            if eid not in seen:
+                seen.add(eid)
+                employees.append(emp)
     else:
         employees = await Employee.find(filters).to_list()
 

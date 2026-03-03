@@ -4,7 +4,9 @@ import type { OrgTreeResponse } from "@/types/org"
 interface OrgChartState {
   treeData: OrgTreeResponse | null
   expandedNodeIds: Set<string>
+  expandedDeptGroups: Set<string>
   selectedEmployeeId: string | null
+  focusedEmployeeId: string | null
   highlightedPath: string[]
   isDrawerOpen: boolean
   traceMode: { active: boolean; fromId?: string; toId?: string }
@@ -14,8 +16,11 @@ interface OrgChartState {
   toggleNodeExpand: (nodeId: string) => void
   expandNode: (nodeId: string) => void
   collapseNode: (nodeId: string) => void
+  toggleDeptGroupExpand: (groupId: string) => void
   selectEmployee: (id: string) => void
   closeDrawer: () => void
+  focusOnEmployee: (id: string) => void
+  exitFocus: () => void
   setHighlightedPath: (path: string[]) => void
   clearHighlight: () => void
   startTrace: (fromId: string) => void
@@ -28,7 +33,9 @@ interface OrgChartState {
 export const useOrgChartStore = create<OrgChartState>((set, get) => ({
   treeData: null,
   expandedNodeIds: new Set<string>(),
+  expandedDeptGroups: new Set<string>(),
   selectedEmployeeId: null,
+  focusedEmployeeId: null,
   highlightedPath: [],
   isDrawerOpen: false,
   traceMode: { active: false },
@@ -58,9 +65,23 @@ export const useOrgChartStore = create<OrgChartState>((set, get) => ({
     set({ expandedNodeIds: expanded })
   },
 
+  toggleDeptGroupExpand: (groupId) => {
+    const expanded = new Set(get().expandedDeptGroups)
+    if (expanded.has(groupId)) {
+      expanded.delete(groupId)
+    } else {
+      expanded.add(groupId)
+    }
+    set({ expandedDeptGroups: expanded })
+  },
+
   selectEmployee: (id) => set({ selectedEmployeeId: id, isDrawerOpen: true }),
 
   closeDrawer: () => set({ isDrawerOpen: false, selectedEmployeeId: null }),
+
+  focusOnEmployee: (id) => set({ focusedEmployeeId: id }),
+
+  exitFocus: () => set({ focusedEmployeeId: null }),
 
   setHighlightedPath: (path) => set({ highlightedPath: path }),
 

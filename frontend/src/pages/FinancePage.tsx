@@ -17,20 +17,16 @@ function getCurrentPeriod(): string {
 export function FinancePage() {
   const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod)
   const [billableData, setBillableData] = useState<FinanceBillableEntry[]>([])
-  const [latestVersion, setLatestVersion] = useState(1)
-  const [selectedVersion, setSelectedVersion] = useState<number | null>(null)
   const [uploadHistory, setUploadHistory] = useState<FinanceUploadHistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchBillable = useCallback(
-    async (version?: number) => {
+    async () => {
       try {
         const res = await getFinanceBillable({
           period: selectedPeriod,
-          version: version ?? undefined,
         })
         setBillableData(res.entries)
-        setLatestVersion(res.latest_version)
       } catch {
         setBillableData([])
       }
@@ -49,7 +45,6 @@ export function FinancePage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    setSelectedVersion(null)
     await Promise.all([fetchBillable(), fetchHistory()])
     setLoading(false)
   }, [fetchBillable, fetchHistory])
@@ -57,11 +52,6 @@ export function FinancePage() {
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
-
-  const handleVersionChange = (version: number) => {
-    setSelectedVersion(version)
-    fetchBillable(version)
-  }
 
   const handleUploadComplete = () => {
     fetchAll()
@@ -96,9 +86,6 @@ export function FinancePage() {
         <FinanceBillableTable
           entries={billableData}
           period={selectedPeriod}
-          latestVersion={latestVersion}
-          selectedVersion={selectedVersion}
-          onVersionChange={handleVersionChange}
         />
       </div>
 

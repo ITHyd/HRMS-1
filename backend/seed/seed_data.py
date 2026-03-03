@@ -427,6 +427,7 @@ async def seed():
         ("kavitha.rao@company.com", dir_eng_blr, BLR, "Kavitha Rao"),
         ("james.mitchell@company.com", coo, LON, "James Mitchell"),
         ("michael.torres@company.com", vp_eng_apac, SYD, "Michael Torres"),
+        ("vamsi.krishna@company.com", hr2_hyd, HYD, "Vamsi Krishna"),
     ]
 
     for email, emp_id, loc_id, name in users_data:

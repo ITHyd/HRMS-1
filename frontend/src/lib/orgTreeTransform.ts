@@ -4,6 +4,9 @@ import type { OrgTreeNode, SecondaryEdge } from "@/types/org"
 
 const NODE_WIDTH = 240
 const NODE_HEIGHT = 84
+const GROUP_NODE_WIDTH = 280
+const GROUP_NODE_HEIGHT = 72
+export const DEPT_GROUP_THRESHOLD = 10
 
 export interface EmployeeNodeData {
   name: string
@@ -20,10 +23,75 @@ export interface EmployeeNodeData {
   [key: string]: unknown
 }
 
+export interface DepartmentGroupNodeData {
+  parentId: string
+  department: string
+  departmentId: string
+  headcount: number
+  employeeIds: string[]
+  isExpanded: boolean
+  locationBreakdown: Record<string, number>
+  [key: string]: unknown
+}
+
 interface TransformOptions {
   branchLocationId: string
   branchHeadEmployeeId: string
   expandedNodeIds: Set<string>
+  expandedDeptGroups: Set<string>
+}
+
+function emitDepartmentGroups(
+  parentNode: OrgTreeNode,
+  rfNodes: Node[],
+  rfEdges: Edge[],
+  options: TransformOptions
+) {
+  const deptMap = new Map<string, OrgTreeNode[]>()
+  for (const child of parentNode.children) {
+    const key = child.department_id || "general"
+    if (!deptMap.has(key)) deptMap.set(key, [])
+    deptMap.get(key)!.push(child)
+  }
+
+  for (const [deptId, children] of deptMap) {
+    const groupId = `dept-group-${parentNode.id}-${deptId}`
+    const isGroupExpanded = options.expandedDeptGroups.has(groupId)
+    const deptName = children[0].department || "General"
+
+    const locationBreakdown: Record<string, number> = {}
+    for (const c of children) {
+      const code = c.location_code || "?"
+      locationBreakdown[code] = (locationBreakdown[code] || 0) + 1
+    }
+
+    rfNodes.push({
+      id: groupId,
+      type: "departmentGroupNode",
+      position: { x: 0, y: 0 },
+      data: {
+        parentId: parentNode.id,
+        department: deptName,
+        departmentId: deptId,
+        headcount: children.length,
+        employeeIds: children.map((c) => c.id),
+        isExpanded: isGroupExpanded,
+        locationBreakdown,
+      } satisfies DepartmentGroupNodeData,
+    })
+
+    rfEdges.push({
+      id: `e-${parentNode.id}-${groupId}`,
+      source: parentNode.id,
+      target: groupId,
+      type: "reportingEdge",
+      data: { relationType: "PRIMARY" },
+    })
+
+    if (isGroupExpanded) {
+      flattenTree(children, rfNodes, rfEdges, options, groupId)
+    }
+  }
 }
 
 function flattenTree(
@@ -35,7 +103,6 @@ function flattenTree(
 ) {
   for (const node of nodes) {
     const isExpanded = options.expandedNodeIds.has(node.id)
-    const childCount = countDescendants(node)
 
     rfNodes.push({
       id: node.id,
@@ -67,7 +134,11 @@ function flattenTree(
     }
 
     if (isExpanded && node.children.length > 0) {
-      flattenTree(node.children, rfNodes, rfEdges, options, node.id)
+      if (node.children.length > DEPT_GROUP_THRESHOLD) {
+        emitDepartmentGroups(node, rfNodes, rfEdges, options)
+      } else {
+        flattenTree(node.children, rfNodes, rfEdges, options, node.id)
+      }
     }
   }
 }
@@ -107,10 +178,14 @@ export function transformOrgTree(
   // Dagre layout
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: "TB", nodesep: 60, ranksep: 120 })
+  g.setGraph({ rankdir: "TB", nodesep: 80, ranksep: 120 })
 
   rfNodes.forEach((node) => {
-    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
+    if (node.type === "departmentGroupNode") {
+      g.setNode(node.id, { width: GROUP_NODE_WIDTH, height: GROUP_NODE_HEIGHT })
+    } else {
+      g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
+    }
   })
 
   // Only use primary edges for layout
@@ -124,12 +199,53 @@ export function transformOrgTree(
 
   rfNodes.forEach((node) => {
     const pos = g.node(node.id)
+    const w = node.type === "departmentGroupNode" ? GROUP_NODE_WIDTH : NODE_WIDTH
+    const h = node.type === "departmentGroupNode" ? GROUP_NODE_HEIGHT : NODE_HEIGHT
     if (pos) {
-      node.position = { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 }
+      node.position = { x: pos.x - w / 2, y: pos.y - h / 2 }
     }
   })
 
   return { nodes: rfNodes, edges: rfEdges }
+}
+
+export function computeFocusedNodeIds(
+  treeRoots: OrgTreeNode[],
+  secondaryEdges: SecondaryEdge[],
+  focusedId: string
+): Set<string> {
+  const focused = new Set<string>()
+  focused.add(focusedId)
+
+  // Build parent map
+  const parentMap = new Map<string, string>()
+  function buildParentMap(nodes: OrgTreeNode[], parentId?: string) {
+    for (const node of nodes) {
+      if (parentId) parentMap.set(node.id, parentId)
+      buildParentMap(node.children, node.id)
+    }
+  }
+  buildParentMap(treeRoots)
+
+  // Add parent (manager)
+  const parentId = parentMap.get(focusedId)
+  if (parentId) focused.add(parentId)
+
+  // Add direct reports
+  const focusedNode = findNodeById(treeRoots, focusedId)
+  if (focusedNode) {
+    for (const child of focusedNode.children) {
+      focused.add(child.id)
+    }
+  }
+
+  // Add secondary relationship endpoints
+  for (const edge of secondaryEdges) {
+    if (edge.from_id === focusedId) focused.add(edge.to_id)
+    if (edge.to_id === focusedId) focused.add(edge.from_id)
+  }
+
+  return focused
 }
 
 export function collectOwnBranchIds(

@@ -29,7 +29,7 @@ export function Header() {
   }
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-background px-6">
+    <header className="relative z-30 flex h-14 items-center gap-4 border-b bg-background px-6">
       <SearchBar />
 
       <div className="ml-auto flex items-center gap-2">
@@ -49,10 +49,12 @@ export function Header() {
           </Button>
         )}
 
-        <Button variant="outline" size="sm" onClick={handleExport}>
-          <Download className="mr-1.5 h-3.5 w-3.5" />
-          Export
-        </Button>
+        {isOrgChart && (
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            Export
+          </Button>
+        )}
       </div>
     </header>
   )

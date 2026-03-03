@@ -14,8 +14,11 @@ function EmployeeNodeComponent({ data, id }: NodeProps) {
   const traceMode = useOrgChartStore((s) => s.traceMode)
   const startTrace = useOrgChartStore((s) => s.startTrace)
   const completeTrace = useOrgChartStore((s) => s.completeTrace)
+  const focusOnEmployee = useOrgChartStore((s) => s.focusOnEmployee)
+  const focusedEmployeeId = useOrgChartStore((s) => s.focusedEmployeeId)
 
   const isHighlighted = highlightedPath.includes(id)
+  const isFocused = focusedEmployeeId === id
   const locColor = LOCATION_COLORS[d.locationCode] || "#6b7280"
   const deptColor = DEPARTMENT_COLORS[d.department] || "#6b7280"
 
@@ -24,8 +27,13 @@ function EmployeeNodeComponent({ data, id }: NodeProps) {
     if (traceMode.active && traceMode.fromId && !traceMode.toId) {
       completeTrace(id)
     } else {
-      selectEmployee(id)
+      focusOnEmployee(id)
     }
+  }
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    selectEmployee(id)
   }
 
   const handleExpand = (e: React.MouseEvent) => {
@@ -42,6 +50,7 @@ function EmployeeNodeComponent({ data, id }: NodeProps) {
   return (
     <div
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onContextMenu={(e) => {
         e.preventDefault()
         startTrace(id)
@@ -51,6 +60,7 @@ function EmployeeNodeComponent({ data, id }: NodeProps) {
         "min-w-[220px]",
         d.isBranchHead && "ring-2 ring-amber-400 ring-offset-1",
         d.isOwnBranch && !d.isBranchHead && "border-indigo-200 bg-indigo-50/30",
+        isFocused && "ring-2 ring-blue-500 ring-offset-2 shadow-lg",
         isHighlighted && "ring-2 ring-blue-500 ring-offset-1 shadow-md",
         traceMode.active && "hover:ring-2 hover:ring-green-400"
       )}

@@ -45,7 +45,9 @@ async def _search_employees(query: str, branch_location_id: str, limit: int) -> 
         "is_active": True,
         "level": {"$nin": list(CORPORATE_LEVELS)},
     }
-    search_cond = {
+
+    # Find employees matching by name/email/designation
+    name_cond = {
         "$and": [
             filters,
             {"$or": [
@@ -55,9 +57,33 @@ async def _search_employees(query: str, branch_location_id: str, limit: int) -> 
             ]},
         ]
     }
+    name_matches = await Employee.find(name_cond).to_list()
 
-    total = await Employee.find(search_cond).count()
-    employees = await Employee.find(search_cond).limit(limit).to_list()
+    # Also find employees matching by skill name
+    skill_records = await EmployeeSkill.find(
+        {"skill_name": {"$regex": query, "$options": "i"}}
+    ).to_list()
+    skill_emp_ids = list({es.employee_id for es in skill_records})
+
+    if skill_emp_ids:
+        skill_matches = await Employee.find(
+            {"_id": {"$in": [ObjectId(eid) for eid in skill_emp_ids if ObjectId.is_valid(eid)]},
+             **filters}
+        ).to_list()
+    else:
+        skill_matches = []
+
+    # Merge and deduplicate
+    seen_ids: set[str] = set()
+    employees: list = []
+    for emp in name_matches + skill_matches:
+        eid = str(emp.id)
+        if eid not in seen_ids:
+            seen_ids.add(eid)
+            employees.append(emp)
+
+    total = len(employees)
+    employees = employees[:limit]
 
     dept_ids = list({e.department_id for e in employees if e.department_id})
     depts = await Department.find(
