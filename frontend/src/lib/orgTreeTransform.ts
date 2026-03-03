@@ -290,3 +290,17 @@ export function findNodeById(
   }
   return null
 }
+
+/** Walk the tree and return all ancestor IDs leading to the target node. */
+export function collectAncestorIds(
+  nodes: OrgTreeNode[],
+  targetId: string,
+  path: string[] = []
+): string[] | null {
+  for (const node of nodes) {
+    if (node.id === targetId) return path
+    const result = collectAncestorIds(node.children, targetId, [...path, node.id])
+    if (result) return result
+  }
+  return null
+}

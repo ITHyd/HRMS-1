@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import type { OrgTreeResponse } from "@/types/org"
+import { collectAncestorIds } from "@/lib/orgTreeTransform"
 
 interface OrgChartState {
   treeData: OrgTreeResponse | null
@@ -28,6 +29,9 @@ interface OrgChartState {
   clearTrace: () => void
   setLoading: (loading: boolean) => void
   expandBranch: (nodeIds: string[]) => void
+  focusEmployeeId: string | null
+  focusEmployee: (id: string) => void
+  clearFocusEmployee: () => void
 }
 
 export const useOrgChartStore = create<OrgChartState>((set, get) => ({
@@ -40,6 +44,7 @@ export const useOrgChartStore = create<OrgChartState>((set, get) => ({
   isDrawerOpen: false,
   traceMode: { active: false },
   isLoading: false,
+  focusEmployeeId: null,
 
   setTreeData: (data) => set({ treeData: data }),
 
@@ -105,4 +110,19 @@ export const useOrgChartStore = create<OrgChartState>((set, get) => ({
     nodeIds.forEach((id) => expanded.add(id))
     set({ expandedNodeIds: expanded })
   },
+
+  focusEmployee: (id) => {
+    const { treeData } = get()
+    if (treeData) {
+      const ancestors = collectAncestorIds(treeData.nodes, id) || []
+      if (ancestors.length > 0) {
+        const expanded = new Set(get().expandedNodeIds)
+        ancestors.forEach((a) => expanded.add(a))
+        set({ expandedNodeIds: expanded })
+      }
+    }
+    set({ selectedEmployeeId: id, isDrawerOpen: true, focusEmployeeId: id })
+  },
+
+  clearFocusEmployee: () => set({ focusEmployeeId: null }),
 }))
