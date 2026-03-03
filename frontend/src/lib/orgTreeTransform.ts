@@ -147,6 +147,22 @@ export function collectOwnBranchIds(
   return result
 }
 
+export function collectIdsUpToDepth(
+  nodes: OrgTreeNode[],
+  maxDepth: number,
+  currentDepth: number = 0,
+  result: string[] = []
+): string[] {
+  if (currentDepth >= maxDepth) return result
+  for (const node of nodes) {
+    if (node.children.length > 0) {
+      result.push(node.id)
+      collectIdsUpToDepth(node.children, maxDepth, currentDepth + 1, result)
+    }
+  }
+  return result
+}
+
 export function findNodeById(
   nodes: OrgTreeNode[],
   id: string

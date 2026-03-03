@@ -127,7 +127,7 @@ export function EmployeeDrawer() {
                       {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground mx-0.5" />}
                       <button
                         onClick={() => selectEmployee((c as Record<string, string>).id)}
-                        className="rounded px-1.5 py-0.5 hover:bg-accent transition-colors"
+                        className="cursor-pointer rounded px-1.5 py-0.5 hover:bg-accent transition-colors"
                       >
                         {(c as Record<string, string>).id === employee.id ? (
                           <strong>{(c as Record<string, string>).name} (You)</strong>
@@ -274,7 +274,7 @@ export function EmployeeDrawer() {
                         <button
                           key={mgr.id}
                           onClick={() => selectEmployee(mgr.id)}
-                          className="flex w-full items-center gap-2 rounded-lg border p-2 text-left text-sm hover:bg-accent transition-colors"
+                          className="cursor-pointer flex w-full items-center gap-2 rounded-lg border p-2 text-left text-sm hover:bg-accent transition-colors"
                         >
                           <div className="flex-1">
                             <p className="font-medium">{mgr.name}</p>
@@ -358,7 +358,7 @@ export function EmployeeDrawer() {
                     <button
                       key={report.id}
                       onClick={() => selectEmployee(report.id)}
-                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-accent transition-colors"
+                      className="cursor-pointer flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-accent transition-colors"
                     >
                       <div
                         className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white"

@@ -12,7 +12,7 @@ export function Header() {
   const clearHighlight = useOrgChartStore((s) => s.clearHighlight)
   const clearTrace = useOrgChartStore((s) => s.clearTrace)
 
-  const isOrgChart = location.pathname === "/"
+  const isOrgChart = location.pathname === "/org-chart"
 
   const handleExport = async () => {
     try {

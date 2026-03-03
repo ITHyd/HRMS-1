@@ -27,7 +27,7 @@ export function PeriodSelector({ value, onChange }: PeriodSelectorProps) {
     <div className="flex items-center gap-2">
       <button
         onClick={prev}
-        className="rounded-md border p-1.5 hover:bg-accent transition-colors"
+        className="cursor-pointer rounded-md border p-1.5 hover:bg-accent transition-colors"
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
@@ -36,7 +36,7 @@ export function PeriodSelector({ value, onChange }: PeriodSelectorProps) {
       </span>
       <button
         onClick={next}
-        className="rounded-md border p-1.5 hover:bg-accent transition-colors"
+        className="cursor-pointer rounded-md border p-1.5 hover:bg-accent transition-colors"
       >
         <ChevronRight className="h-4 w-4" />
       </button>

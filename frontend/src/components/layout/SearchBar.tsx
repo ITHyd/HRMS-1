@@ -69,7 +69,7 @@ export function SearchBar() {
             <button
               key={emp.id}
               onClick={() => handleSelect(emp)}
-              className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+              className="cursor-pointer flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
             >
               <div
                 className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white"

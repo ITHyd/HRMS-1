@@ -13,23 +13,20 @@ export function Sheet({ open, onClose, children, className }: SheetProps) {
   if (!open) return null
 
   return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
-      <div
-        className={cn(
-          "fixed right-0 top-0 z-50 h-full w-[480px] max-w-[90vw] bg-background shadow-xl border-l transition-transform duration-300 overflow-y-auto",
-          className
-        )}
-      >
+    <div
+      className={cn(
+        "fixed right-0 top-0 z-50 h-full w-[480px] max-w-[90vw] bg-background shadow-xl border-l transition-transform duration-300 overflow-y-auto",
+        className
+      )}
+    >
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
+          className="absolute right-4 top-4 cursor-pointer rounded-md p-1 opacity-70 transition-all hover:opacity-100 hover:bg-muted"
         >
           <X className="h-4 w-4" />
         </button>
         {children}
-      </div>
-    </>
+    </div>
   )
 }
 

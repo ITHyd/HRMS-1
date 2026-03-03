@@ -30,7 +30,7 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       <select
         ref={ref}
         className={cn(
-          "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-9 w-full cursor-pointer rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         value={value}
@@ -115,7 +115,7 @@ function CustomSelect({
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          "flex h-9 w-full cursor-pointer items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           className
         )}
       >
@@ -149,7 +149,7 @@ function CustomSelect({
                   type="button"
                   onClick={() => handleSelect(opt.value)}
                   className={cn(
-                    "block w-full px-3 py-1.5 text-left text-sm transition-colors first:rounded-t-md last:rounded-b-md",
+                    "block w-full cursor-pointer px-3 py-1.5 text-left text-sm transition-colors first:rounded-t-md last:rounded-b-md",
                     opt.value === value
                       ? "bg-accent font-medium"
                       : "hover:bg-accent/50"

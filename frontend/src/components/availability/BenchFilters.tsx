@@ -229,7 +229,7 @@ export function BenchFilters({
                     onMouseDown={() =>
                       handleSkillSelect(suggestion.name, suggestion.display_name)
                     }
-                    className="block w-full px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors first:rounded-t-md last:rounded-b-md"
+                    className="cursor-pointer block w-full px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors first:rounded-t-md last:rounded-b-md"
                   >
                     {suggestion.display_name}
                   </button>
