@@ -5,10 +5,27 @@ import type {
   SkillCatalogEntry,
 } from "@/types/availability"
 
+export async function getLocations(): Promise<
+  { code: string; label: string }[]
+> {
+  const res = await client.get<{ code: string; label: string }[]>(
+    "/availability/locations"
+  )
+  return res.data
+}
+
+export async function getDesignations(): Promise<string[]> {
+  const res = await client.get<string[]>("/availability/designations")
+  return res.data
+}
+
 export async function getBenchPool(params: {
   skill?: string
   location?: string
   classification?: string
+  designation?: string
+  utilisation_min?: number
+  utilisation_max?: number
   search?: string
   page?: number
   page_size?: number
@@ -43,7 +60,7 @@ export async function removeEmployeeSkill(
   employeeId: string,
   skillName: string
 ): Promise<void> {
-  await client.delete(`/availability/skills/${employeeId}/${skillName}`)
+  await client.delete(`/availability/skills/${employeeId}/${encodeURIComponent(skillName)}`)
 }
 
 export async function getSkillCatalog(
@@ -67,8 +84,12 @@ export async function searchSkillCatalog(
 }
 
 export async function exportBenchPool(): Promise<Blob> {
+  // Use previous month since current month data may not exist yet
+  const now = new Date()
+  now.setMonth(now.getMonth() - 1)
+  const period = now.toISOString().slice(0, 7)
   const res = await client.get("/export/bench", {
-    params: { period: new Date().toISOString().slice(0, 7) },
+    params: { period },
     responseType: "blob",
   })
   return res.data

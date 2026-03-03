@@ -7,17 +7,20 @@ import { BenchPoolTable } from "@/components/availability/BenchPoolTable"
 import { getBenchPool, exportBenchPool } from "@/api/availability"
 import type { AvailableEmployee } from "@/types/availability"
 
-const PAGE_SIZE = 20
-
 export function AvailabilityPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [skillFilter, setSkillFilter] = useState("")
   const [classificationFilter, setClassificationFilter] = useState("")
+  const [locationFilter, setLocationFilter] = useState("")
+  const [designationFilter, setDesignationFilter] = useState("")
+  const [utilisationMin, setUtilisationMin] = useState<number | undefined>()
+  const [utilisationMax, setUtilisationMax] = useState<number | undefined>()
   const [employees, setEmployees] = useState<AvailableEmployee[]>([])
   const [total, setTotal] = useState(0)
   const [benchCount, setBenchCount] = useState(0)
   const [partialCount, setPartialCount] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
 
   const fetchData = useCallback(async () => {
@@ -27,8 +30,12 @@ export function AvailabilityPage() {
         search: searchQuery || undefined,
         skill: skillFilter || undefined,
         classification: classificationFilter || undefined,
+        location: locationFilter || undefined,
+        designation: designationFilter || undefined,
+        utilisation_min: utilisationMin,
+        utilisation_max: utilisationMax,
         page,
-        page_size: PAGE_SIZE,
+        page_size: pageSize,
       })
       setEmployees(data.employees)
       setTotal(data.total)
@@ -43,7 +50,17 @@ export function AvailabilityPage() {
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, skillFilter, classificationFilter, page])
+  }, [
+    searchQuery,
+    skillFilter,
+    classificationFilter,
+    locationFilter,
+    designationFilter,
+    utilisationMin,
+    utilisationMax,
+    page,
+    pageSize,
+  ])
 
   useEffect(() => {
     fetchData()
@@ -64,9 +81,43 @@ export function AvailabilityPage() {
     setPage(1)
   }
 
+  const handleLocationFilter = (location: string) => {
+    setLocationFilter(location)
+    setPage(1)
+  }
+
+  const handleDesignationFilter = (designation: string) => {
+    setDesignationFilter(designation)
+    setPage(1)
+  }
+
+  const handleUtilisationRange = (
+    min: number | undefined,
+    max: number | undefined
+  ) => {
+    setUtilisationMin(min)
+    setUtilisationMax(max)
+    setPage(1)
+  }
+
   const handlePageChange = (newPage: number) => {
     setPage(newPage)
   }
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size)
+    setPage(1)
+  }
+
+  const hasActiveFilters = !!(
+    searchQuery ||
+    skillFilter ||
+    classificationFilter ||
+    locationFilter ||
+    designationFilter ||
+    utilisationMin !== undefined ||
+    utilisationMax !== undefined
+  )
 
   const summaryCards = [
     {
@@ -109,16 +160,6 @@ export function AvailabilityPage() {
         />
       </div>
 
-      {/* Filters */}
-      <BenchFilters
-        onSearch={handleSearch}
-        onSkillFilter={handleSkillFilter}
-        onClassificationFilter={handleClassificationFilter}
-        searchQuery={searchQuery}
-        skillFilter={skillFilter}
-        classificationFilter={classificationFilter}
-      />
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {summaryCards.map((card) => (
@@ -140,6 +181,23 @@ export function AvailabilityPage() {
         ))}
       </div>
 
+      {/* Filters */}
+      <BenchFilters
+        onSearch={handleSearch}
+        onSkillFilter={handleSkillFilter}
+        onClassificationFilter={handleClassificationFilter}
+        onLocationFilter={handleLocationFilter}
+        onDesignationFilter={handleDesignationFilter}
+        onUtilisationRange={handleUtilisationRange}
+        searchQuery={searchQuery}
+        skillFilter={skillFilter}
+        classificationFilter={classificationFilter}
+        locationFilter={locationFilter}
+        designationFilter={designationFilter}
+        utilisationMin={utilisationMin}
+        utilisationMax={utilisationMax}
+      />
+
       {/* Table */}
       {loading ? (
         <div className="flex h-64 items-center justify-center">
@@ -150,9 +208,11 @@ export function AvailabilityPage() {
           employees={employees}
           total={total}
           page={page}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
           onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
           onRefresh={fetchData}
+          hasActiveFilters={hasActiveFilters}
         />
       )}
     </div>

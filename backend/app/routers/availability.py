@@ -12,6 +12,9 @@ async def get_bench_pool(
     skill: str = Query(None, description="Filter by skill name"),
     location: str = Query(None, description="Filter by location code"),
     classification: str = Query(None, description="Filter by classification (bench | partially_billed)"),
+    designation: str = Query(None, description="Filter by role/designation"),
+    utilisation_min: float = Query(None, ge=0, le=100, description="Min utilisation %"),
+    utilisation_max: float = Query(None, ge=0, le=100, description="Max utilisation %"),
     search: str = Query(None, description="Search by employee name or designation"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -23,10 +26,29 @@ async def get_bench_pool(
         skill_filter=skill,
         location_filter=location,
         classification_filter=classification,
+        designation_filter=designation,
+        utilisation_min=utilisation_min,
+        utilisation_max=utilisation_max,
         search=search,
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/locations")
+async def get_locations(
+    user: CurrentUser = Depends(get_current_user),
+):
+    """List all locations for filter dropdowns."""
+    return await availability_service.get_locations()
+
+
+@router.get("/designations")
+async def get_designations(
+    user: CurrentUser = Depends(get_current_user),
+):
+    """List distinct designations for bench/available employees."""
+    return await availability_service.get_bench_designations(user.branch_location_id)
 
 
 @router.get("/skills/{employee_id}")
