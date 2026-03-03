@@ -16,8 +16,10 @@ async def list_projects(
     search: Optional[str] = None,
     project_type: Optional[str] = None,
     status: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
 ):
-    """List projects scoped to branch via employee assignments."""
+    """List projects scoped to branch via employee assignments (paginated)."""
     branch_emps = await Employee.find(
         Employee.location_id == branch_location_id,
     ).to_list()
@@ -29,7 +31,7 @@ async def list_projects(
     proj_ids = list({a.project_id for a in assignments})
 
     if not proj_ids:
-        return []
+        return {"projects": [], "total": 0, "active_count": 0, "completed_count": 0, "on_hold_count": 0}
 
     filters = {"_id": {"$in": [ObjectId(pid) for pid in proj_ids if ObjectId.is_valid(pid)]}}
     if status:
@@ -55,6 +57,11 @@ async def list_projects(
         if a.project_id not in member_counts:
             member_counts[a.project_id] = 0
         member_counts[a.project_id] += 1
+
+    # Status counts
+    active_count = sum(1 for p in projects if p.status == "ACTIVE")
+    completed_count = sum(1 for p in projects if p.status == "COMPLETED")
+    on_hold_count = sum(1 for p in projects if p.status == "ON_HOLD")
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     result = []
@@ -82,7 +89,17 @@ async def list_projects(
             "progress_percent": round(progress, 1),
         })
 
-    return result
+    total = len(result)
+    skip = (page - 1) * page_size
+    paginated = result[skip : skip + page_size]
+
+    return {
+        "projects": paginated,
+        "total": total,
+        "active_count": active_count,
+        "completed_count": completed_count,
+        "on_hold_count": on_hold_count,
+    }
 
 
 async def create_project(
@@ -183,15 +200,35 @@ async def get_project_detail(project_id: str):
         EmployeeProject.project_id == project_id
     ).to_list()
 
+    # Batch-fetch employees and lookups for members
+    emp_ids = [a.employee_id for a in assignments]
+    emps = await Employee.find(
+        {"_id": {"$in": [ObjectId(eid) for eid in emp_ids if ObjectId.is_valid(eid)]}}
+    ).to_list() if emp_ids else []
+    emp_map = {str(e.id): e for e in emps}
+
+    all_dept_ids = list({e.department_id for e in emps if e.department_id})
+    all_loc_ids = list({e.location_id for e in emps if e.location_id})
+    member_depts = await Department.find(
+        {"_id": {"$in": [ObjectId(d) for d in all_dept_ids if ObjectId.is_valid(d)]}}
+    ).to_list() if all_dept_ids else []
+    member_locs = await Location.find(
+        {"_id": {"$in": [ObjectId(l) for l in all_loc_ids if ObjectId.is_valid(l)]}}
+    ).to_list() if all_loc_ids else []
+    mdept_map = {str(d.id): d.name for d in member_depts}
+    mloc_map = {str(l.id): l for l in member_locs}
+
     members = []
     for a in assignments:
-        emp = await Employee.get(a.employee_id)
+        emp = emp_map.get(a.employee_id)
         if emp:
-            loc = await Location.get(emp.location_id)
+            loc = mloc_map.get(emp.location_id)
             members.append({
                 "employee_id": str(emp.id),
                 "employee_name": emp.name,
                 "designation": emp.designation,
+                "department": mdept_map.get(emp.department_id, "Unknown"),
+                "location": f"{loc.city}, {loc.country}" if loc else "Unknown",
                 "location_code": loc.code if loc else "UNK",
                 "role_in_project": a.role_in_project,
                 "assigned_at": a.assigned_at.isoformat() if a.assigned_at else None,

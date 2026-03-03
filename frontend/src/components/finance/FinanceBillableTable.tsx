@@ -61,7 +61,6 @@ export function FinanceBillableTable({
                   <th className="px-3 py-2 text-right">Billed Amount</th>
                   <th className="px-3 py-2 text-left">Project</th>
                   <th className="px-3 py-2 text-left">Client</th>
-                  <th className="px-3 py-2 text-center">Version</th>
                 </tr>
               </thead>
               <tbody>
@@ -84,11 +83,6 @@ export function FinanceBillableTable({
                     </td>
                     <td className="px-3 py-2">{entry.project_name || "\u2014"}</td>
                     <td className="px-3 py-2">{entry.client_name || "\u2014"}</td>
-                    <td className="px-3 py-2 text-center">
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
-                        v{entry.version}
-                      </span>
-                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,9 +1,44 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.middleware.auth_middleware import CurrentUser, get_current_user
-from app.services.employee_service import get_employee_detail, search_employees
+from app.services.employee_service import (
+    get_employee_departments,
+    get_employee_detail,
+    list_employees,
+    search_employees,
+)
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
+
+
+@router.get("/")
+async def get_employees(
+    search: Optional[str] = Query(None),
+    department_id: Optional[str] = Query(None),
+    level: Optional[str] = Query(None),
+    is_active: Optional[bool] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user: CurrentUser = Depends(get_current_user),
+):
+    return await list_employees(
+        branch_location_id=user.branch_location_id,
+        search=search,
+        department_id=department_id,
+        level=level,
+        is_active=is_active,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/departments")
+async def get_departments(
+    user: CurrentUser = Depends(get_current_user),
+):
+    return await get_employee_departments(user.branch_location_id)
 
 
 @router.get("/search")

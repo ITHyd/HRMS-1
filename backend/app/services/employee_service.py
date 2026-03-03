@@ -225,3 +225,106 @@ async def search_employees(query: str, location_id: str = None, department_id: s
 
     total = len(results)
     return {"employees": results, "total": total}
+
+
+CORPORATE_LEVELS = {"c-suite", "vp"}
+
+
+async def list_employees(
+    branch_location_id: str,
+    search: str | None = None,
+    department_id: str | None = None,
+    level: str | None = None,
+    is_active: bool | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    """Paginated employee list for the Employee Master page, scoped to branch."""
+    from bson import ObjectId
+
+    filters: dict = {
+        "location_id": branch_location_id,
+        "level": {"$nin": list(CORPORATE_LEVELS)},
+    }
+    if department_id:
+        filters["department_id"] = department_id
+    if level:
+        filters["level"] = level
+    if is_active is not None:
+        filters["is_active"] = is_active
+
+    if search:
+        employees = await Employee.find(
+            {"$and": [
+                filters,
+                {"$or": [
+                    {"name": {"$regex": search, "$options": "i"}},
+                    {"email": {"$regex": search, "$options": "i"}},
+                    {"designation": {"$regex": search, "$options": "i"}},
+                ]},
+            ]}
+        ).to_list()
+    else:
+        employees = await Employee.find(filters).to_list()
+
+    # Lookup maps
+    dept_ids = list({e.department_id for e in employees if e.department_id})
+    departments = await Department.find(
+        {"_id": {"$in": [ObjectId(d) for d in dept_ids if ObjectId.is_valid(d)]}}
+    ).to_list() if dept_ids else []
+    dept_map = {str(d.id): d.name for d in departments}
+
+    locations = await Location.find_all().to_list()
+    loc_map = {str(l.id): l for l in locations}
+
+    results = []
+    active_count = 0
+    inactive_count = 0
+    for emp in employees:
+        loc = loc_map.get(emp.location_id)
+        if emp.is_active:
+            active_count += 1
+        else:
+            inactive_count += 1
+        results.append({
+            "id": str(emp.id),
+            "name": emp.name,
+            "email": emp.email,
+            "designation": emp.designation,
+            "department": dept_map.get(emp.department_id, "Unknown"),
+            "level": emp.level,
+            "location": f"{loc.city}, {loc.country}" if loc else "Unknown",
+            "join_date": emp.join_date.isoformat() if emp.join_date else None,
+            "is_active": emp.is_active,
+        })
+
+    total = len(results)
+    skip = (page - 1) * page_size
+    paginated = results[skip : skip + page_size]
+
+    return {
+        "employees": paginated,
+        "total": total,
+        "active_count": active_count,
+        "inactive_count": inactive_count,
+    }
+
+
+async def get_employee_departments(branch_location_id: str) -> list[dict]:
+    """Return departments that have employees in this branch."""
+    from bson import ObjectId
+
+    employees = await Employee.find(
+        Employee.location_id == branch_location_id,
+        {"level": {"$nin": list(CORPORATE_LEVELS)}},
+    ).to_list()
+
+    dept_ids = list({e.department_id for e in employees if e.department_id})
+    if not dept_ids:
+        return []
+
+    departments = await Department.find(
+        {"_id": {"$in": [ObjectId(d) for d in dept_ids if ObjectId.is_valid(d)]}}
+    ).sort(Department.name).to_list()
+
+    return [{"id": str(d.id), "name": d.name} for d in departments]

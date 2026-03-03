@@ -7,7 +7,7 @@ from app.config import settings
 from app.database import init_db
 from app.routers import (
     analytics, audit, auth, availability, dashboard, employees, export_data,
-    finance, hrms_sync, import_data, integration, org, projects, timesheets, utilisation,
+    finance, hrms_sync, import_data, integration, org, projects, search, timesheets, utilisation,
 )
 
 
@@ -47,6 +47,7 @@ app.include_router(dashboard.router)
 app.include_router(availability.router)
 app.include_router(integration.router)
 app.include_router(projects.router)
+app.include_router(search.router)
 
 
 @app.get("/health")

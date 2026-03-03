@@ -3,11 +3,20 @@ export interface ProjectBrief {
   name: string
   status: string
   project_type: string
-  department: string
+  department_name: string
+  description?: string
   member_count: number
-  start_date: string
-  end_date?: string
+  start_date: string | null
+  end_date: string | null
   progress_percent: number
+}
+
+export interface ProjectListResponse {
+  projects: ProjectBrief[]
+  total: number
+  active_count: number
+  completed_count: number
+  on_hold_count: number
 }
 
 export interface ProjectDetail {
@@ -16,15 +25,20 @@ export interface ProjectDetail {
   status: string
   project_type: string
   description?: string
-  department: string
-  start_date: string
-  end_date?: string
+  department_name: string
+  start_date: string | null
+  end_date: string | null
   progress_percent: number
+  member_count: number
   members: Array<{
     employee_id: string
     employee_name: string
     designation: string
+    department: string
+    location: string
+    location_code: string
     role_in_project: string
+    assigned_at: string | null
   }>
 }
 

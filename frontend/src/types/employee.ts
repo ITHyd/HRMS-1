@@ -55,6 +55,18 @@ export interface TimesheetSummary {
   entry_count: number
 }
 
+export interface EmployeeMasterEntry {
+  id: string
+  name: string
+  email: string
+  designation: string
+  department: string
+  level: string
+  location: string
+  join_date: string | null
+  is_active: boolean
+}
+
 export interface EmployeeDetail {
   id: string
   name: string

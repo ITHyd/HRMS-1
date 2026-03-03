@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, UserMinus, UserCheck } from "lucide-react"
+import { Users, UserMinus, UserCheck, SlidersHorizontal } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { ExportButton } from "@/components/shared/ExportButton"
 import { BenchFilters } from "@/components/availability/BenchFilters"
 import { BenchPoolTable } from "@/components/availability/BenchPoolTable"
@@ -22,6 +23,7 @@ export function AvailabilityPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
+  const [showFilters, setShowFilters] = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -119,6 +121,15 @@ export function AvailabilityPage() {
     utilisationMax !== undefined
   )
 
+  const activeFilterCount = [
+    searchQuery,
+    skillFilter,
+    classificationFilter,
+    locationFilter,
+    designationFilter,
+    utilisationMin !== undefined || utilisationMax !== undefined ? "range" : "",
+  ].filter(Boolean).length
+
   const summaryCards = [
     {
       title: "Total Available",
@@ -153,11 +164,27 @@ export function AvailabilityPage() {
             View and manage available employees, skills, and bench status
           </p>
         </div>
-        <ExportButton
-          onExport={exportBenchPool}
-          filename="bench-pool.csv"
-          label="Export Bench CSV"
-        />
+        <div className="flex items-center gap-2">
+          <Button
+            variant={showFilters ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowFilters((v) => !v)}
+            className="h-8 text-xs relative"
+          >
+            <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+          <ExportButton
+            onExport={exportBenchPool}
+            filename="bench-pool.csv"
+            label="Export Bench CSV"
+          />
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -181,22 +208,24 @@ export function AvailabilityPage() {
         ))}
       </div>
 
-      {/* Filters */}
-      <BenchFilters
-        onSearch={handleSearch}
-        onSkillFilter={handleSkillFilter}
-        onClassificationFilter={handleClassificationFilter}
-        onLocationFilter={handleLocationFilter}
-        onDesignationFilter={handleDesignationFilter}
-        onUtilisationRange={handleUtilisationRange}
-        searchQuery={searchQuery}
-        skillFilter={skillFilter}
-        classificationFilter={classificationFilter}
-        locationFilter={locationFilter}
-        designationFilter={designationFilter}
-        utilisationMin={utilisationMin}
-        utilisationMax={utilisationMax}
-      />
+      {/* Collapsible Filters */}
+      {showFilters && (
+        <BenchFilters
+          onSearch={handleSearch}
+          onSkillFilter={handleSkillFilter}
+          onClassificationFilter={handleClassificationFilter}
+          onLocationFilter={handleLocationFilter}
+          onDesignationFilter={handleDesignationFilter}
+          onUtilisationRange={handleUtilisationRange}
+          searchQuery={searchQuery}
+          skillFilter={skillFilter}
+          classificationFilter={classificationFilter}
+          locationFilter={locationFilter}
+          designationFilter={designationFilter}
+          utilisationMin={utilisationMin}
+          utilisationMax={utilisationMax}
+        />
+      )}
 
       {/* Table */}
       {loading ? (

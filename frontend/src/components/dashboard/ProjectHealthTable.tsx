@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +15,7 @@ interface ProjectHealthTableProps {
 export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
+  const navigate = useNavigate()
 
   const toggleRow = (projectId: string) => {
     setExpandedRows((prev) => {
@@ -35,7 +37,7 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Project Health Overview</CardTitle>
+        <CardTitle className="text-base">Project Overview</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -50,14 +52,13 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                 <th className="pb-2 pr-4 font-medium">Deadline</th>
                 <th className="pb-2 pr-4 font-medium text-right">Members</th>
                 <th className="pb-2 pr-4 font-medium text-right">Hours</th>
-                <th className="pb-2 pr-4 font-medium text-right">Billable %</th>
-                <th className="pb-2 font-medium">Health</th>
+                <th className="pb-2 font-medium text-right">Billable %</th>
               </tr>
             </thead>
             <tbody>
               {projects.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-8 text-center text-muted-foreground">
                     No projects found
                   </td>
                 </tr>
@@ -69,10 +70,12 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                     <>
                       <tr
                         key={project.project_id}
-                        className="border-b hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => toggleRow(project.project_id)}
+                        className="border-b hover:bg-muted/50 transition-colors"
                       >
-                        <td className="py-2.5 pr-2">
+                        <td
+                          className="py-2.5 pr-2 cursor-pointer"
+                          onClick={() => project.members.length > 0 && toggleRow(project.project_id)}
+                        >
                           {project.members.length > 0 && (
                             isExpanded ? (
                               <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -81,8 +84,13 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                             )
                           )}
                         </td>
-                        <td className="py-2.5 pr-4 font-medium">
-                          {project.project_name}
+                        <td className="py-2.5 pr-4">
+                          <button
+                            onClick={() => navigate(`/projects/${project.project_id}`)}
+                            className="font-medium text-primary hover:underline text-left"
+                          >
+                            {project.project_name}
+                          </button>
                         </td>
                         <td className="py-2.5 pr-4">
                           <Badge
@@ -119,7 +127,7 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                         <td className="py-2.5 pr-4 text-right tabular-nums">
                           {project.total_hours_consumed.toFixed(1)}
                         </td>
-                        <td className="py-2.5 pr-4 text-right tabular-nums">
+                        <td className="py-2.5 text-right tabular-nums">
                           <span
                             className={
                               project.billable_percent >= 80
@@ -132,13 +140,10 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                             {project.billable_percent.toFixed(1)}%
                           </span>
                         </td>
-                        <td className="py-2.5">
-                          <StatusBadge status={project.health} />
-                        </td>
                       </tr>
                       {isExpanded && project.members.length > 0 && (
                         <tr key={`${project.project_id}-members`}>
-                          <td colSpan={10} className="p-0">
+                          <td colSpan={9} className="p-0">
                             <div className="bg-muted/30 border-b px-8 py-3">
                               <p className="text-xs font-medium text-muted-foreground mb-2">
                                 Team Members

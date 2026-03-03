@@ -42,7 +42,7 @@ export function AssignProjectModal({
     setLoading(true)
     try {
       const data = await listProjects({ search: q, status: "ACTIVE" })
-      setProjects(data)
+      setProjects(data.projects)
     } catch {
       console.error("Failed to load projects")
     }
@@ -189,7 +189,7 @@ export function AssignProjectModal({
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{proj.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {proj.department} · {proj.member_count} members
+                          {proj.department_name} · {proj.member_count} members
                         </p>
                       </div>
                       <Badge

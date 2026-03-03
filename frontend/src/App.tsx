@@ -10,6 +10,10 @@ import { FinancePage } from "@/pages/FinancePage"
 import { DashboardPage } from "@/pages/DashboardPage"
 import { AvailabilityPage } from "@/pages/AvailabilityPage"
 import { IntegrationPage } from "@/pages/IntegrationPage"
+import { EmployeeMasterPage } from "@/pages/EmployeeMasterPage"
+import { ProjectListPage } from "@/pages/ProjectListPage"
+import { ProjectDetailPage } from "@/pages/ProjectDetailPage"
+import { SearchResultsPage } from "@/pages/SearchResultsPage"
 import { useAuthStore } from "@/store/authStore"
 
 function App() {
@@ -24,6 +28,10 @@ function App() {
           <Route path="/timesheets" element={<TimesheetPage />} />
           <Route path="/finance" element={<FinancePage />} />
           <Route path="/availability" element={<AvailabilityPage />} />
+          <Route path="/employees" element={<EmployeeMasterPage />} />
+          <Route path="/projects" element={<ProjectListPage />} />
+          <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+          <Route path="/search" element={<SearchResultsPage />} />
           <Route path="/integrations" element={<IntegrationPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/audit" element={<AuditPage />} />

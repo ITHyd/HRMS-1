@@ -10,6 +10,8 @@ import {
   DollarSign,
   LayoutDashboard,
   Users,
+  Users2,
+  FolderKanban,
   Link2,
 } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
@@ -22,6 +24,8 @@ const navItems = [
   { to: "/timesheets", icon: Clock, label: "Timesheets" },
   { to: "/finance", icon: DollarSign, label: "Finance" },
   { to: "/availability", icon: Users, label: "Bench Pool" },
+  { to: "/employees", icon: Users2, label: "Employees" },
+  { to: "/projects", icon: FolderKanban, label: "Projects" },
   { to: "/integrations", icon: Link2, label: "Integrations" },
   { to: "/import", icon: Upload, label: "Import" },
   { to: "/audit", icon: ClipboardList, label: "Audit Log" },
