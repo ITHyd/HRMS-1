@@ -7,12 +7,13 @@ import {
   Building2,
   ArrowRight,
   Loader2,
+  Network,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { globalSearch } from "@/api/search"
 import { useOrgChartStore } from "@/store/orgChartStore"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { LOCATION_COLORS } from "@/lib/constants"
 import type { GlobalSearchResponse } from "@/types/search"
 
@@ -25,7 +26,9 @@ export function SearchBar() {
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
+  const location = useLocation()
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
+  const focusEmployee = useOrgChartStore((s) => s.focusEmployee)
 
   // Debounced global search
   useEffect(() => {
@@ -87,6 +90,16 @@ export function SearchBar() {
   const handleEmployeeClick = (id: string) => {
     close()
     selectEmployee(id)
+  }
+
+  const handleViewInOrgChart = (id: string) => {
+    close()
+    // Set focus target in the store — OrgChartCanvas will handle
+    // ancestor expansion and centering once tree data is ready
+    focusEmployee(id)
+    if (location.pathname !== "/org-chart") {
+      navigate("/org-chart")
+    }
   }
 
   const handleProjectClick = (id: string) => {
@@ -151,25 +164,36 @@ export function SearchBar() {
                 <span className="ml-auto text-[10px] font-normal">{results!.employees.total} total</span>
               </div>
               {results!.employees.items.map((emp) => (
-                <button
+                <div
                   key={emp.id}
-                  onClick={() => handleEmployeeClick(emp.id)}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                  className="flex items-center hover:bg-accent transition-colors"
                 >
-                  <div
-                    className="h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                    style={{ backgroundColor: LOCATION_COLORS[emp.location_code] || "#6b7280" }}
+                  <button
+                    onClick={() => handleEmployeeClick(emp.id)}
+                    className="flex flex-1 items-center gap-3 px-3 py-2 text-left text-sm min-w-0"
                   >
-                    {emp.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate text-sm">{emp.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {emp.designation} · {emp.department}
-                    </p>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground shrink-0">{emp.location_code}</span>
-                </button>
+                    <div
+                      className="h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                      style={{ backgroundColor: LOCATION_COLORS[emp.location_code] || "#6b7280" }}
+                    >
+                      {emp.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate text-sm">{emp.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {emp.designation} · {emp.department}
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0">{emp.location_code}</span>
+                  </button>
+                  <button
+                    onClick={() => handleViewInOrgChart(emp.id)}
+                    className="shrink-0 rounded p-1.5 mr-2 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                    title="View in Org Chart"
+                  >
+                    <Network className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))}
             </div>
           )}

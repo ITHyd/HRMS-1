@@ -8,8 +8,8 @@ import { login } from "@/api/auth"
 import { Building2 } from "lucide-react"
 
 export function LoginPage() {
-  const [email, setEmail] = useState("vikram.patel@company.com")
-  const [password, setPassword] = useState("demo123")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const setAuth = useAuthStore((s) => s.setAuth)
