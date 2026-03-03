@@ -30,7 +30,7 @@ export function FinanceBillableTable({
             <select
               value={currentVersion}
               onChange={(e) => onVersionChange(Number(e.target.value))}
-              className="rounded-md border bg-background px-2 py-1 text-xs"
+              className="cursor-pointer rounded-md border bg-background px-2 py-1 text-xs"
             >
               {versions.map((v) => (
                 <option key={v} value={v}>

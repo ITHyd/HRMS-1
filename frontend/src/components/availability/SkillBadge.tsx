@@ -30,7 +30,7 @@ export function SkillBadge({ name, proficiency, onRemove }: SkillBadgeProps) {
         <button
           type="button"
           onClick={onRemove}
-          className="ml-0.5 rounded-full p-0.5 hover:bg-black/10 transition-colors"
+          className="cursor-pointer ml-0.5 rounded-full p-0.5 hover:bg-black/10 transition-colors"
           aria-label={`Remove ${name}`}
         >
           <X className="h-2.5 w-2.5" />

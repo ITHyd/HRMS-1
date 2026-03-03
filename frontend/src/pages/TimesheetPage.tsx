@@ -217,7 +217,7 @@ export function TimesheetPage() {
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            className={`cursor-pointer flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
               activeTab === key
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"

@@ -106,7 +106,7 @@ export function AssignProjectModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="text-base font-semibold">Assign to Project</h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-muted">
+          <button onClick={onClose} className="cursor-pointer p-1 rounded hover:bg-muted">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -134,7 +134,7 @@ export function AssignProjectModal({
         <div className="flex border-b px-4">
           <button
             onClick={() => setTab("existing")}
-            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`cursor-pointer px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === "existing"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -145,7 +145,7 @@ export function AssignProjectModal({
           </button>
           <button
             onClick={() => setTab("new")}
-            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`cursor-pointer px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === "new"
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -179,7 +179,7 @@ export function AssignProjectModal({
                     <button
                       key={proj.id}
                       onClick={() => setSelectedProjectId(proj.id)}
-                      className={`flex w-full items-center gap-3 rounded-lg border p-2.5 text-left text-sm transition-colors ${
+                      className={`cursor-pointer flex w-full items-center gap-3 rounded-lg border p-2.5 text-left text-sm transition-colors ${
                         selectedProjectId === proj.id
                           ? "border-primary bg-primary/5 ring-1 ring-primary"
                           : "hover:bg-muted/50"
@@ -221,7 +221,7 @@ export function AssignProjectModal({
                     <button
                       key={t}
                       onClick={() => setNewType(t)}
-                      className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      className={`cursor-pointer rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                         newType === t
                           ? t === "client"
                             ? "border-blue-400 bg-blue-50 text-blue-700"
@@ -274,7 +274,7 @@ export function AssignProjectModal({
                 <button
                   key={r}
                   onClick={() => setRole(r)}
-                  className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`cursor-pointer rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                     role === r
                       ? "border-primary bg-primary/10 text-primary"
                       : "hover:bg-muted"

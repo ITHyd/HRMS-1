@@ -109,7 +109,7 @@ export function BenchPoolTable({
                       type="checkbox"
                       checked={employees.length > 0 && selectedIds.size === employees.length}
                       onChange={toggleAll}
-                      className="rounded border-gray-300"
+                      className="cursor-pointer rounded border-gray-300"
                     />
                   </th>
                   <th className="pb-2 px-3 font-medium border-l border-border">Name</th>
@@ -143,13 +143,13 @@ export function BenchPoolTable({
                           type="checkbox"
                           checked={selectedIds.has(emp.employee_id)}
                           onChange={() => toggleSelect(emp.employee_id)}
-                          className="rounded border-gray-300"
+                          className="cursor-pointer rounded border-gray-300"
                         />
                       </td>
                       <td className="py-2.5 px-3 border-l border-border">
                         <button
                           onClick={() => selectEmployee(emp.employee_id)}
-                          className="font-medium text-primary hover:underline text-left"
+                          className="cursor-pointer font-medium text-primary hover:underline text-left"
                         >
                           {emp.employee_name}
                         </button>
@@ -253,7 +253,7 @@ export function BenchPoolTable({
                 <button
                   onClick={() => onPageChange(1)}
                   disabled={page <= 1}
-                  className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="cursor-pointer rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="First page"
                 >
                   <ChevronsLeft className="h-3.5 w-3.5" />
@@ -261,7 +261,7 @@ export function BenchPoolTable({
                 <button
                   onClick={() => onPageChange(page - 1)}
                   disabled={page <= 1}
-                  className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="cursor-pointer rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Previous page"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
@@ -279,7 +279,7 @@ export function BenchPoolTable({
                     <button
                       key={item}
                       onClick={() => onPageChange(item)}
-                      className={`rounded-md min-w-7 px-1.5 py-1 text-xs font-medium transition-colors ${
+                      className={`cursor-pointer rounded-md min-w-7 px-1.5 py-1 text-xs font-medium transition-colors ${
                         item === page
                           ? "bg-primary text-primary-foreground"
                           : "border hover:bg-accent"
@@ -293,7 +293,7 @@ export function BenchPoolTable({
                 <button
                   onClick={() => onPageChange(page + 1)}
                   disabled={page >= totalPages}
-                  className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="cursor-pointer rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Next page"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
@@ -301,7 +301,7 @@ export function BenchPoolTable({
                 <button
                   onClick={() => onPageChange(totalPages)}
                   disabled={page >= totalPages}
-                  className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="cursor-pointer rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Last page"
                 >
                   <ChevronsRight className="h-3.5 w-3.5" />
@@ -314,7 +314,7 @@ export function BenchPoolTable({
                 <select
                   value={pageSize}
                   onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                  className="h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="cursor-pointer h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   {PAGE_SIZE_OPTIONS.map((size) => (
                     <option key={size} value={size}>

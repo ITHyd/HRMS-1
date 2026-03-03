@@ -58,7 +58,7 @@ export function ResourceTable({
                   <button
                     key={opt.value}
                     onClick={() => onClassificationChange(opt.value)}
-                    className={`px-2.5 py-1 text-xs font-medium transition-colors border-r last:border-r-0 ${
+                    className={`cursor-pointer px-2.5 py-1 text-xs font-medium transition-colors border-r last:border-r-0 ${
                       classification === opt.value
                         ? "bg-primary text-primary-foreground"
                         : "hover:bg-muted text-muted-foreground"
@@ -113,7 +113,7 @@ export function ResourceTable({
                     <td className="py-2.5 pr-4">
                       <button
                         onClick={() => selectEmployee(entry.employee_id)}
-                        className="font-medium text-primary hover:underline text-left"
+                        className="cursor-pointer font-medium text-primary hover:underline text-left"
                       >
                         {entry.employee_name}
                       </button>
@@ -173,7 +173,7 @@ export function ResourceTable({
               <button
                 onClick={() => onPageChange(page - 1)}
                 disabled={page <= 1}
-                className="rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="cursor-pointer rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
@@ -192,7 +192,7 @@ export function ResourceTable({
                   <button
                     key={pageNum}
                     onClick={() => onPageChange(pageNum)}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                       pageNum === page
                         ? "bg-primary text-primary-foreground"
                         : "border hover:bg-accent"
@@ -205,7 +205,7 @@ export function ResourceTable({
               <button
                 onClick={() => onPageChange(page + 1)}
                 disabled={page >= totalPages}
-                className="rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="cursor-pointer rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>

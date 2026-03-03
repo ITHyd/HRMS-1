@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, useRef } from "react"
+import { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import {
   ReactFlow,
   MiniMap,
@@ -15,8 +15,9 @@ import { useOrgChartStore } from "@/store/orgChartStore"
 import { useAuthStore } from "@/store/authStore"
 import { getFullOrgTree } from "@/api/org"
 import { tracePath } from "@/api/org"
-import { transformOrgTree, collectOwnBranchIds } from "@/lib/orgTreeTransform"
+import { transformOrgTree, collectIdsUpToDepth } from "@/lib/orgTreeTransform"
 import { LOCATION_COLORS } from "@/lib/constants"
+import { Maximize, Minimize } from "lucide-react"
 
 const nodeTypes: NodeTypes = {
   employeeNode: EmployeeNode,
@@ -40,6 +41,27 @@ export function OrgChartCanvas() {
   const traceMode = useOrgChartStore((s) => s.traceMode)
   const clearTrace = useOrgChartStore((s) => s.clearTrace)
   const initialized = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen()
+    } else {
+      document.exitFullscreen()
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+      // Re-fit the view after viewport size changes
+      setTimeout(() => fitView({ padding: 0.05, duration: 300 }), 200)
+    }
+    document.addEventListener("fullscreenchange", handleChange)
+    return () => document.removeEventListener("fullscreenchange", handleChange)
+  }, [fitView])
 
   // Fetch org tree on mount
   useEffect(() => {
@@ -50,10 +72,10 @@ export function OrgChartCanvas() {
         const data = await getFullOrgTree()
         setTreeData(data)
 
-        // Auto-expand own branch nodes
+        // Auto-expand only first 3 levels
         if (!initialized.current) {
-          const branchIds = collectOwnBranchIds(data.nodes)
-          expandBranch(branchIds)
+          const initialIds = collectIdsUpToDepth(data.nodes, 2)
+          expandBranch(initialIds)
           initialized.current = true
         }
       } catch (err) {
@@ -92,7 +114,7 @@ export function OrgChartCanvas() {
   // Auto-fit on data change
   useEffect(() => {
     if (nodes.length > 0) {
-      setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 100)
+      setTimeout(() => fitView({ padding: 0.05, duration: 300 }), 100)
     }
   }, [nodes.length])
 
@@ -107,7 +129,7 @@ export function OrgChartCanvas() {
         setCenter(
           branchNode.position.x + 120,
           branchNode.position.y + 42,
-          { zoom: 1.2, duration: 500 }
+          { zoom: 1.0, duration: 500 }
         )
       }
     }
@@ -124,17 +146,24 @@ export function OrgChartCanvas() {
   }
 
   return (
-    <div className="h-full w-full">
+    <div ref={containerRef} className="h-full w-full bg-white">
+      <button
+        onClick={toggleFullscreen}
+        className="cursor-pointer absolute top-4 right-4 z-20 bg-white border rounded-lg p-2 shadow hover:bg-gray-50 transition-colors"
+        title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+      >
+        {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+      </button>
       {traceMode.active && traceMode.fromId && !traceMode.toId && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm text-blue-700 shadow">
           Click on another employee to trace the reporting path
         </div>
       )}
       {highlightedPath.length > 0 && (
-        <div className="absolute top-4 right-4 z-20">
+        <div className="absolute top-4 right-16 z-20">
           <button
             onClick={() => setHighlightedPath([])}
-            className="bg-white border rounded-lg px-3 py-1.5 text-sm shadow hover:bg-gray-50"
+            className="cursor-pointer bg-white border rounded-lg px-3 py-1.5 text-sm shadow hover:bg-gray-50"
           >
             Clear highlight
           </button>

@@ -34,7 +34,7 @@ export function TimesheetTable({
                 type="checkbox"
                 checked={allSelected}
                 onChange={onSelectAll}
-                className="h-4 w-4 rounded border-gray-300"
+                className="cursor-pointer h-4 w-4 rounded border-gray-300"
               />
             </th>
             <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">Date</th>
@@ -63,7 +63,7 @@ export function TimesheetTable({
                     checked={isSelected}
                     onChange={() => onSelect(entry.id)}
                     onClick={(e) => e.stopPropagation()}
-                    className="h-4 w-4 rounded border-gray-300"
+                    className="cursor-pointer h-4 w-4 rounded border-gray-300"
                   />
                 </td>
                 <td className="px-3 py-2.5 whitespace-nowrap">

@@ -175,7 +175,7 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                                               e.stopPropagation()
                                               selectEmployee(member.employee_id)
                                             }}
-                                            className="text-primary hover:underline font-medium"
+                                            className="cursor-pointer text-primary hover:underline font-medium"
                                           >
                                             {member.employee_name}
                                           </button>

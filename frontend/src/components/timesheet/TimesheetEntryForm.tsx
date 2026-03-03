@@ -52,7 +52,7 @@ export function TimesheetEntryForm({
   }
 
   const inputClass =
-    "w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    "w-full cursor-pointer rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -140,7 +140,7 @@ export function TimesheetEntryForm({
           type="checkbox"
           checked={billable}
           onChange={(e) => setBillable(e.target.checked)}
-          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+          className="cursor-pointer h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
         />
         <label className="text-sm font-medium leading-none" htmlFor="ts-billable">
           Billable
