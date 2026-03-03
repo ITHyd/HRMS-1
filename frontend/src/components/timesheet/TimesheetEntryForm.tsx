@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { Button } from "@/components/ui/button"
+import { Select } from "@/components/ui/select"
 import { useAuthStore } from "@/store/authStore"
 import type { TimesheetEntryCreate } from "@/types/timesheet"
 
@@ -59,44 +60,36 @@ export function TimesheetEntryForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* Employee Select */}
         <div className="space-y-1.5">
-          <label className="text-sm font-medium leading-none" htmlFor="ts-employee">
+          <label className="text-sm font-medium leading-none">
             Employee
           </label>
-          <select
-            id="ts-employee"
+          <Select
+            options={[
+              { value: "", label: "Select employee..." },
+              ...employees.map((emp) => ({ value: emp.id, label: emp.name })),
+            ]}
             value={employeeId}
             onChange={(e) => setEmployeeId(e.target.value)}
-            className={inputClass}
-            required
-          >
-            <option value="">Select employee...</option>
-            {employees.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.name}
-              </option>
-            ))}
-          </select>
+            searchable
+            maxRows={8}
+          />
         </div>
 
         {/* Project Select */}
         <div className="space-y-1.5">
-          <label className="text-sm font-medium leading-none" htmlFor="ts-project">
+          <label className="text-sm font-medium leading-none">
             Project
           </label>
-          <select
-            id="ts-project"
+          <Select
+            options={[
+              { value: "", label: "Select project..." },
+              ...projects.map((proj) => ({ value: proj.id, label: proj.name })),
+            ]}
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
-            className={inputClass}
-            required
-          >
-            <option value="">Select project...</option>
-            {projects.map((proj) => (
-              <option key={proj.id} value={proj.id}>
-                {proj.name}
-              </option>
-            ))}
-          </select>
+            searchable
+            maxRows={8}
+          />
         </div>
 
         {/* Date Input */}

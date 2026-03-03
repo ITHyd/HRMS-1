@@ -16,7 +16,31 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react"
+import { Select } from "@/components/ui/select"
+import { DEPARTMENT_COLORS } from "@/lib/constants"
 import type { EmployeeMasterEntry } from "@/types/employee"
+
+const LEVEL_OPTIONS = [
+  { value: "", label: "All Levels" },
+  { value: "intern", label: "Intern" },
+  { value: "junior", label: "Junior" },
+  { value: "mid", label: "Mid" },
+  { value: "senior", label: "Senior" },
+  { value: "lead", label: "Lead" },
+  { value: "manager", label: "Manager" },
+  { value: "director", label: "Director" },
+]
+
+const STATUS_OPTIONS = [
+  { value: "", label: "All Status" },
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+]
+
+const STATUS_COLORS: Record<string, string> = {
+  Active: "#22c55e",
+  Inactive: "#ef4444",
+}
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
@@ -174,38 +198,29 @@ export function EmployeeMasterPage() {
                   className="w-full h-8 rounded-md border border-input bg-transparent pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </form>
-              <select
+              <Select
+                options={[
+                  { value: "", label: "All Departments" },
+                  ...departments.map((d) => ({ value: d.id, label: d.name })),
+                ]}
                 value={departmentId}
                 onChange={(e) => { setDepartmentId(e.target.value); setPage(1) }}
-                className="h-8 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">All Departments</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-              <select
+                colorMap={DEPARTMENT_COLORS}
+                className="h-8 text-sm"
+              />
+              <Select
+                options={LEVEL_OPTIONS}
                 value={level}
                 onChange={(e) => { setLevel(e.target.value); setPage(1) }}
-                className="h-8 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">All Levels</option>
-                <option value="junior">Junior</option>
-                <option value="mid">Mid</option>
-                <option value="senior">Senior</option>
-                <option value="lead">Lead</option>
-                <option value="manager">Manager</option>
-                <option value="director">Director</option>
-              </select>
-              <select
+                className="h-8 text-sm"
+              />
+              <Select
+                options={STATUS_OPTIONS}
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-                className="h-8 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+                colorMap={STATUS_COLORS}
+                className="h-8 text-sm"
+              />
             </div>
           </CardContent>
         </Card>
@@ -350,15 +365,13 @@ export function EmployeeMasterPage() {
 
                 <div className="flex items-center gap-2 min-w-[140px] justify-end">
                   <span className="text-xs text-muted-foreground">Rows</span>
-                  <select
-                    value={pageSize}
+                  <Select
+                    options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: String(size) }))}
+                    value={String(pageSize)}
                     onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}
-                    className="h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <option key={size} value={size}>{size}</option>
-                    ))}
-                  </select>
+                    className="h-7 text-xs w-[70px]"
+                    maxRows={4}
+                  />
                 </div>
               </div>
             )}

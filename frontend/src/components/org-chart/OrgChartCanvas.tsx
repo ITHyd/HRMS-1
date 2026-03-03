@@ -22,6 +22,7 @@ import {
   transformOrgTree,
   collectIdsUpToDepth,
   computeFocusedNodeIds,
+  collectAncestorIds,
 } from "@/lib/orgTreeTransform"
 import { LOCATION_COLORS, DEPARTMENT_COLORS } from "@/lib/constants"
 import { EmployeeDrawer } from "@/components/employee-detail/EmployeeDrawer"
@@ -43,6 +44,7 @@ export function OrgChartCanvas() {
   const setTreeData = useOrgChartStore((s) => s.setTreeData)
   const expandedNodeIds = useOrgChartStore((s) => s.expandedNodeIds)
   const expandedDeptGroups = useOrgChartStore((s) => s.expandedDeptGroups)
+  const toggleDeptGroupExpand = useOrgChartStore((s) => s.toggleDeptGroupExpand)
   const expandBranch = useOrgChartStore((s) => s.expandBranch)
   const setLoading = useOrgChartStore((s) => s.setLoading)
   const isLoading = useOrgChartStore((s) => s.isLoading)
@@ -56,6 +58,7 @@ export function OrgChartCanvas() {
   const focusEmployeeId = useOrgChartStore((s) => s.focusEmployeeId)
   const clearFocusEmployee = useOrgChartStore((s) => s.clearFocusEmployee)
   const initialized = useRef(false)
+  const expandAttemptedRef = useRef<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
@@ -85,6 +88,15 @@ export function OrgChartCanvas() {
       try {
         const data = await getFullOrgTree()
         setTreeData(data)
+
+        // If there's a pending focus from search, expand that employee's ancestors
+        const pendingFocus = useOrgChartStore.getState().focusEmployeeId
+        if (pendingFocus) {
+          const ancestors = collectAncestorIds(data.nodes, pendingFocus)
+          if (ancestors && ancestors.length > 0) {
+            expandBranch(ancestors)
+          }
+        }
 
         if (!initialized.current) {
           const initialIds = collectIdsUpToDepth(data.nodes, 2)
@@ -190,18 +202,24 @@ export function OrgChartCanvas() {
     }
   }, [traceMode.active, traceMode.fromId, traceMode.toId, setHighlightedPath, clearTrace])
 
-  // Auto-fit only on initial load
+  // Auto-fit only on initial load (skip if there's a pending search focus)
   const hasFitted = useRef(false)
   useEffect(() => {
-    if (nodes.length > 0 && !hasFitted.current && !focusedEmployeeId) {
+    if (nodes.length > 0 && !hasFitted.current && !focusedEmployeeId && !focusEmployeeId) {
       hasFitted.current = true
       setTimeout(() => fitView({ padding: 0.05, duration: 300 }), 100)
     }
-  }, [nodes.length, fitView, focusedEmployeeId])
+  }, [nodes.length, fitView, focusedEmployeeId, focusEmployeeId])
 
-  // Focus on a specific employee (from drawer navigation)
+  // Focus on a specific employee (from search / drawer navigation)
+  // Flow: expand ancestors → expand dept group if needed → center on node
   useEffect(() => {
-    if (!focusEmployeeId) return
+    if (!focusEmployeeId) {
+      expandAttemptedRef.current = null
+      return
+    }
+
+    // Case 1: Node is directly visible — center on it
     const targetNode = nodes.find((n) => n.id === focusEmployeeId)
     if (targetNode) {
       setTimeout(() => {
@@ -210,10 +228,48 @@ export function OrgChartCanvas() {
           targetNode.position.y + 42,
           { zoom: 1.0, duration: 500 }
         )
-      }, 150)
+      }, 200)
+      clearFocusEmployee()
+      return
+    }
+
+    // Case 2: Node is inside a department group — expand the group so it appears
+    const groupNode = nodes.find(
+      (n) =>
+        n.type === "departmentGroupNode" &&
+        ((n.data as Record<string, unknown>).employeeIds as string[])?.includes(focusEmployeeId)
+    )
+    if (groupNode) {
+      const isGroupExpanded = (groupNode.data as Record<string, unknown>).isExpanded as boolean
+      if (!isGroupExpanded) {
+        // Expand the group — employee node will appear on next render, Case 1 handles centering
+        toggleDeptGroupExpand(groupNode.id)
+        return
+      }
+      // Group already expanded but node not found (edge case) — center on group as fallback
+      setTimeout(() => {
+        setCenter(
+          groupNode.position.x + 140,
+          groupNode.position.y + 36,
+          { zoom: 1.0, duration: 500 }
+        )
+      }, 200)
+      clearFocusEmployee()
+      return
+    }
+
+    // Case 3: Node not visible at all — expand ancestors once, then re-render triggers Case 2 → Case 1
+    if (treeData && expandAttemptedRef.current !== focusEmployeeId) {
+      expandAttemptedRef.current = focusEmployeeId
+      const ancestors = collectAncestorIds(treeData.nodes, focusEmployeeId)
+      if (ancestors && ancestors.length > 0) {
+        expandBranch(ancestors)
+      }
+    } else if (expandAttemptedRef.current === focusEmployeeId) {
+      // Already attempted expansion and node still not found — stop to prevent loop
       clearFocusEmployee()
     }
-  }, [focusEmployeeId, nodes, setCenter, clearFocusEmployee])
+  }, [focusEmployeeId, nodes, treeData, setCenter, clearFocusEmployee, expandBranch, toggleDeptGroupExpand])
 
   // Focus mode: fit view to focused nodes
   useEffect(() => {
