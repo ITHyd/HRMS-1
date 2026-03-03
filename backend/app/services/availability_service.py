@@ -19,6 +19,9 @@ async def get_bench_pool(
     skill_filter: Optional[str] = None,
     location_filter: Optional[str] = None,
     classification_filter: Optional[str] = None,
+    designation_filter: Optional[str] = None,
+    utilisation_min: Optional[float] = None,
+    utilisation_max: Optional[float] = None,
     search: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
@@ -27,12 +30,28 @@ async def get_bench_pool(
     Query UtilisationSnapshot for bench/partially_billed employees.
 
     Joins with Employee (designation, department, location), EmployeeSkill,
-    and EmployeeProject. Optionally filters by skill, location, classification,
-    and search term. Returns a BenchPoolResponse-shaped dict.
+    and EmployeeProject. Filters by skill, location, classification,
+    designation, utilisation range, and search term.
     """
+    # Step 0: Find the latest period for this branch to avoid mixing months
+    latest_snap = await UtilisationSnapshot.find(
+        UtilisationSnapshot.branch_location_id == branch_location_id,
+    ).sort(-UtilisationSnapshot.period).limit(1).to_list()
+
+    if not latest_snap:
+        return {
+            "employees": [],
+            "total": 0,
+            "bench_count": 0,
+            "partial_count": 0,
+        }
+
+    latest_period = latest_snap[0].period
+
     # Step 1: Find snapshots where classification is bench or partially_billed
     snapshot_filters: list = [
         UtilisationSnapshot.branch_location_id == branch_location_id,
+        UtilisationSnapshot.period == latest_period,
     ]
 
     if classification_filter and classification_filter in ("bench", "partially_billed"):
@@ -84,7 +103,7 @@ async def get_bench_pool(
     for skill in all_skills:
         skills_by_emp.setdefault(skill.employee_id, []).append(skill)
 
-    # Step 5: Fetch project assignments for all employees
+    # Step 5: Fetch project assignments and compute available_from dates
     all_assignments = await EmployeeProject.find(
         {"employee_id": {"$in": employee_ids}}
     ).to_list()
@@ -95,6 +114,9 @@ async def get_bench_pool(
     proj_map = {str(p.id): p for p in projects}
 
     assignments_by_emp: dict[str, list] = {}
+    # Track earliest available_from per employee based on project end dates
+    available_from_map: dict[str, Optional[str]] = {}
+
     for a in all_assignments:
         proj = proj_map.get(a.project_id)
         if proj:
@@ -104,6 +126,14 @@ async def get_bench_pool(
                 "status": proj.status,
                 "role": a.role_in_project,
             })
+            # For active projects, track the latest end_date as available_from
+            if proj.status == "ACTIVE" and proj.end_date:
+                end_str = proj.end_date.strftime("%Y-%m-%d")
+                current = available_from_map.get(a.employee_id)
+                if current is None or end_str > current:
+                    available_from_map[a.employee_id] = end_str
+
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # Step 6: Build result list with filters applied
     results = []
@@ -118,6 +148,16 @@ async def get_bench_pool(
 
         # Location filter
         if location_filter and loc_code_map.get(emp.location_id, "") != location_filter:
+            continue
+
+        # Designation filter
+        if designation_filter and emp.designation.lower() != designation_filter.lower():
+            continue
+
+        # Utilisation range filter
+        if utilisation_min is not None and snapshot.utilisation_percent < utilisation_min:
+            continue
+        if utilisation_max is not None and snapshot.utilisation_percent > utilisation_max:
             continue
 
         # Skill filter
@@ -155,6 +195,14 @@ async def get_bench_pool(
             for s in emp_skills
         ]
 
+        # Compute available_from: if bench with no active projects, available now
+        # If partially_billed with active projects, use latest project end_date
+        avail_from = available_from_map.get(eid)
+        if snapshot.classification == "bench" and eid not in assignments_by_emp:
+            avail_from = now_str  # Available immediately
+        elif avail_from is None:
+            avail_from = now_str  # No active project end date known = available now
+
         results.append({
             "employee_id": eid,
             "employee_name": emp.name,
@@ -164,7 +212,7 @@ async def get_bench_pool(
             "skills": skill_responses,
             "utilisation_percent": snapshot.utilisation_percent,
             "classification": snapshot.classification,
-            "available_from": None,
+            "available_from": avail_from,
             "current_projects": assignments_by_emp.get(eid, []),
         })
 
@@ -180,6 +228,42 @@ async def get_bench_pool(
         "bench_count": bench_count,
         "partial_count": partial_count,
     }
+
+
+async def get_locations() -> list[dict]:
+    """Return all locations for filter dropdowns."""
+    locs = await Location.find_all().sort(Location.code).to_list()
+    return [
+        {"code": l.code, "label": f"{l.city}, {l.country}"}
+        for l in locs
+    ]
+
+
+async def get_bench_designations(branch_location_id: str) -> list[str]:
+    """Return distinct designations among bench/partially_billed employees."""
+    latest_snap = await UtilisationSnapshot.find(
+        UtilisationSnapshot.branch_location_id == branch_location_id,
+    ).sort(-UtilisationSnapshot.period).limit(1).to_list()
+
+    if not latest_snap:
+        return []
+
+    snapshots = await UtilisationSnapshot.find(
+        UtilisationSnapshot.branch_location_id == branch_location_id,
+        UtilisationSnapshot.period == latest_snap[0].period,
+        {"classification": {"$in": ["bench", "partially_billed"]}},
+    ).to_list()
+
+    employee_ids = [s.employee_id for s in snapshots]
+    if not employee_ids:
+        return []
+
+    employees = await Employee.find(
+        {"_id": {"$in": [ObjectId(eid) for eid in employee_ids if ObjectId.is_valid(eid)]}}
+    ).to_list()
+
+    designations = sorted({e.designation for e in employees})
+    return designations
 
 
 async def get_employee_skills(employee_id: str) -> list[dict]:
@@ -301,9 +385,12 @@ async def get_skill_catalog(category: Optional[str] = None) -> list[dict]:
 
 
 async def search_skill_catalog(query: str) -> list[dict]:
-    """Search SkillCatalog by name (case-insensitive contains)."""
+    """Search SkillCatalog by name or display_name (case-insensitive contains)."""
     entries = await SkillCatalog.find(
-        {"name": {"$regex": query, "$options": "i"}}
+        {"$or": [
+            {"name": {"$regex": query, "$options": "i"}},
+            {"display_name": {"$regex": query, "$options": "i"}},
+        ]}
     ).sort(SkillCatalog.name).to_list()
 
     return [

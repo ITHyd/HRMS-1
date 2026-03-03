@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Settings2 } from "lucide-react"
+import { Settings2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/shared/StatusBadge"
@@ -7,13 +7,32 @@ import { SkillBadge } from "@/components/availability/SkillBadge"
 import { SkillTagManager } from "@/components/availability/SkillTagManager"
 import type { AvailableEmployee } from "@/types/availability"
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+
+function getPageNumbers(current: number, total: number): (number | "ellipsis")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages: (number | "ellipsis")[] = [1]
+  if (current <= 4) {
+    for (let i = 2; i <= 5; i++) pages.push(i)
+    pages.push("ellipsis", total)
+  } else if (current >= total - 3) {
+    pages.push("ellipsis")
+    for (let i = total - 4; i <= total; i++) pages.push(i)
+  } else {
+    pages.push("ellipsis", current - 1, current, current + 1, "ellipsis", total)
+  }
+  return pages
+}
+
 interface BenchPoolTableProps {
   employees: AvailableEmployee[]
   total: number
   page: number
   pageSize: number
   onPageChange: (page: number) => void
+  onPageSizeChange: (size: number) => void
   onRefresh: () => void
+  hasActiveFilters?: boolean
 }
 
 export function BenchPoolTable({
@@ -22,7 +41,9 @@ export function BenchPoolTable({
   page,
   pageSize,
   onPageChange,
+  onPageSizeChange,
   onRefresh,
+  hasActiveFilters = false,
 }: BenchPoolTableProps) {
   const [managingEmployee, setManagingEmployee] = useState<AvailableEmployee | null>(null)
   const totalPages = Math.ceil(total / pageSize)
@@ -42,21 +63,24 @@ export function BenchPoolTable({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-2 pr-4 font-medium">Name</th>
-                  <th className="pb-2 pr-4 font-medium">Designation</th>
-                  <th className="pb-2 pr-4 font-medium">Department</th>
-                  <th className="pb-2 pr-4 font-medium">Skills</th>
-                  <th className="pb-2 pr-4 font-medium text-right">Utilisation %</th>
-                  <th className="pb-2 pr-4 font-medium">Classification</th>
-                  <th className="pb-2 pr-4 font-medium">Projects</th>
-                  <th className="pb-2 font-medium">Actions</th>
+                  <th className="pb-2 px-3 font-medium">Name</th>
+                  <th className="pb-2 px-3 font-medium border-l border-border">Designation</th>
+                  <th className="pb-2 px-3 font-medium border-l border-border">Department</th>
+                  <th className="pb-2 px-3 font-medium border-l border-border">Skills</th>
+                  <th className="pb-2 px-3 font-medium text-right whitespace-nowrap border-l border-border">Utilisation %</th>
+                  <th className="pb-2 px-3 font-medium border-l border-border">Classification</th>
+                  <th className="pb-2 px-3 font-medium border-l border-border">Available From</th>
+                  <th className="pb-2 px-3 font-medium border-l border-border">Projects</th>
+                  <th className="pb-2 px-3 font-medium border-l border-border">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {employees.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                      No available employees found
+                    <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                      {hasActiveFilters
+                        ? "No employees match the current filters"
+                        : "No available employees found"}
                     </td>
                   </tr>
                 ) : (
@@ -65,34 +89,39 @@ export function BenchPoolTable({
                       key={emp.employee_id}
                       className="border-b last:border-0 hover:bg-muted/50 transition-colors"
                     >
-                      <td className="py-2.5 pr-4 font-medium">{emp.employee_name}</td>
-                      <td className="py-2.5 pr-4 text-muted-foreground">
+                      <td className="py-2.5 px-3 font-medium">{emp.employee_name}</td>
+                      <td className="py-2.5 px-3 text-muted-foreground border-l border-border">
                         {emp.designation}
                       </td>
-                      <td className="py-2.5 pr-4 text-muted-foreground">
+                      <td className="py-2.5 px-3 text-muted-foreground border-l border-border">
                         {emp.department}
                       </td>
-                      <td className="py-2.5 pr-4">
-                        <div className="flex flex-wrap gap-1 max-w-[240px]">
+                      <td className="py-2.5 px-3 border-l border-border">
+                        <div className="flex items-center gap-1">
                           {emp.skills.length === 0 ? (
                             <span className="text-muted-foreground text-xs">-</span>
                           ) : (
-                            emp.skills.slice(0, 4).map((skill) => (
-                              <SkillBadge
-                                key={skill.id}
-                                name={skill.skill_name}
-                                proficiency={skill.proficiency}
-                              />
-                            ))
-                          )}
-                          {emp.skills.length > 4 && (
-                            <span className="text-[10px] text-muted-foreground self-center">
-                              +{emp.skills.length - 4} more
-                            </span>
+                            <>
+                              {emp.skills.slice(0, 3).map((skill) => (
+                                <SkillBadge
+                                  key={skill.id}
+                                  name={skill.skill_name}
+                                  proficiency={skill.proficiency}
+                                />
+                              ))}
+                              {emp.skills.length > 3 && (
+                                <span
+                                  className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                                  title={emp.skills.slice(3).map((s) => s.skill_name).join(", ")}
+                                >
+                                  +{emp.skills.length - 3}
+                                </span>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>
-                      <td className="py-2.5 pr-4 text-right tabular-nums">
+                      <td className="py-2.5 px-3 text-right tabular-nums border-l border-border">
                         <span
                           className={
                             emp.utilisation_percent >= 80
@@ -105,10 +134,17 @@ export function BenchPoolTable({
                           {emp.utilisation_percent.toFixed(1)}%
                         </span>
                       </td>
-                      <td className="py-2.5 pr-4">
+                      <td className="py-2.5 px-3 border-l border-border">
                         <StatusBadge status={emp.classification} />
                       </td>
-                      <td className="py-2.5 pr-4 max-w-[200px]">
+                      <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap border-l border-border">
+                        {emp.available_from
+                          ? new Date(emp.available_from) <= new Date()
+                            ? "Now"
+                            : emp.available_from
+                          : "-"}
+                      </td>
+                      <td className="py-2.5 px-3 max-w-50 border-l border-border">
                         <span
                           className="truncate block text-muted-foreground"
                           title={
@@ -122,7 +158,7 @@ export function BenchPoolTable({
                             .join(", ") || "-"}
                         </span>
                       </td>
-                      <td className="py-2.5">
+                      <td className="py-2.5 px-3 border-l border-border">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -140,52 +176,88 @@ export function BenchPoolTable({
             </table>
           </div>
 
-          {totalPages > 1 && (
+          {total > 0 && (
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
-              <p className="text-xs text-muted-foreground">
-                Showing {(page - 1) * pageSize + 1}-
-                {Math.min(page * pageSize, total)} of {total} employees
+              {/* Left: showing count */}
+              <p className="text-xs text-muted-foreground tabular-nums min-w-[140px]">
+                Showing {(page - 1) * pageSize + 1}&ndash;{Math.min(page * pageSize, total)} of{" "}
+                {total}
               </p>
+
+              {/* Center: page navigation */}
               <div className="flex items-center gap-1">
+                <button
+                  onClick={() => onPageChange(1)}
+                  disabled={page <= 1}
+                  className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="First page"
+                >
+                  <ChevronsLeft className="h-3.5 w-3.5" />
+                </button>
                 <button
                   onClick={() => onPageChange(page - 1)}
                   disabled={page <= 1}
-                  className="rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Previous page"
                 >
-                  Previous
+                  <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
-                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                  let pageNum: number
-                  if (totalPages <= 5) {
-                    pageNum = i + 1
-                  } else if (page <= 3) {
-                    pageNum = i + 1
-                  } else if (page >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i
-                  } else {
-                    pageNum = page - 2 + i
-                  }
-                  return (
+
+                {getPageNumbers(page, totalPages).map((item, idx) =>
+                  item === "ellipsis" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-1.5 text-xs text-muted-foreground select-none"
+                    >
+                      &hellip;
+                    </span>
+                  ) : (
                     <button
-                      key={pageNum}
-                      onClick={() => onPageChange(pageNum)}
-                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                        pageNum === page
+                      key={item}
+                      onClick={() => onPageChange(item)}
+                      className={`rounded-md min-w-7 px-1.5 py-1 text-xs font-medium transition-colors ${
+                        item === page
                           ? "bg-primary text-primary-foreground"
                           : "border hover:bg-accent"
                       }`}
                     >
-                      {pageNum}
+                      {item}
                     </button>
                   )
-                })}
+                )}
+
                 <button
                   onClick={() => onPageChange(page + 1)}
                   disabled={page >= totalPages}
-                  className="rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Next page"
                 >
-                  Next
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </button>
+                <button
+                  onClick={() => onPageChange(totalPages)}
+                  disabled={page >= totalPages}
+                  className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Last page"
+                >
+                  <ChevronsRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {/* Right: rows per page dropdown */}
+              <div className="flex items-center gap-2 min-w-[140px] justify-end">
+                <span className="text-xs text-muted-foreground">Rows</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => onPageSizeChange(Number(e.target.value))}
+                  className="h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           )}

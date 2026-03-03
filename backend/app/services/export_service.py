@@ -165,12 +165,25 @@ async def export_billable_list(location_id: str, period: str) -> bytes:
 
 
 async def export_bench_list(location_id: str, period: str) -> bytes:
-    """Export bench list for a branch and period as CSV bytes."""
+    """Export bench and partially billed employees for a branch and period as CSV bytes."""
+    # If no data for the requested period, fall back to the latest available period
     snapshots = await UtilisationSnapshot.find(
         UtilisationSnapshot.branch_location_id == location_id,
         UtilisationSnapshot.period == period,
-        UtilisationSnapshot.classification == "bench",
+        {"classification": {"$in": ["bench", "partially_billed"]}},
     ).to_list()
+
+    if not snapshots:
+        latest = await UtilisationSnapshot.find(
+            UtilisationSnapshot.branch_location_id == location_id,
+        ).sort(-UtilisationSnapshot.period).limit(1).to_list()
+        if latest:
+            period = latest[0].period
+            snapshots = await UtilisationSnapshot.find(
+                UtilisationSnapshot.branch_location_id == location_id,
+                UtilisationSnapshot.period == period,
+                {"classification": {"$in": ["bench", "partially_billed"]}},
+            ).to_list()
 
     # Get employee details for designation / department
     employee_ids = list({s.employee_id for s in snapshots})
