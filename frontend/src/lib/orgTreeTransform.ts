@@ -201,7 +201,7 @@ function rearrangeWideRows(rfNodes: Node[], rfEdges: Edge[]) {
     const nodeW = isGroup ? GROUP_NODE_WIDTH : NODE_WIDTH
     const nodeH = isGroup ? GROUP_NODE_HEIGHT : NODE_HEIGHT
     const colGap = 80
-    const rowGap = 50
+    const rowGap = 300
     const colWidth = nodeW + colGap
     const rowHeight = nodeH + rowGap
 
@@ -245,6 +245,35 @@ function rearrangeWideRows(rfNodes: Node[], rfEdges: Edge[]) {
           const desc = nodeMap.get(descId)
           if (desc) {
             desc.position = { x: desc.position.x, y: desc.position.y + yDelta }
+          }
+        }
+      }
+    }
+
+    // Chain edges row-by-row so they don't cross through intermediate rows.
+    // Row 0 children keep their direct parent → child edges.
+    // Row N (N>0) children connect from the backbone-adjacent child in row N-1.
+    const rowCount = Math.ceil(children.length / MAX_CHILDREN_PER_ROW)
+    for (let r = 1; r < rowCount; r++) {
+      const prevRowStart = (r - 1) * MAX_CHILDREN_PER_ROW
+      const prevNodesInRow = Math.min(MAX_CHILDREN_PER_ROW, children.length - prevRowStart)
+      const prevLeftCount = Math.min(NODES_PER_SIDE, Math.ceil(prevNodesInRow / 2))
+      // Connector: rightmost left-side child (closest to backbone)
+      const connector = children[prevRowStart + prevLeftCount - 1]
+
+      const currRowStart = r * MAX_CHILDREN_PER_ROW
+      const currRowEnd = Math.min(currRowStart + MAX_CHILDREN_PER_ROW, children.length)
+
+      for (let i = currRowStart; i < currRowEnd; i++) {
+        const childId = children[i].id
+        const edgeIdx = rfEdges.findIndex(
+          (e) => e.source === parentId && e.target === childId
+        )
+        if (edgeIdx !== -1) {
+          rfEdges[edgeIdx] = {
+            ...rfEdges[edgeIdx],
+            id: `e-${connector.id}-${childId}`,
+            source: connector.id,
           }
         }
       }
