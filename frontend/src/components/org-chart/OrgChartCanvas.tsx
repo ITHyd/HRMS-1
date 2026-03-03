@@ -61,6 +61,7 @@ export function OrgChartCanvas() {
   const expandAttemptedRef = useRef<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [rfReady, setRfReady] = useState(false)
 
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return
@@ -202,14 +203,25 @@ export function OrgChartCanvas() {
     }
   }, [traceMode.active, traceMode.fromId, traceMode.toId, setHighlightedPath, clearTrace])
 
-  // Auto-fit only on initial load (skip if there's a pending search focus)
+  // On initial load, center on the logged-in user's node (like "My Branch")
   const hasFitted = useRef(false)
   useEffect(() => {
-    if (nodes.length > 0 && !hasFitted.current && !focusedEmployeeId && !focusEmployeeId) {
+    if (nodes.length > 0 && rfReady && !hasFitted.current && !focusedEmployeeId && !focusEmployeeId && user) {
       hasFitted.current = true
-      setTimeout(() => fitView({ padding: 0.05, duration: 300 }), 100)
+      const myNode = nodes.find((n) => n.id === user.employee_id)
+      if (myNode) {
+        setTimeout(() => {
+          setCenter(
+            myNode.position.x + 120,
+            myNode.position.y + 250,
+            { zoom: 1.0, duration: 300 }
+          )
+        }, 50)
+      } else {
+        setTimeout(() => fitView({ padding: 0.05, duration: 300 }), 50)
+      }
     }
-  }, [nodes.length, fitView, focusedEmployeeId, focusEmployeeId])
+  }, [nodes.length, rfReady, fitView, setCenter, focusedEmployeeId, focusEmployeeId, user, nodes])
 
   // Focus on a specific employee (from search / drawer navigation)
   // Flow: expand ancestors → expand dept group if needed → center on node
@@ -302,7 +314,7 @@ export function OrgChartCanvas() {
       if (branchNode) {
         setCenter(
           branchNode.position.x + 120,
-          branchNode.position.y + 42,
+          branchNode.position.y + 250,
           { zoom: 1.0, duration: 500 }
         )
       }
@@ -310,6 +322,91 @@ export function OrgChartCanvas() {
     window.addEventListener("focus-my-branch", handleFocusBranch)
     return () => window.removeEventListener("focus-my-branch", handleFocusBranch)
   }, [nodes, user, setCenter])
+
+  // Inject edge lines into MiniMap SVG (MiniMap doesn't render edges natively)
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || styledEdges.length === 0) return
+
+    const nodeMap = new Map<string, Node>()
+    for (const node of styledNodes) {
+      nodeMap.set(node.id, node)
+    }
+
+    const injectEdges = () => {
+      const svg = container.querySelector<SVGSVGElement>(".react-flow__minimap-svg")
+      if (!svg) return
+
+      svg.querySelector(".minimap-edges")?.remove()
+
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g")
+      g.setAttribute("class", "minimap-edges")
+
+      for (const edge of styledEdges) {
+        const source = nodeMap.get(edge.source)
+        const target = nodeMap.get(edge.target)
+        if (!source || !target) continue
+
+        const sw = (source.width as number) || (source.type === "departmentGroupNode" ? 280 : 240)
+        const sh = (source.height as number) || (source.type === "departmentGroupNode" ? 72 : 84)
+        const tw = (target.width as number) || (target.type === "departmentGroupNode" ? 280 : 240)
+
+        // Match canvas edge style: smooth step path with 90° bends
+        const sourceXc = source.position.x + sw / 2
+        const sourceYc = source.position.y + sh
+        const targetXc = target.position.x + tw / 2
+        const targetYc = target.position.y
+        const midY = (sourceYc + targetYc) / 2
+        const d = `M${sourceXc},${sourceYc} L${sourceXc},${midY} L${targetXc},${midY} L${targetXc},${targetYc}`
+
+        const edgeData = edge.data as Record<string, unknown> | undefined
+        const relationType = edgeData?.relationType as string | undefined
+        const isDashed = relationType !== "PRIMARY" && relationType !== undefined
+        const isOnPath =
+          highlightedPath.includes(edge.source) && highlightedPath.includes(edge.target)
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path")
+        path.setAttribute("d", d)
+        path.setAttribute("fill", "none")
+        path.setAttribute("stroke", isOnPath ? "#3b82f6" : isDashed ? "#a3a3a3" : "#000000")
+        path.setAttribute("stroke-width", isOnPath ? "8" : isDashed ? "4" : "5")
+        if (isDashed) {
+          path.setAttribute("stroke-dasharray", "12 8")
+        }
+        if (edge.style?.opacity !== undefined) {
+          path.setAttribute("opacity", String(edge.style.opacity))
+        }
+
+        g.appendChild(path)
+      }
+
+      // Insert before first child so edges render behind nodes
+      if (svg.firstChild) {
+        svg.insertBefore(g, svg.firstChild)
+      } else {
+        svg.appendChild(g)
+      }
+    }
+
+    const timer = setTimeout(injectEdges, 100)
+
+    // Re-inject if MiniMap internally re-renders and removes our group
+    const observer = new MutationObserver(() => {
+      const svg = container.querySelector<SVGSVGElement>(".react-flow__minimap-svg")
+      if (svg && !svg.querySelector(".minimap-edges")) {
+        injectEdges()
+      }
+    })
+    const miniMapPanel = container.querySelector(".react-flow__minimap")
+    if (miniMapPanel) {
+      observer.observe(miniMapPanel, { childList: true, subtree: true })
+    }
+
+    return () => {
+      clearTimeout(timer)
+      observer.disconnect()
+    }
+  }, [styledEdges, styledNodes, highlightedPath])
 
   // Click on canvas background exits focus mode
   const handlePaneClick = useCallback(() => {
@@ -389,12 +486,15 @@ export function OrgChartCanvas() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onPaneClick={handlePaneClick}
+        onInit={() => setRfReady(true)}
         minZoom={0.1}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
         <Controls position="bottom-right" />
         <MiniMap
+          pannable
+          zoomable
           position="bottom-left"
           nodeColor={(node) => {
             if (node.type === "departmentGroupNode") {

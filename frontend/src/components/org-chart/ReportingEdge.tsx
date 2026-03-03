@@ -1,7 +1,7 @@
 import { memo } from "react"
 import {
   BaseEdge,
-  getBezierPath,
+  getSmoothStepPath,
   type EdgeProps,
 } from "@xyflow/react"
 import { useOrgChartStore } from "@/store/orgChartStore"
@@ -25,13 +25,14 @@ function ReportingEdgeComponent({
   const isOnPath =
     highlightedPath.includes(source) && highlightedPath.includes(target)
 
-  const [edgePath] = getBezierPath({
+  const [edgePath] = getSmoothStepPath({
     sourceX,
     sourceY,
     targetX,
     targetY,
     sourcePosition,
     targetPosition,
+    borderRadius: 0,
   })
 
   return (

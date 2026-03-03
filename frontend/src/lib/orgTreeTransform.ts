@@ -7,6 +7,8 @@ const NODE_HEIGHT = 84
 const GROUP_NODE_WIDTH = 280
 const GROUP_NODE_HEIGHT = 72
 export const DEPT_GROUP_THRESHOLD = 10
+const MAX_CHILDREN_PER_ROW = 8
+const NODES_PER_SIDE = 4
 
 export interface EmployeeNodeData {
   name: string
@@ -69,6 +71,8 @@ function emitDepartmentGroups(
       id: groupId,
       type: "departmentGroupNode",
       position: { x: 0, y: 0 },
+      width: GROUP_NODE_WIDTH,
+      height: GROUP_NODE_HEIGHT,
       data: {
         parentId: parentNode.id,
         department: deptName,
@@ -108,6 +112,8 @@ function flattenTree(
       id: node.id,
       type: "employeeNode",
       position: { x: 0, y: 0 },
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
       data: {
         name: node.name,
         designation: node.designation,
@@ -149,6 +155,101 @@ function countDescendants(node: OrgTreeNode): number {
     count += countDescendants(child)
   }
   return count
+}
+
+/**
+ * After dagre layout, rearrange sibling groups that exceed MAX_CHILDREN_PER_ROW
+ * into a multi-row grid so the tree doesn't stretch infinitely wide.
+ */
+function rearrangeWideRows(rfNodes: Node[], rfEdges: Edge[]) {
+  const primaryEdges = rfEdges.filter((e) => !e.id.startsWith("sec-"))
+
+  // Build parent → child IDs map
+  const childrenMap = new Map<string, string[]>()
+  for (const edge of primaryEdges) {
+    if (!childrenMap.has(edge.source)) childrenMap.set(edge.source, [])
+    childrenMap.get(edge.source)!.push(edge.target)
+  }
+
+  const nodeMap = new Map<string, Node>()
+  for (const node of rfNodes) nodeMap.set(node.id, node)
+
+  // Recursively collect all descendant IDs
+  function collectDescendants(id: string, result: Set<string>) {
+    const kids = childrenMap.get(id)
+    if (!kids) return
+    for (const kid of kids) {
+      result.add(kid)
+      collectDescendants(kid, result)
+    }
+  }
+
+  for (const [parentId, childIds] of childrenMap) {
+    if (childIds.length <= MAX_CHILDREN_PER_ROW) continue
+
+    const parent = nodeMap.get(parentId)
+    if (!parent) continue
+
+    const children = childIds
+      .map((id) => nodeMap.get(id))
+      .filter((n): n is Node => !!n)
+
+    // Sort by dagre X position to preserve relative order
+    children.sort((a, b) => a.position.x - b.position.x)
+
+    const isGroup = children[0].type === "departmentGroupNode"
+    const nodeW = isGroup ? GROUP_NODE_WIDTH : NODE_WIDTH
+    const nodeH = isGroup ? GROUP_NODE_HEIGHT : NODE_HEIGHT
+    const colGap = 80
+    const rowGap = 50
+    const colWidth = nodeW + colGap
+    const rowHeight = nodeH + rowGap
+
+    const originalY = children[0].position.y
+    const parentW = parent.type === "departmentGroupNode" ? GROUP_NODE_WIDTH : NODE_WIDTH
+    const parentCenterX = parent.position.x + parentW / 2
+
+    const spineGap = 40 // gap between backbone and first node in the row
+
+    for (let i = 0; i < children.length; i++) {
+      const row = Math.floor(i / MAX_CHILDREN_PER_ROW)
+      const posInRow = i % MAX_CHILDREN_PER_ROW
+
+      // Split each row: first half LEFT, second half RIGHT
+      const nodesInRow = Math.min(MAX_CHILDREN_PER_ROW, children.length - row * MAX_CHILDREN_PER_ROW)
+      const leftCount = Math.min(NODES_PER_SIDE, Math.ceil(nodesInRow / 2))
+      const isLeftSide = posInRow < leftCount
+
+      let newX: number
+      if (isLeftSide) {
+        const col = posInRow
+        const leftWidth = leftCount * colWidth - colGap
+        const startX = parentCenterX - spineGap - leftWidth
+        newX = startX + col * colWidth
+      } else {
+        const col = posInRow - leftCount
+        const startX = parentCenterX + spineGap
+        newX = startX + col * colWidth
+      }
+
+      const newY = originalY + row * rowHeight
+      const yDelta = newY - children[i].position.y
+
+      children[i].position = { x: newX, y: newY }
+
+      // Shift all descendants by the same Y delta
+      if (yDelta !== 0) {
+        const descendants = new Set<string>()
+        collectDescendants(children[i].id, descendants)
+        for (const descId of descendants) {
+          const desc = nodeMap.get(descId)
+          if (desc) {
+            desc.position = { x: desc.position.x, y: desc.position.y + yDelta }
+          }
+        }
+      }
+    }
+  }
 }
 
 export function transformOrgTree(
@@ -205,6 +306,9 @@ export function transformOrgTree(
       node.position = { x: pos.x - w / 2, y: pos.y - h / 2 }
     }
   })
+
+  // Wrap wide sibling rows into a multi-row grid
+  rearrangeWideRows(rfNodes, rfEdges)
 
   return { nodes: rfNodes, edges: rfEdges }
 }
