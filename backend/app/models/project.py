@@ -9,7 +9,7 @@ class Project(Document):
     status: str  # "ACTIVE" | "COMPLETED" | "ON_HOLD"
     project_type: str = "client"  # "client" | "internal"
     description: Optional[str] = None
-    department_id: str
+    department_id: Optional[str] = None
     start_date: datetime
     end_date: Optional[datetime] = None
 
