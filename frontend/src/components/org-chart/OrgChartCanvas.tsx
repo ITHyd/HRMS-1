@@ -3,8 +3,6 @@ import {
   ReactFlow,
   MiniMap,
   Controls,
-  Background,
-  BackgroundVariant,
   useReactFlow,
   type NodeTypes,
   type EdgeTypes,
@@ -152,7 +150,7 @@ export function OrgChartCanvas() {
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+        {/* Clean white background — no dots or lines */}
         <Controls position="bottom-right" />
         <MiniMap
           position="bottom-left"

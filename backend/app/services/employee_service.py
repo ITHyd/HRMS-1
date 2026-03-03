@@ -3,9 +3,12 @@ from datetime import datetime, timezone
 from app.models.department import Department
 from app.models.employee import Employee
 from app.models.employee_project import EmployeeProject
+from app.models.employee_skill import EmployeeSkill
 from app.models.location import Location
 from app.models.project import Project
 from app.models.reporting_relationship import ReportingRelationship
+from app.models.timesheet_entry import TimesheetEntry
+from app.models.utilisation_snapshot import UtilisationSnapshot
 
 
 async def get_employee_detail(employee_id: str, requester_branch_location_id: str):
@@ -110,11 +113,65 @@ async def get_employee_detail(employee_id: str, requester_branch_location_id: st
                     "id": str(project.id),
                     "name": project.name,
                     "status": project.status,
+                    "project_type": project.project_type,
                     "role_in_project": ep.role_in_project,
                     "start_date": project.start_date.isoformat(),
                     "end_date": project.end_date.isoformat() if project.end_date else None,
                     "progress_percent": round(progress, 1),
                 })
+
+    # Skills (own branch only)
+    if is_own_branch:
+        skills = await EmployeeSkill.find(
+            EmployeeSkill.employee_id == employee_id
+        ).to_list()
+        result["skills"] = [
+            {
+                "skill_name": s.skill_name,
+                "proficiency": s.proficiency,
+                "notes": s.notes,
+            }
+            for s in skills
+        ]
+
+    # Utilisation — latest snapshot (own branch only)
+    if is_own_branch:
+        latest_util = await UtilisationSnapshot.find(
+            UtilisationSnapshot.employee_id == employee_id,
+        ).sort([("period", -1)]).limit(1).to_list()
+
+        if latest_util:
+            u = latest_util[0]
+            result["utilisation"] = {
+                "period": u.period,
+                "utilisation_percent": u.utilisation_percent,
+                "billable_percent": u.billable_percent,
+                "total_hours": u.total_hours_logged,
+                "billable_hours": u.billable_hours,
+                "non_billable_hours": u.non_billable_hours,
+                "capacity_hours": u.capacity_hours,
+                "classification": u.classification,
+            }
+
+    # Timesheet summary — current period (own branch only)
+    if is_own_branch:
+        now = datetime.now(timezone.utc)
+        current_period = f"{now.year:04d}-{now.month:02d}"
+        ts_entries = await TimesheetEntry.find(
+            TimesheetEntry.employee_id == employee_id,
+            TimesheetEntry.period == current_period,
+            TimesheetEntry.status != "rejected",
+        ).to_list()
+
+        if ts_entries:
+            total_hours = sum(e.hours for e in ts_entries)
+            billable_hours = sum(e.hours for e in ts_entries if e.is_billable)
+            result["timesheet_summary"] = {
+                "period": current_period,
+                "total_hours": round(total_hours, 2),
+                "billable_hours": round(billable_hours, 2),
+                "entry_count": len(ts_entries),
+            }
 
     return result
 

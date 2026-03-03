@@ -340,21 +340,21 @@ async def seed():
     # ── Projects ──
     now = datetime.now(timezone.utc)
     projects_data = [
-        ("Platform Modernization", "ACTIVE", ("Engineering", HYD), date(2025, 1, 1), date(2026, 6, 30)),
-        ("Mobile App v2", "ACTIVE", ("Engineering", HYD), date(2025, 3, 1), date(2025, 12, 31)),
-        ("EMEA Market Launch", "ACTIVE", ("Product", LON), date(2025, 4, 1), date(2026, 3, 31)),
-        ("HR Portal Redesign", "COMPLETED", ("HR", HYD), date(2024, 6, 1), date(2025, 2, 28)),
-        ("Cloud Migration", "ACTIVE", ("Engineering", BLR), date(2025, 2, 1), date(2026, 1, 31)),
-        ("Design System v3", "ACTIVE", ("Design", HYD), date(2025, 5, 1), date(2026, 4, 30)),
-        ("Customer Dashboard", "ACTIVE", ("Engineering", LON), date(2025, 6, 1), date(2026, 2, 28)),
-        ("APAC Expansion", "ACTIVE", ("Sales", SYD), date(2025, 7, 1), date(2026, 6, 30)),
-        ("Data Analytics Pipeline", "ON_HOLD", ("Engineering", HYD), date(2025, 8, 1), date(2026, 7, 31)),
-        ("Employee Wellness Program", "ACTIVE", ("HR", LON), date(2025, 9, 1), date(2026, 3, 31)),
+        ("Platform Modernization", "ACTIVE", "client", ("Engineering", HYD), date(2025, 1, 1), date(2026, 6, 30)),
+        ("Mobile App v2", "ACTIVE", "internal", ("Engineering", HYD), date(2025, 3, 1), date(2025, 12, 31)),
+        ("EMEA Market Launch", "ACTIVE", "client", ("Product", LON), date(2025, 4, 1), date(2026, 3, 31)),
+        ("HR Portal Redesign", "COMPLETED", "internal", ("HR", HYD), date(2024, 6, 1), date(2025, 2, 28)),
+        ("Cloud Migration", "ACTIVE", "client", ("Engineering", BLR), date(2025, 2, 1), date(2026, 1, 31)),
+        ("Design System v3", "ACTIVE", "internal", ("Design", HYD), date(2025, 5, 1), date(2026, 4, 30)),
+        ("Customer Dashboard", "ACTIVE", "client", ("Engineering", LON), date(2025, 6, 1), date(2026, 2, 28)),
+        ("APAC Expansion", "ACTIVE", "client", ("Sales", SYD), date(2025, 7, 1), date(2026, 6, 30)),
+        ("Data Analytics Pipeline", "ON_HOLD", "internal", ("Engineering", HYD), date(2025, 8, 1), date(2026, 7, 31)),
+        ("Employee Wellness Program", "ACTIVE", "internal", ("HR", LON), date(2025, 9, 1), date(2026, 3, 31)),
     ]
 
     project_ids = {}
-    for name, status, dept_key, start, end in projects_data:
-        p = Project(name=name, status=status, department_id=depts[dept_key], start_date=start, end_date=end)
+    for name, status, ptype, dept_key, start, end in projects_data:
+        p = Project(name=name, status=status, project_type=ptype, department_id=depts[dept_key], start_date=start, end_date=end)
         await p.insert()
         project_ids[name] = str(p.id)
 
@@ -412,6 +412,8 @@ async def seed():
             employee_id=emp_id,
             project_id=project_ids[proj_name],
             role_in_project=role,
+            assigned_at=now,
+            assigned_by="system",
         )
         await ep.insert()
 
@@ -465,6 +467,8 @@ async def seed():
     all_employees_db = await Employee.find_all().to_list()
     emp_id_to_location = {str(e.id): e.location_id for e in all_employees_db}
     emp_id_to_name = {str(e.id): e.name for e in all_employees_db}
+    emp_id_to_level = {str(e.id): e.level for e in all_employees_db}
+    CORPORATE_LEVELS = {"c-suite", "vp"}
 
     # Build employee_id -> list of (project_id, role) from assignments
     emp_projects = {}
@@ -518,6 +522,11 @@ async def seed():
 
         for loc_id, emp_list in branch_employees.items():
             for eid in emp_list:
+                # Skip corporate-level employees from timesheet generation
+                level = emp_id_to_level.get(eid, "")
+                if level in CORPORATE_LEVELS:
+                    continue
+
                 proj_list = emp_projects.get(eid, [])
 
                 if proj_list:
@@ -604,6 +613,11 @@ async def seed():
 
         for loc_id, emp_list in branch_employees.items():
             for eid in emp_list:
+                # Skip corporate-level employees from finance data
+                level = emp_id_to_level.get(eid, "")
+                if level in CORPORATE_LEVELS:
+                    continue
+
                 proj_list = emp_projects.get(eid, [])
 
                 if proj_list:
@@ -694,6 +708,11 @@ async def seed():
 
         for loc_id, emp_list in branch_employees.items():
             for eid in emp_list:
+                # Skip corporate-level employees (c-suite, vp)
+                level = emp_id_to_level.get(eid, "")
+                if level in CORPORATE_LEVELS:
+                    continue
+
                 key = (eid, period)
                 agg = ts_agg.get(key, {"total": 0.0, "billable": 0.0, "non_billable": 0.0})
 
@@ -717,6 +736,7 @@ async def seed():
                 snap = UtilisationSnapshot(
                     employee_id=eid,
                     employee_name=emp_id_to_name.get(eid, "Unknown"),
+                    employee_level=level,
                     period=period,
                     branch_location_id=loc_id,
                     total_hours_logged=total_logged,

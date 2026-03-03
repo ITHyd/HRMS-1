@@ -176,10 +176,12 @@ async def compute_utilisation(
     """
     config = await get_or_create_capacity_config(branch_location_id)
 
-    # Fetch active employees in this branch
+    # Fetch active employees in this branch (exclude corporate-level roles)
+    CORPORATE_LEVELS = {"c-suite", "vp"}
     employees = await Employee.find(
         Employee.location_id == branch_location_id,
         Employee.is_active == True,
+        {"level": {"$nin": list(CORPORATE_LEVELS)}},
     ).to_list()
 
     if not employees:
@@ -268,6 +270,7 @@ async def compute_utilisation(
         snapshot = UtilisationSnapshot(
             employee_id=eid,
             employee_name=emp.name,
+            employee_level=emp.level,
             period=period,
             branch_location_id=branch_location_id,
             total_hours_logged=round(total_hours, 2),

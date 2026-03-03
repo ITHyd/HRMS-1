@@ -16,11 +16,11 @@ import { useAuthStore } from "@/store/authStore"
 import { cn } from "@/lib/utils"
 
 const navItems = [
-  { to: "/", icon: Network, label: "Org Chart" },
+  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/org-chart", icon: Network, label: "Org Chart" },
   { to: "/analytics", icon: BarChart3, label: "Analytics" },
   { to: "/timesheets", icon: Clock, label: "Timesheets" },
   { to: "/finance", icon: DollarSign, label: "Finance" },
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/availability", icon: Users, label: "Bench Pool" },
   { to: "/integrations", icon: Link2, label: "Integrations" },
   { to: "/import", icon: Upload, label: "Import" },

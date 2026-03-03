@@ -11,6 +11,9 @@ from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
 
 
+CORPORATE_LEVELS = {"c-suite", "vp"}
+
+
 def _previous_periods(period: str, count: int) -> list[str]:
     """Return a list of `count` periods (YYYY-MM) ending at and including `period`."""
     year, month = int(period[:4]), int(period[5:7])
@@ -35,10 +38,11 @@ async def get_executive_dashboard(
     Returns headline KPIs, classification breakdown, top projects, resource
     availability, and a 6-period trend.
     """
-    # Current period snapshots
+    # Current period snapshots (exclude corporate-level employees)
     snapshots = await UtilisationSnapshot.find(
         UtilisationSnapshot.branch_location_id == branch_location_id,
         UtilisationSnapshot.period == period,
+        {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
     ).to_list()
 
     total_active = len(snapshots)
@@ -62,10 +66,13 @@ async def get_executive_dashboard(
     overall_billable = round(total_billable_pct / total_active, 2) if total_active > 0 else 0.0
 
     # Top consuming projects: aggregate TimesheetEntry by project for the period
+    # Only include timesheet entries from branch-level employees (not corporate)
+    branch_emp_ids = [s.employee_id for s in snapshots]
     entries = await TimesheetEntry.find(
         TimesheetEntry.branch_location_id == branch_location_id,
         TimesheetEntry.period == period,
         TimesheetEntry.status != "rejected",
+        {"employee_id": {"$in": branch_emp_ids}},
     ).to_list()
 
     project_hours: dict[str, float] = defaultdict(float)
@@ -123,6 +130,7 @@ async def get_executive_dashboard(
     trend_snapshots = await UtilisationSnapshot.find(
         UtilisationSnapshot.branch_location_id == branch_location_id,
         {"period": {"$in": trend_periods}},
+        {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
     ).to_list()
 
     period_groups: dict[str, list[UtilisationSnapshot]] = defaultdict(list)
@@ -172,10 +180,11 @@ async def get_resource_dashboard(
     Supports text search by name and filter by classification.
     Includes per-employee project hours from TimesheetEntry.
     """
-    # Build query filters
+    # Build query filters (exclude corporate-level employees)
     filters: list = [
         UtilisationSnapshot.branch_location_id == branch_location_id,
         UtilisationSnapshot.period == period,
+        {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
     ]
     if classification:
         filters.append(UtilisationSnapshot.classification == classification)
@@ -291,11 +300,20 @@ async def get_project_dashboard(
     Aggregates timesheet hours by project, lists members and billable
     breakdown, computes health status and identifies over-utilised members.
     """
-    # Fetch timesheet entries for the period
+    # First get branch-level employee IDs (exclude corporate)
+    branch_employees = await Employee.find(
+        Employee.location_id == branch_location_id,
+        Employee.is_active == True,
+        {"level": {"$nin": list(CORPORATE_LEVELS)}},
+    ).to_list()
+    branch_emp_ids = [str(e.id) for e in branch_employees]
+
+    # Fetch timesheet entries for the period (only branch-level employees)
     ts_filters: list = [
         TimesheetEntry.branch_location_id == branch_location_id,
         TimesheetEntry.period == period,
         TimesheetEntry.status != "rejected",
+        {"employee_id": {"$in": branch_emp_ids}},
     ]
     if project_id:
         ts_filters.append(TimesheetEntry.project_id == project_id)
@@ -361,6 +379,7 @@ async def get_project_dashboard(
             UtilisationSnapshot.period == period,
             UtilisationSnapshot.branch_location_id == branch_location_id,
             {"employee_id": {"$in": list(all_member_ids)}},
+            {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
         ).to_list()
         if all_member_ids
         else []
@@ -424,11 +443,30 @@ async def get_project_dashboard(
         else:
             health = "critical"
 
+        # Project type, dates, and progress
+        proj_type = proj.project_type if proj else "client"
+        proj_start = proj.start_date.isoformat() if proj and proj.start_date else None
+        proj_end = proj.end_date.isoformat() if proj and proj.end_date else None
+
+        progress_percent = 0.0
+        if proj and proj.start_date and proj.end_date:
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            start = proj.start_date.replace(tzinfo=None) if proj.start_date.tzinfo else proj.start_date
+            end = proj.end_date.replace(tzinfo=None) if proj.end_date.tzinfo else proj.end_date
+            total_dur = (end - start).total_seconds()
+            elapsed = (now - start).total_seconds()
+            if total_dur > 0:
+                progress_percent = min(100.0, max(0.0, (elapsed / total_dur) * 100))
+
         result_projects.append({
             "project_id": pid,
             "project_name": proj_name,
             "status": proj_status,
+            "project_type": proj_type,
             "department": proj_dept,
+            "start_date": proj_start,
+            "end_date": proj_end,
+            "progress_percent": round(progress_percent, 1),
             "total_hours_consumed": round(total_hours, 2),
             "billable_hours": round(billable_hours, 2),
             "billable_percent": billable_pct,

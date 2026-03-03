@@ -58,7 +58,11 @@ export interface ProjectDashboardEntry {
   project_id: string
   project_name: string
   status: string
+  project_type: string
   department: string
+  start_date?: string
+  end_date?: string
+  progress_percent: number
   total_hours_consumed: number
   billable_hours: number
   billable_percent: number
@@ -66,7 +70,9 @@ export interface ProjectDashboardEntry {
   members: Array<{
     employee_id: string
     employee_name: string
+    role: string
     hours: number
+    billable_hours: number
   }>
   health: string
   over_utilised_members: string[]

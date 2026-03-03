@@ -31,8 +31,11 @@ async def get_bench_pool(
     and search term. Returns a BenchPoolResponse-shaped dict.
     """
     # Step 1: Find snapshots where classification is bench or partially_billed
+    # Exclude corporate-level employees (c-suite, vp)
+    CORPORATE_LEVELS = {"c-suite", "vp"}
     snapshot_filters: list = [
         UtilisationSnapshot.branch_location_id == branch_location_id,
+        {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
     ]
 
     if classification_filter and classification_filter in ("bench", "partially_billed"):

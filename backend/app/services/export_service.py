@@ -124,6 +124,8 @@ def _build_csv(headers: list[str], rows: list[list]) -> bytes:
 
 async def export_billable_list(location_id: str, period: str) -> bytes:
     """Export billable list for a branch and period as CSV bytes."""
+    CORPORATE_LEVELS = {"c-suite", "vp"}
+
     billables = await FinanceBillable.find(
         FinanceBillable.branch_location_id == location_id,
         FinanceBillable.period == period,
@@ -134,6 +136,10 @@ async def export_billable_list(location_id: str, period: str) -> bytes:
     employees = await Employee.find(
         {"_id": {"$in": [ObjectId(eid) for eid in employee_ids]}}
     ).to_list() if employee_ids else []
+    # Filter out corporate-level employees
+    employees = [e for e in employees if e.level not in CORPORATE_LEVELS]
+    branch_emp_ids = {str(e.id) for e in employees}
+    billables = [b for b in billables if b.employee_id in branch_emp_ids]
     emp_map = {str(e.id): e.name for e in employees}
 
     # Build project name map
@@ -166,10 +172,13 @@ async def export_billable_list(location_id: str, period: str) -> bytes:
 
 async def export_bench_list(location_id: str, period: str) -> bytes:
     """Export bench list for a branch and period as CSV bytes."""
+    CORPORATE_LEVELS = {"c-suite", "vp"}
+
     snapshots = await UtilisationSnapshot.find(
         UtilisationSnapshot.branch_location_id == location_id,
         UtilisationSnapshot.period == period,
         UtilisationSnapshot.classification == "bench",
+        {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
     ).to_list()
 
     # Get employee details for designation / department
@@ -214,9 +223,20 @@ async def export_bench_list(location_id: str, period: str) -> bytes:
 
 async def export_project_utilisation(location_id: str, period: str) -> bytes:
     """Export project utilisation for a branch and period as CSV bytes."""
+    CORPORATE_LEVELS = {"c-suite", "vp"}
+
+    # Get branch-level employee IDs (exclude corporate)
+    branch_employees = await Employee.find(
+        Employee.location_id == location_id,
+        Employee.is_active == True,
+        {"level": {"$nin": list(CORPORATE_LEVELS)}},
+    ).to_list()
+    branch_emp_ids = [str(e.id) for e in branch_employees]
+
     entries = await TimesheetEntry.find(
         TimesheetEntry.branch_location_id == location_id,
         TimesheetEntry.period == period,
+        {"employee_id": {"$in": branch_emp_ids}},
     ).to_list()
 
     # Aggregate by project
@@ -262,9 +282,12 @@ async def export_project_utilisation(location_id: str, period: str) -> bytes:
 
 async def export_employee_allocation(location_id: str, period: str) -> bytes:
     """Export employee allocation for a branch and period as CSV bytes."""
+    CORPORATE_LEVELS = {"c-suite", "vp"}
+
     snapshots = await UtilisationSnapshot.find(
         UtilisationSnapshot.branch_location_id == location_id,
         UtilisationSnapshot.period == period,
+        {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
     ).to_list()
 
     # Get employee details

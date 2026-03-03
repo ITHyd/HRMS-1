@@ -56,6 +56,7 @@ export function DashboardPage() {
   const [resourceEntries, setResourceEntries] = useState<ResourceDashboardEntry[]>([])
   const [resourceTotal, setResourceTotal] = useState(0)
   const [resourceSearch, setResourceSearch] = useState("")
+  const [resourceClassification, setResourceClassification] = useState("")
   const [resourcePage, setResourcePage] = useState(1)
 
   // Projects tab state
@@ -75,12 +76,13 @@ export function DashboardPage() {
   }, [])
 
   const fetchResourceData = useCallback(
-    async (period: string, search?: string, page?: number) => {
+    async (period: string, search?: string, classification?: string, page?: number) => {
       setLoading(true)
       try {
         const data = await getResourceDashboard({
           period,
           search: search || undefined,
+          classification: classification || undefined,
           page: page || 1,
           page_size: 20,
         })
@@ -117,7 +119,7 @@ export function DashboardPage() {
         fetchExecutiveData(selectedPeriod)
         break
       case "resources":
-        fetchResourceData(selectedPeriod, resourceSearch, resourcePage)
+        fetchResourceData(selectedPeriod, resourceSearch, resourceClassification, resourcePage)
         break
       case "projects":
         fetchProjectData(selectedPeriod)
@@ -130,6 +132,7 @@ export function DashboardPage() {
     fetchResourceData,
     fetchProjectData,
     resourceSearch,
+    resourceClassification,
     resourcePage,
   ])
 
@@ -137,6 +140,7 @@ export function DashboardPage() {
     setSelectedPeriod(period)
     setResourcePage(1)
     setResourceSearch("")
+    setResourceClassification("")
   }
 
   const handleComputeUtilisation = async () => {
@@ -149,7 +153,7 @@ export function DashboardPage() {
           await fetchExecutiveData(selectedPeriod)
           break
         case "resources":
-          await fetchResourceData(selectedPeriod, resourceSearch, resourcePage)
+          await fetchResourceData(selectedPeriod, resourceSearch, resourceClassification, resourcePage)
           break
         case "projects":
           await fetchProjectData(selectedPeriod)
@@ -167,6 +171,11 @@ export function DashboardPage() {
     setResourcePage(1)
   }
 
+  const handleResourceClassification = (value: string) => {
+    setResourceClassification(value)
+    setResourcePage(1)
+  }
+
   const handleResourcePageChange = (page: number) => {
     setResourcePage(page)
   }
@@ -176,6 +185,7 @@ export function DashboardPage() {
     if (tab === "resources") {
       setResourcePage(1)
       setResourceSearch("")
+      setResourceClassification("")
     }
   }
 
@@ -315,6 +325,8 @@ export function DashboardPage() {
               entries={resourceEntries}
               onSearch={handleResourceSearch}
               searchQuery={resourceSearch}
+              classification={resourceClassification}
+              onClassificationChange={handleResourceClassification}
               total={resourceTotal}
               page={resourcePage}
               pageSize={20}

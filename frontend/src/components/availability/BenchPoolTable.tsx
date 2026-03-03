@@ -1,10 +1,12 @@
 import { useState } from "react"
-import { Settings2 } from "lucide-react"
+import { Settings2, Briefcase } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { SkillBadge } from "@/components/availability/SkillBadge"
 import { SkillTagManager } from "@/components/availability/SkillTagManager"
+import { AssignProjectModal } from "@/components/availability/AssignProjectModal"
+import { useOrgChartStore } from "@/store/orgChartStore"
 import type { AvailableEmployee } from "@/types/availability"
 
 interface BenchPoolTableProps {
@@ -25,23 +27,70 @@ export function BenchPoolTable({
   onRefresh,
 }: BenchPoolTableProps) {
   const [managingEmployee, setManagingEmployee] = useState<AvailableEmployee | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
   const totalPages = Math.ceil(total / pageSize)
 
   const handleSkillUpdate = () => {
     onRefresh()
   }
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    if (selectedIds.size === employees.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(employees.map((e) => e.employee_id)))
+    }
+  }
+
+  const selectedEmployees = employees
+    .filter((e) => selectedIds.has(e.employee_id))
+    .map((e) => ({ id: e.employee_id, name: e.employee_name }))
+
   return (
     <>
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Available Employees</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Available Employees</CardTitle>
+            {selectedIds.size > 0 && (
+              <Button
+                size="sm"
+                onClick={() => setShowAssignModal(true)}
+                className="h-8 text-xs"
+              >
+                <Briefcase className="mr-1.5 h-3.5 w-3.5" />
+                Assign to Project ({selectedIds.size})
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
+                  <th className="pb-2 pr-2 font-medium w-8">
+                    <input
+                      type="checkbox"
+                      checked={employees.length > 0 && selectedIds.size === employees.length}
+                      onChange={toggleAll}
+                      className="rounded border-gray-300"
+                    />
+                  </th>
                   <th className="pb-2 pr-4 font-medium">Name</th>
                   <th className="pb-2 pr-4 font-medium">Designation</th>
                   <th className="pb-2 pr-4 font-medium">Department</th>
@@ -55,7 +104,7 @@ export function BenchPoolTable({
               <tbody>
                 {employees.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={9} className="py-8 text-center text-muted-foreground">
                       No available employees found
                     </td>
                   </tr>
@@ -63,9 +112,24 @@ export function BenchPoolTable({
                   employees.map((emp) => (
                     <tr
                       key={emp.employee_id}
-                      className="border-b last:border-0 hover:bg-muted/50 transition-colors"
+                      className={`border-b last:border-0 hover:bg-muted/50 transition-colors ${selectedIds.has(emp.employee_id) ? "bg-primary/5" : ""}`}
                     >
-                      <td className="py-2.5 pr-4 font-medium">{emp.employee_name}</td>
+                      <td className="py-2.5 pr-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(emp.employee_id)}
+                          onChange={() => toggleSelect(emp.employee_id)}
+                          className="rounded border-gray-300"
+                        />
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        <button
+                          onClick={() => selectEmployee(emp.employee_id)}
+                          className="font-medium text-primary hover:underline text-left"
+                        >
+                          {emp.employee_name}
+                        </button>
+                      </td>
                       <td className="py-2.5 pr-4 text-muted-foreground">
                         {emp.designation}
                       </td>
@@ -200,6 +264,18 @@ export function BenchPoolTable({
           skills={managingEmployee.skills}
           onUpdate={handleSkillUpdate}
           onClose={() => setManagingEmployee(null)}
+        />
+      )}
+
+      {/* Assign Project Modal */}
+      {showAssignModal && (
+        <AssignProjectModal
+          selectedEmployees={selectedEmployees}
+          onClose={() => setShowAssignModal(false)}
+          onSuccess={() => {
+            setSelectedIds(new Set())
+            onRefresh()
+          }}
         />
       )}
     </>

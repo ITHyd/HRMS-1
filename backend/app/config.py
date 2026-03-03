@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     JWT_EXPIRATION_MINUTES: int = 480  # 8 hours
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
 
+    # HRMS integration
+    HRMS_BASE_URL: str = "http://149.102.158.71:2342"
+    HRMS_TOKEN: str = ""
+
     class Config:
         env_file = ".env"
 

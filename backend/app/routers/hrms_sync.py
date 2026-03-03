@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from app.middleware.auth_middleware import CurrentUser, get_current_user
 from app.schemas.hrms_sync import HrmsSyncTriggerRequest
-from app.services.hrms_sync_service import trigger_sync, get_sync_logs
+from app.services.hrms_sync_service import trigger_sync, sync_master_data, get_sync_logs
 
 router = APIRouter(prefix="/hrms-sync", tags=["HRMS Sync"])
 
@@ -17,6 +17,19 @@ async def trigger_hrms_sync(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/master-data")
+async def trigger_master_data_sync(
+    hrms_token: str = Body(..., embed=True),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Full replacement sync of master data from the real HRMS portal."""
+    try:
+        result = await sync_master_data(token=hrms_token, user_id=user.user_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/logs")

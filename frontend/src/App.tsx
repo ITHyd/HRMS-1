@@ -18,11 +18,11 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<AppLayout />}>
-          <Route path="/" element={<OrgChartPage />} />
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/org-chart" element={<OrgChartPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/timesheets" element={<TimesheetPage />} />
           <Route path="/finance" element={<FinancePage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/availability" element={<AvailabilityPage />} />
           <Route path="/integrations" element={<IntegrationPage />} />
           <Route path="/import" element={<ImportPage />} />

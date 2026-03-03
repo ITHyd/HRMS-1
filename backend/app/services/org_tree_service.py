@@ -61,14 +61,19 @@ async def build_full_org_tree(branch_location_id: str = None, branch_head_id: st
 
     emp_map = {str(e.id): e for e in employees}
 
-    def build_subtree(node_id):
+    def build_subtree(node_id, visited=None):
+        if visited is None:
+            visited = set()
+        if node_id in visited:
+            return None
+        visited.add(node_id)
         emp = emp_map.get(node_id)
         if not emp:
             return None
         node = _employee_to_dict(emp, loc_map, dept_map, branch_location_id, branch_head_id)
         child_ids = children_map.get(node_id, [])
         for child_id in child_ids:
-            child_node = build_subtree(child_id)
+            child_node = build_subtree(child_id, visited)
             if child_node:
                 node["children"].append(child_node)
         return node
@@ -117,13 +122,18 @@ async def get_branch_subtree(location_id: str, branch_head_id: str = None):
     }
     root_ids = branch_emp_ids - managed_in_branch
 
-    def build_subtree(node_id):
+    def build_subtree(node_id, visited=None):
+        if visited is None:
+            visited = set()
+        if node_id in visited:
+            return None
+        visited.add(node_id)
         emp = emp_map.get(node_id)
         if not emp:
             return None
         node = _employee_to_dict(emp, loc_map, dept_map, location_id, branch_head_id)
         for child_id in children_map.get(node_id, []):
-            child_node = build_subtree(child_id)
+            child_node = build_subtree(child_id, visited)
             if child_node:
                 node["children"].append(child_node)
         return node

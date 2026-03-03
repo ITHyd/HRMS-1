@@ -7,6 +7,7 @@ from beanie import Document
 class UtilisationSnapshot(Document):
     employee_id: str
     employee_name: str
+    employee_level: str = ""  # mirrors Employee.level for filtering
     period: str  # YYYY-MM
     branch_location_id: str
     total_hours_logged: float = 0.0

@@ -1,6 +1,7 @@
 import { Outlet, Navigate } from "react-router-dom"
 import { Sidebar } from "./Sidebar"
 import { Header } from "./Header"
+import { EmployeeDrawer } from "@/components/employee-detail/EmployeeDrawer"
 import { useAuthStore } from "@/store/authStore"
 
 export function AppLayout() {
@@ -19,6 +20,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <EmployeeDrawer />
     </div>
   )
 }
