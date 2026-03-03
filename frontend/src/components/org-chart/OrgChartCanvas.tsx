@@ -24,6 +24,7 @@ import {
   computeFocusedNodeIds,
 } from "@/lib/orgTreeTransform"
 import { LOCATION_COLORS, DEPARTMENT_COLORS } from "@/lib/constants"
+import { EmployeeDrawer } from "@/components/employee-detail/EmployeeDrawer"
 import { Maximize, Minimize, X, UserRoundSearch } from "lucide-react"
 
 const nodeTypes: NodeTypes = {
@@ -52,6 +53,8 @@ export function OrgChartCanvas() {
   const focusedEmployeeId = useOrgChartStore((s) => s.focusedEmployeeId)
   const exitFocus = useOrgChartStore((s) => s.exitFocus)
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
+  const focusEmployeeId = useOrgChartStore((s) => s.focusEmployeeId)
+  const clearFocusEmployee = useOrgChartStore((s) => s.clearFocusEmployee)
   const initialized = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -95,7 +98,7 @@ export function OrgChartCanvas() {
       }
     }
     load()
-  }, [user])
+  }, [user, setLoading, setTreeData, expandBranch])
 
   // Transform tree data into React Flow nodes/edges
   const { nodes, edges } = useMemo(() => {
@@ -185,14 +188,32 @@ export function OrgChartCanvas() {
         .catch(console.error)
         .finally(() => clearTrace())
     }
-  }, [traceMode.toId])
+  }, [traceMode.active, traceMode.fromId, traceMode.toId, setHighlightedPath, clearTrace])
 
-  // Auto-fit on data change
+  // Auto-fit only on initial load
+  const hasFitted = useRef(false)
   useEffect(() => {
-    if (nodes.length > 0 && !focusedEmployeeId) {
+    if (nodes.length > 0 && !hasFitted.current && !focusedEmployeeId) {
+      hasFitted.current = true
       setTimeout(() => fitView({ padding: 0.05, duration: 300 }), 100)
     }
-  }, [nodes.length])
+  }, [nodes.length, fitView, focusedEmployeeId])
+
+  // Focus on a specific employee (from drawer navigation)
+  useEffect(() => {
+    if (!focusEmployeeId) return
+    const targetNode = nodes.find((n) => n.id === focusEmployeeId)
+    if (targetNode) {
+      setTimeout(() => {
+        setCenter(
+          targetNode.position.x + 120,
+          targetNode.position.y + 42,
+          { zoom: 1.0, duration: 500 }
+        )
+      }, 150)
+      clearFocusEmployee()
+    }
+  }, [focusEmployeeId, nodes, setCenter, clearFocusEmployee])
 
   // Focus mode: fit view to focused nodes
   useEffect(() => {
@@ -312,7 +333,6 @@ export function OrgChartCanvas() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onPaneClick={handlePaneClick}
-        fitView
         minZoom={0.1}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
@@ -331,9 +351,10 @@ export function OrgChartCanvas() {
             return LOCATION_COLORS[code] || "#d1d5db"
           }}
           maskColor="rgba(0,0,0,0.08)"
-          className="!bg-white !border"
+          className="bg-white border border-border"
         />
       </ReactFlow>
+      {isFullscreen && <EmployeeDrawer />}
     </div>
   )
 }

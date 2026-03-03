@@ -15,15 +15,15 @@ export function Sheet({ open, onClose, children, className }: SheetProps) {
   return (
     <div
       className={cn(
-        "fixed right-0 top-0 z-50 h-full w-[480px] max-w-[90vw] bg-background shadow-xl border-l transition-transform duration-300 overflow-y-auto",
+        "fixed right-0 top-14 z-50 flex flex-col h-[calc(100%-3.5rem)] w-96 max-w-[90vw] bg-background shadow-xl border-l transition-transform duration-300",
         className
       )}
     >
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 cursor-pointer rounded-md p-1 opacity-70 transition-all hover:opacity-100 hover:bg-muted"
+          className="absolute right-4 top-4 z-10 cursor-pointer rounded-md p-1 opacity-70 transition-all hover:opacity-100 hover:bg-muted"
         >
-          <X className="h-4 w-4" />
+          <X className="h-5 w-5" />
         </button>
         {children}
     </div>
@@ -31,7 +31,7 @@ export function Sheet({ open, onClose, children, className }: SheetProps) {
 }
 
 export function SheetHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col space-y-2 p-6 pb-0", className)} {...props} />
+  return <div className={cn("flex flex-col space-y-1.5 shrink-0 px-5 py-3 border-b", className)} {...props} />
 }
 
 export function SheetTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
@@ -39,5 +39,5 @@ export function SheetTitle({ className, ...props }: React.HTMLAttributes<HTMLHea
 }
 
 export function SheetContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-6", className)} {...props} />
+  return <div className={cn("flex-1 overflow-y-auto p-6", className)} {...props} />
 }

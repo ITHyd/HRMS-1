@@ -3,6 +3,7 @@ import { Sheet, SheetHeader, SheetTitle, SheetContent } from "@/components/ui/sh
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useOrgChartStore } from "@/store/orgChartStore"
+import { useAuthStore } from "@/store/authStore"
 import { getEmployee } from "@/api/employees"
 import { getReportingChain } from "@/api/org"
 import type { EmployeeDetail } from "@/types/employee"
@@ -39,7 +40,8 @@ export function EmployeeDrawer() {
   const isOpen = useOrgChartStore((s) => s.isDrawerOpen)
   const selectedId = useOrgChartStore((s) => s.selectedEmployeeId)
   const closeDrawer = useOrgChartStore((s) => s.closeDrawer)
-  const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
+  const focusEmployee = useOrgChartStore((s) => s.focusEmployee)
+  const loggedInUser = useAuthStore((s) => s.user)
   const [employee, setEmployee] = useState<EmployeeDetail | null>(null)
   const [chain, setChain] = useState<Record<string, unknown>[]>([])
   const [loading, setLoading] = useState(false)
@@ -93,24 +95,24 @@ export function EmployeeDrawer() {
       ) : employee ? (
         <>
           <SheetHeader>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <div
-                className="h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold text-white"
+                className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
                 style={{ backgroundColor: locColor }}
               >
                 {employee.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
               </div>
-              <div>
-                <SheetTitle>{employee.name}</SheetTitle>
-                <p className="text-sm text-muted-foreground">{employee.designation}</p>
+              <div className="min-w-0">
+                <SheetTitle className="text-base leading-tight">{employee.name}</SheetTitle>
+                <p className="text-xs text-muted-foreground">{employee.designation}</p>
               </div>
             </div>
-            <div className="flex gap-2 mt-2">
-              <Badge variant="secondary">{employee.department}</Badge>
-              <Badge style={{ backgroundColor: locColor + "20", color: locColor, borderColor: locColor }}>
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{employee.department}</Badge>
+              <Badge className="text-[10px] px-1.5 py-0" style={{ backgroundColor: locColor + "20", color: locColor, borderColor: locColor }}>
                 {employee.location_code} · {employee.location_city}
               </Badge>
-              <Badge variant="outline">{LEVEL_LABELS[employee.level] || employee.level}</Badge>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0">{LEVEL_LABELS[employee.level] || employee.level}</Badge>
             </div>
           </SheetHeader>
 
@@ -126,10 +128,10 @@ export function EmployeeDrawer() {
                     <span key={(c as Record<string, string>).id} className="flex items-center">
                       {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground mx-0.5" />}
                       <button
-                        onClick={() => selectEmployee((c as Record<string, string>).id)}
+                        onClick={() => focusEmployee((c as Record<string, string>).id)}
                         className="cursor-pointer rounded px-1.5 py-0.5 hover:bg-accent transition-colors"
                       >
-                        {(c as Record<string, string>).id === employee.id ? (
+                        {(c as Record<string, string>).id === loggedInUser?.employee_id ? (
                           <strong>{(c as Record<string, string>).name} (You)</strong>
                         ) : (
                           (c as Record<string, string>).name
@@ -273,7 +275,7 @@ export function EmployeeDrawer() {
                       {employee.managers.map((mgr) => (
                         <button
                           key={mgr.id}
-                          onClick={() => selectEmployee(mgr.id)}
+                          onClick={() => focusEmployee(mgr.id)}
                           className="cursor-pointer flex w-full items-center gap-2 rounded-lg border p-2 text-left text-sm hover:bg-accent transition-colors"
                         >
                           <div className="flex-1">
@@ -357,7 +359,7 @@ export function EmployeeDrawer() {
                   {employee.direct_reports.map((report) => (
                     <button
                       key={report.id}
-                      onClick={() => selectEmployee(report.id)}
+                      onClick={() => focusEmployee(report.id)}
                       className="cursor-pointer flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-accent transition-colors"
                     >
                       <div
