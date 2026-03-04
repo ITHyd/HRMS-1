@@ -43,6 +43,61 @@ interface TransformOptions {
   expandedDeptGroups: Set<string>
 }
 
+function emitRoleGroups(
+  parentNode: OrgTreeNode,
+  rfNodes: Node[],
+  rfEdges: Edge[],
+  options: TransformOptions
+) {
+  // Group children by designation/role instead of department
+  const roleMap = new Map<string, OrgTreeNode[]>()
+  for (const child of parentNode.children) {
+    const role = child.designation || "Other"
+    if (!roleMap.has(role)) roleMap.set(role, [])
+    roleMap.get(role)!.push(child)
+  }
+
+  for (const [role, children] of roleMap) {
+    const groupId = `role-group-${parentNode.id}-${role.replace(/\s+/g, '-')}`
+    const isGroupExpanded = options.expandedDeptGroups.has(groupId)
+
+    const locationBreakdown: Record<string, number> = {}
+    for (const c of children) {
+      const code = c.location_code || "?"
+      locationBreakdown[code] = (locationBreakdown[code] || 0) + 1
+    }
+
+    rfNodes.push({
+      id: groupId,
+      type: "departmentGroupNode",
+      position: { x: 0, y: 0 },
+      width: GROUP_NODE_WIDTH,
+      height: GROUP_NODE_HEIGHT,
+      data: {
+        parentId: parentNode.id,
+        department: role, // Use role as the label
+        departmentId: groupId,
+        headcount: children.length,
+        employeeIds: children.map((c) => c.id),
+        isExpanded: isGroupExpanded,
+        locationBreakdown,
+      } satisfies DepartmentGroupNodeData,
+    })
+
+    rfEdges.push({
+      id: `e-${parentNode.id}-${groupId}`,
+      source: parentNode.id,
+      target: groupId,
+      type: "reportingEdge",
+      data: { relationType: "PRIMARY" },
+    })
+
+    if (isGroupExpanded) {
+      flattenTree(children, rfNodes, rfEdges, options, groupId)
+    }
+  }
+}
+
 function emitDepartmentGroups(
   parentNode: OrgTreeNode,
   rfNodes: Node[],
@@ -209,7 +264,7 @@ function flattenTree(
 
     if (isExpanded && node.children.length > 0) {
       if (node.children.length > DEPT_GROUP_THRESHOLD) {
-        emitDepartmentGroups(node, rfNodes, rfEdges, options)
+        emitRoleGroups(node, rfNodes, rfEdges, options)
       } else {
         flattenTree(node.children, rfNodes, rfEdges, options, node.id)
       }
