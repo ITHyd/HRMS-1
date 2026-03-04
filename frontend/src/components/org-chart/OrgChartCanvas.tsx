@@ -4,6 +4,8 @@ import {
   MiniMap,
   Controls,
   useReactFlow,
+  Handle,
+  Position,
   type NodeTypes,
   type EdgeTypes,
   type Node,
@@ -28,9 +30,17 @@ import { LOCATION_COLORS, DEPARTMENT_COLORS } from "@/lib/constants"
 import { EmployeeDrawer } from "@/components/employee-detail/EmployeeDrawer"
 import { Maximize, Minimize, X, UserRoundSearch } from "lucide-react"
 
+const JunctionNode = () => (
+  <div style={{ width: 0, height: 0, overflow: "hidden" }}>
+    <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
+    <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+  </div>
+)
+
 const nodeTypes: NodeTypes = {
   employeeNode: EmployeeNode,
   departmentGroupNode: DepartmentGroupNode,
+  junctionNode: JunctionNode,
 }
 
 const edgeTypes: EdgeTypes = {
@@ -38,7 +48,7 @@ const edgeTypes: EdgeTypes = {
 }
 
 export function OrgChartCanvas() {
-  const { fitView, setCenter } = useReactFlow()
+  const { fitView, setCenter, getZoom } = useReactFlow()
   const user = useAuthStore((s) => s.user)
   const treeData = useOrgChartStore((s) => s.treeData)
   const setTreeData = useOrgChartStore((s) => s.setTreeData)
@@ -60,6 +70,7 @@ export function OrgChartCanvas() {
   const initialized = useRef(false)
   const expandAttemptedRef = useRef<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const prevExpandedGroups = useRef<Set<string>>(new Set())
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [rfReady, setRfReady] = useState(false)
 
@@ -304,6 +315,33 @@ export function OrgChartCanvas() {
     }
   }, [focusedEmployeeId, focusedNodeIds, nodes, fitView])
 
+  // Auto-center on newly expanded department groups
+  useEffect(() => {
+    const newlyExpanded = [...expandedDeptGroups].filter(
+      (id) => !prevExpandedGroups.current.has(id)
+    )
+    prevExpandedGroups.current = new Set(expandedDeptGroups)
+
+    if (newlyExpanded.length === 0 || nodes.length === 0) return
+
+    const groupId = newlyExpanded[0]
+    const groupNode = nodes.find((n) => n.id === groupId)
+    if (!groupNode) return
+
+    const data = groupNode.data as Record<string, unknown>
+    const employeeIds = data.employeeIds as string[] | undefined
+    if (!employeeIds) return
+
+    const childIds = new Set(employeeIds)
+    const relevantNodes = nodes.filter(
+      (n) => n.id === groupId || childIds.has(n.id)
+    )
+
+    setTimeout(() => {
+      fitView({ nodes: relevantNodes, padding: 0.15, duration: 500 })
+    }, 200)
+  }, [expandedDeptGroups, nodes, fitView])
+
   // "My Branch" button event
   useEffect(() => {
     const handleFocusBranch = () => {
@@ -505,6 +543,9 @@ export function OrgChartCanvas() {
             const data = node.data as Record<string, unknown>
             const code = data?.locationCode as string
             return LOCATION_COLORS[code] || "#d1d5db"
+          }}
+          onClick={(_event, position) => {
+            setCenter(position.x, position.y, { zoom: getZoom(), duration: 300 })
           }}
           maskColor="rgba(0,0,0,0.08)"
           className="bg-white border border-border"
