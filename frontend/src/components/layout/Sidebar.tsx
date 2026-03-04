@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { NavLink } from "react-router-dom"
 import {
   Network,
@@ -15,9 +16,11 @@ import {
   Link2,
   PanelLeftClose,
   PanelLeftOpen,
+  UserCircle2,
 } from "lucide-react"
 import { useAuthStore } from "@/store/authStore"
 import { cn } from "@/lib/utils"
+import { UserProfileModal } from "./UserProfileModal"
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -40,6 +43,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user, logout } = useAuthStore()
+  const [showProfileModal, setShowProfileModal] = useState(false)
 
   return (
     <aside
@@ -110,29 +114,61 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Footer */}
       <div className="border-t p-3">
         <div className="flex items-center gap-2">
+          {/* Profile Avatar - Clickable */}
+          <button
+            onClick={() => setShowProfileModal(true)}
+            className={cn(
+              "flex-shrink-0 rounded-full transition-all duration-200 hover:ring-2 hover:ring-primary/50 focus:outline-none focus:ring-2 focus:ring-primary",
+              collapsed ? "mx-auto" : ""
+            )}
+            title={collapsed ? `View ${user?.name}'s profile` : "View profile"}
+          >
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white text-sm font-bold shadow-md">
+              {user?.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+            </div>
+          </button>
+
           <div
             className={cn(
               "overflow-hidden transition-all duration-300 ease-in-out min-w-0",
               collapsed ? "w-0 opacity-0" : "flex-1 opacity-100"
             )}
           >
-            <p className="text-sm font-medium truncate whitespace-nowrap">{user?.name}</p>
-            <p className="text-xs text-muted-foreground whitespace-nowrap">
-              Branch: {user?.branch_code}
-            </p>
+            <button
+              onClick={() => setShowProfileModal(true)}
+              className="text-left w-full group"
+            >
+              <p className="text-sm font-medium truncate whitespace-nowrap group-hover:text-primary transition-colors">
+                {user?.name}
+              </p>
+              <p className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                <Building2 className="h-3 w-3" />
+                Branch: {user?.branch_code}
+              </p>
+            </button>
           </div>
+
           <button
             onClick={logout}
             title="Sign Out"
             className={cn(
               "cursor-pointer shrink-0 rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors duration-200",
-              collapsed && "mx-auto"
+              collapsed && "hidden"
             )}
           >
             <LogOut className="h-4 w-4" />
           </button>
         </div>
       </div>
+
+      {/* Profile Modal */}
+      {user?.employee_id && (
+        <UserProfileModal
+          employeeId={user.employee_id}
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+        />
+      )}
     </aside>
   )
 }
