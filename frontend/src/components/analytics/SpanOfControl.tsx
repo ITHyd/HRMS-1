@@ -23,11 +23,6 @@ export function SpanOfControl({ data }: { data: SpanData[] }) {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-lg font-bold">{mgr.direct_report_count}</span>
-                {mgr.is_outlier && (
-                  <Badge variant="destructive" className="text-[10px]">
-                    {mgr.direct_report_count > 10 ? "Too wide" : "Too narrow"}
-                  </Badge>
-                )}
               </div>
             </div>
           ))}

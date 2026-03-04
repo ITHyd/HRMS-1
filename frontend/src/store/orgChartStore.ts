@@ -12,6 +12,7 @@ interface OrgChartState {
   isDrawerOpen: boolean
   traceMode: { active: boolean; fromId?: string; toId?: string }
   isLoading: boolean
+  showSecondaryEdges: boolean
 
   setTreeData: (data: OrgTreeResponse) => void
   toggleNodeExpand: (nodeId: string) => void
@@ -29,6 +30,7 @@ interface OrgChartState {
   clearTrace: () => void
   setLoading: (loading: boolean) => void
   expandBranch: (nodeIds: string[]) => void
+  toggleSecondaryEdges: () => void
   focusEmployeeId: string | null
   focusEmployee: (id: string) => void
   clearFocusEmployee: () => void
@@ -44,6 +46,7 @@ export const useOrgChartStore = create<OrgChartState>((set, get) => ({
   isDrawerOpen: false,
   traceMode: { active: false },
   isLoading: false,
+  showSecondaryEdges: true,
   focusEmployeeId: null,
 
   setTreeData: (data) => set({ treeData: data }),
@@ -104,6 +107,8 @@ export const useOrgChartStore = create<OrgChartState>((set, get) => ({
     set({ traceMode: { active: false }, highlightedPath: [] }),
 
   setLoading: (loading) => set({ isLoading: loading }),
+
+  toggleSecondaryEdges: () => set({ showSecondaryEdges: !get().showSecondaryEdges }),
 
   expandBranch: (nodeIds) => {
     const expanded = new Set(get().expandedNodeIds)

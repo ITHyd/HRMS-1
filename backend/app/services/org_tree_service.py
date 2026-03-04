@@ -17,12 +17,15 @@ async def _build_lookup_maps():
 def _employee_to_dict(emp, loc_map, dept_map, branch_location_id=None, branch_head_id=None):
     loc = loc_map.get(emp.location_id)
     dept = dept_map.get(emp.department_id)
+    parent_dept = dept_map.get(dept.parent_id) if dept and dept.parent_id else None
     return {
         "id": str(emp.id),
         "name": emp.name,
         "designation": emp.designation,
         "department": dept.name if dept else "Unknown",
         "department_id": emp.department_id,
+        "parent_department_id": dept.parent_id if dept and dept.parent_id else emp.department_id,
+        "parent_department_name": parent_dept.name if parent_dept else (dept.name if dept else "Unknown"),
         "level": emp.level,
         "location_id": emp.location_id,
         "location_code": loc.code if loc else "UNK",

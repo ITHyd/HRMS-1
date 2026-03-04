@@ -53,4 +53,18 @@ export const DEPARTMENT_COLORS: Record<string, string> = {
   "Strategic Delivery": "#0d9488",
   General: "#6b7280",
   Internal: "#64748b",
+  // Parent departments
+  "Managed Services": "#0891b2",
+  "Engineering & Design": "#6366f1",
+  "SAP Services": "#d946ef",
+  "Internal Projects": "#64748b",
+  // Child departments (sub-categories)
+  UKPN: "#0ea5e9",
+  SGN: "#14b8a6",
+  WWU: "#f59e0b",
+  NGN: "#8b5cf6",
+  Cadent: "#f97316",
+  DCWW: "#06b6d4",
+  EirGrid: "#22c55e",
+  ENWL: "#ec4899",
 }
