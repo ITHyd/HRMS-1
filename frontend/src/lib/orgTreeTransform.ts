@@ -49,17 +49,30 @@ function emitDepartmentGroups(
   rfEdges: Edge[],
   options: TransformOptions
 ) {
-  const deptMap = new Map<string, OrgTreeNode[]>()
+  // Group children by parent_department_id first (two-level hierarchy)
+  const parentDeptMap = new Map<string, OrgTreeNode[]>()
   for (const child of parentNode.children) {
-    const key = child.department_id || "general"
-    if (!deptMap.has(key)) deptMap.set(key, [])
-    deptMap.get(key)!.push(child)
+    const key = child.parent_department_id || child.department_id || "general"
+    if (!parentDeptMap.has(key)) parentDeptMap.set(key, [])
+    parentDeptMap.get(key)!.push(child)
   }
 
-  for (const [deptId, children] of deptMap) {
-    const groupId = `dept-group-${parentNode.id}-${deptId}`
+  for (const [parentDeptId, children] of parentDeptMap) {
+    // Check if this parent department has sub-departments
+    const subDeptMap = new Map<string, OrgTreeNode[]>()
+    for (const child of children) {
+      const key = child.department_id || "general"
+      if (!subDeptMap.has(key)) subDeptMap.set(key, [])
+      subDeptMap.get(key)!.push(child)
+    }
+
+    const hasSubDepts =
+      subDeptMap.size > 1 ||
+      (subDeptMap.size === 1 && !subDeptMap.has(parentDeptId))
+
+    const groupId = `dept-group-${parentNode.id}-${parentDeptId}`
     const isGroupExpanded = options.expandedDeptGroups.has(groupId)
-    const deptName = children[0].department || "General"
+    const deptName = children[0].parent_department_name || children[0].department || "General"
 
     const locationBreakdown: Record<string, number> = {}
     for (const c of children) {
@@ -76,7 +89,7 @@ function emitDepartmentGroups(
       data: {
         parentId: parentNode.id,
         department: deptName,
-        departmentId: deptId,
+        departmentId: parentDeptId,
         headcount: children.length,
         employeeIds: children.map((c) => c.id),
         isExpanded: isGroupExpanded,
@@ -93,7 +106,62 @@ function emitDepartmentGroups(
     })
 
     if (isGroupExpanded) {
-      flattenTree(children, rfNodes, rfEdges, options, groupId)
+      if (hasSubDepts) {
+        // Emit sub-department groups within this parent group
+        emitSubDepartmentGroups(groupId, subDeptMap, rfNodes, rfEdges, options)
+      } else {
+        // No sub-departments — show employees directly
+        flattenTree(children, rfNodes, rfEdges, options, groupId)
+      }
+    }
+  }
+}
+
+function emitSubDepartmentGroups(
+  parentGroupId: string,
+  subDeptMap: Map<string, OrgTreeNode[]>,
+  rfNodes: Node[],
+  rfEdges: Edge[],
+  options: TransformOptions
+) {
+  for (const [deptId, children] of subDeptMap) {
+    const subGroupId = `dept-subgroup-${parentGroupId}-${deptId}`
+    const isSubGroupExpanded = options.expandedDeptGroups.has(subGroupId)
+    const deptName = children[0].department || "General"
+
+    const locationBreakdown: Record<string, number> = {}
+    for (const c of children) {
+      const code = c.location_code || "?"
+      locationBreakdown[code] = (locationBreakdown[code] || 0) + 1
+    }
+
+    rfNodes.push({
+      id: subGroupId,
+      type: "departmentGroupNode",
+      position: { x: 0, y: 0 },
+      width: GROUP_NODE_WIDTH,
+      height: GROUP_NODE_HEIGHT,
+      data: {
+        parentId: parentGroupId,
+        department: deptName,
+        departmentId: deptId,
+        headcount: children.length,
+        employeeIds: children.map((c) => c.id),
+        isExpanded: isSubGroupExpanded,
+        locationBreakdown,
+      } satisfies DepartmentGroupNodeData,
+    })
+
+    rfEdges.push({
+      id: `e-${parentGroupId}-${subGroupId}`,
+      source: parentGroupId,
+      target: subGroupId,
+      type: "reportingEdge",
+      data: { relationType: "PRIMARY" },
+    })
+
+    if (isSubGroupExpanded) {
+      flattenTree(children, rfNodes, rfEdges, options, subGroupId)
     }
   }
 }

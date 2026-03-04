@@ -28,7 +28,7 @@ import {
 } from "@/lib/orgTreeTransform"
 import { LOCATION_COLORS, DEPARTMENT_COLORS } from "@/lib/constants"
 import { EmployeeDrawer } from "@/components/employee-detail/EmployeeDrawer"
-import { Maximize, Minimize, X, UserRoundSearch } from "lucide-react"
+import { Maximize, Minimize, X, UserRoundSearch, ToggleLeft, ToggleRight } from "lucide-react"
 
 const JunctionNode = () => (
   <div style={{ width: 0, height: 0, overflow: "hidden" }}>
@@ -67,6 +67,8 @@ export function OrgChartCanvas() {
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
   const focusEmployeeId = useOrgChartStore((s) => s.focusEmployeeId)
   const clearFocusEmployee = useOrgChartStore((s) => s.clearFocusEmployee)
+  const showSecondaryEdges = useOrgChartStore((s) => s.showSecondaryEdges)
+  const toggleSecondaryEdges = useOrgChartStore((s) => s.toggleSecondaryEdges)
   const initialized = useRef(false)
   const expandAttemptedRef = useRef<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -178,9 +180,15 @@ export function OrgChartCanvas() {
     })
   }, [nodes, focusedNodeIds])
 
+  // Filter out secondary (dotted) edges when toggle is off
+  const visibleEdges = useMemo(() => {
+    if (showSecondaryEdges) return edges
+    return edges.filter((e) => !e.id.startsWith("sec-"))
+  }, [edges, showSecondaryEdges])
+
   // Style edges with focus opacity
   const styledEdges = useMemo((): Edge[] => {
-    if (!focusedNodeIds) return edges
+    if (!focusedNodeIds) return visibleEdges
 
     const visibleNodeIds = new Set<string>()
     for (const node of styledNodes) {
@@ -189,7 +197,7 @@ export function OrgChartCanvas() {
       }
     }
 
-    return edges.map((edge) => ({
+    return visibleEdges.map((edge) => ({
       ...edge,
       style: {
         ...edge.style,
@@ -200,7 +208,7 @@ export function OrgChartCanvas() {
         transition: "opacity 0.3s ease",
       },
     }))
-  }, [edges, focusedNodeIds, styledNodes])
+  }, [visibleEdges, focusedNodeIds, styledNodes])
 
   // Handle trace mode completion
   useEffect(() => {
@@ -468,13 +476,27 @@ export function OrgChartCanvas() {
 
   return (
     <div ref={containerRef} className="h-full w-full bg-white">
-      <button
-        onClick={toggleFullscreen}
-        className="cursor-pointer absolute top-4 right-4 z-20 bg-white border rounded-lg p-2 shadow hover:bg-gray-50 transition-colors"
-        title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-      >
-        {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-      </button>
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        <button
+          onClick={toggleSecondaryEdges}
+          className={`cursor-pointer flex items-center gap-1.5 border rounded-lg px-2.5 py-2 text-xs font-medium shadow transition-colors ${
+            showSecondaryEdges
+              ? "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              : "bg-white text-gray-500 hover:bg-gray-50"
+          }`}
+          title={showSecondaryEdges ? "Hide dotted lines" : "Show dotted lines"}
+        >
+          {showSecondaryEdges ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
+          Dotted Lines
+        </button>
+        <button
+          onClick={toggleFullscreen}
+          className="cursor-pointer bg-white border rounded-lg p-2 shadow hover:bg-gray-50 transition-colors"
+          title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+        >
+          {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+        </button>
+      </div>
 
       {/* Focus mode overlay */}
       {focusedEmployeeId && (

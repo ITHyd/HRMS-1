@@ -4,6 +4,8 @@ export interface OrgTreeNode {
   designation: string
   department: string
   department_id: string
+  parent_department_id: string
+  parent_department_name: string
   level: string
   location_id: string
   location_code: string
