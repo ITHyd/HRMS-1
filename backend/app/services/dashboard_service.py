@@ -7,6 +7,7 @@ from app.models.department import Department
 from app.models.employee import Employee
 from app.models.employee_project import EmployeeProject
 from app.models.project import Project
+from app.models.project_allocation import ProjectAllocation
 from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
 
@@ -478,3 +479,41 @@ async def get_project_dashboard(
         })
 
     return {"period": period, "projects": result_projects, "total": total}
+
+
+async def get_allocation_dashboard(
+    period: str,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    """HRMS project allocation data for a given period."""
+    allocations = await ProjectAllocation.find(
+        ProjectAllocation.period == period,
+    ).to_list()
+
+    if search:
+        search_lower = search.lower()
+        allocations = [a for a in allocations if search_lower in a.employee_name.lower()]
+
+    total = len(allocations)
+    start = (page - 1) * page_size
+    page_allocations = allocations[start : start + page_size]
+
+    entries = [
+        {
+            "employee_id": a.employee_id,
+            "employee_name": a.employee_name,
+            "project_id": a.project_id,
+            "project_name": a.project_name,
+            "client_name": a.client_name,
+            "allocation_percentage": a.allocation_percentage,
+            "allocated_days": a.allocated_days,
+            "total_working_days": a.total_working_days,
+            "total_allocated_days": a.total_allocated_days,
+            "available_days": a.available_days,
+        }
+        for a in page_allocations
+    ]
+
+    return {"period": period, "allocations": entries, "total": total}

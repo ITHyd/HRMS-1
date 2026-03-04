@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { StatusBadge } from "@/components/shared/StatusBadge"
+import { PeriodSelector } from "@/components/shared/PeriodSelector"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import { getProjectDetail } from "@/api/projects"
-import { ArrowLeft, Calendar, Users, Clock } from "lucide-react"
+import { ArrowLeft, Calendar, Users, Clock, CalendarDays, Briefcase } from "lucide-react"
 import type { ProjectDetail } from "@/types/project"
 
 export function ProjectDetailPage() {
@@ -16,18 +17,23 @@ export function ProjectDetailPage() {
   const [project, setProject] = useState<ProjectDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedPeriod, setSelectedPeriod] = useState("2025-11")
 
-  useEffect(() => {
+  const fetchProject = useCallback(() => {
     if (!projectId) return
     setLoading(true)
-    getProjectDetail(projectId)
+    getProjectDetail(projectId, selectedPeriod)
       .then(setProject)
       .catch((err) => {
         console.error("Failed to load project:", err)
         setError("Project not found")
       })
       .finally(() => setLoading(false))
-  }, [projectId])
+  }, [projectId, selectedPeriod])
+
+  useEffect(() => {
+    fetchProject()
+  }, [fetchProject])
 
   if (loading) {
     return (
@@ -105,18 +111,23 @@ export function ProjectDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Timeline & Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Period Selector + Stats */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-muted-foreground">Monthly Progress</p>
+        <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="rounded-lg p-2 bg-blue-50">
-                <Calendar className="h-5 w-5 text-blue-600" />
+                <CalendarDays className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Start Date</p>
-                <p className="text-sm font-medium">
-                  {startDate ? startDate.toLocaleDateString() : "Not set"}
+                <p className="text-xs text-muted-foreground">Planned Days</p>
+                <p className="text-xl font-semibold tabular-nums">
+                  {project.planned_days > 0 ? project.planned_days : "-"}
                 </p>
               </div>
             </div>
@@ -125,13 +136,13 @@ export function ProjectDetailPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="rounded-lg p-2 bg-red-50">
-                <Calendar className="h-5 w-5 text-red-600" />
+              <div className="rounded-lg p-2 bg-green-50">
+                <Briefcase className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">End Date</p>
-                <p className="text-sm font-medium">
-                  {endDate ? endDate.toLocaleDateString() : "Not set"}
+                <p className="text-xs text-muted-foreground">Worked Days</p>
+                <p className="text-xl font-semibold tabular-nums">
+                  {project.worked_days > 0 ? project.worked_days : "-"}
                 </p>
               </div>
             </div>
@@ -152,24 +163,60 @@ export function ProjectDetailPage() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg p-2 bg-amber-50">
+                <Users className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Team Size</p>
+                <p className="text-xl font-semibold tabular-nums">
+                  {project.member_count}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Progress */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium">Timeline Progress</p>
-            <span className="text-sm font-medium tabular-nums">
+            <p className="text-sm font-medium">
+              {project.planned_days > 0 ? "Allocation Progress" : "Timeline Progress"}
+            </p>
+            <span className={`text-sm font-medium tabular-nums ${
+              project.progress_percent >= 80
+                ? "text-green-700"
+                : project.progress_percent >= 40
+                  ? "text-amber-700"
+                  : "text-red-700"
+            }`}>
               {project.progress_percent.toFixed(1)}%
             </span>
           </div>
-          <Progress value={project.progress_percent} className="h-3" />
-          {startDate && endDate && (
+          <Progress
+            value={project.progress_percent}
+            className={`h-3 ${
+              project.progress_percent >= 80
+                ? "[&>div]:bg-green-500"
+                : project.progress_percent >= 40
+                  ? "[&>div]:bg-amber-500"
+                  : "[&>div]:bg-red-500"
+            }`}
+          />
+          {project.planned_days > 0 ? (
+            <p className="mt-2 text-xs text-muted-foreground tabular-nums">
+              {project.worked_days} / {project.planned_days} days worked
+            </p>
+          ) : startDate && endDate ? (
             <div className="flex justify-between mt-2 text-xs text-muted-foreground">
               <span>{startDate.toLocaleDateString()}</span>
               <span>{endDate.toLocaleDateString()}</span>
             </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
@@ -196,9 +243,10 @@ export function ProjectDetailPage() {
                     <th className="py-2 px-3 font-medium">Name</th>
                     <th className="py-2 px-3 font-medium border-l border-border">Designation</th>
                     <th className="py-2 px-3 font-medium border-l border-border">Department</th>
-                    <th className="py-2 px-3 font-medium border-l border-border">Location</th>
                     <th className="py-2 px-3 font-medium border-l border-border">Role</th>
-                    <th className="py-2 px-3 font-medium border-l border-border">Assigned</th>
+                    <th className="py-2 px-3 font-medium text-right border-l border-border">Alloc %</th>
+                    <th className="py-2 px-3 font-medium text-right border-l border-border">Planned</th>
+                    <th className="py-2 px-3 font-medium text-right border-l border-border">Worked</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -221,18 +269,41 @@ export function ProjectDetailPage() {
                       <td className="py-2.5 px-3 text-muted-foreground border-l border-border">
                         {member.department}
                       </td>
-                      <td className="py-2.5 px-3 text-muted-foreground border-l border-border">
-                        {member.location}
-                      </td>
                       <td className="py-2.5 px-3 border-l border-border">
                         <Badge variant="outline" className="text-[10px] capitalize">
                           {member.role_in_project}
                         </Badge>
                       </td>
-                      <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap border-l border-border">
-                        {member.assigned_at
-                          ? new Date(member.assigned_at).toLocaleDateString()
-                          : "-"}
+                      <td className="py-2.5 px-3 text-right border-l border-border">
+                        {member.allocation_percentage != null ? (
+                          <span className={`text-xs font-medium tabular-nums ${
+                            member.allocation_percentage >= 80
+                              ? "text-green-700"
+                              : member.allocation_percentage >= 40
+                                ? "text-amber-700"
+                                : "text-red-700"
+                          }`}>
+                            {member.allocation_percentage}%
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right tabular-nums text-muted-foreground border-l border-border">
+                        {member.allocated_days != null ? member.allocated_days : "-"}
+                      </td>
+                      <td className="py-2.5 px-3 text-right tabular-nums border-l border-border">
+                        {member.worked_days != null ? (
+                          <span className={
+                            member.allocated_days != null && member.worked_days > member.allocated_days
+                              ? "text-red-700 font-medium"
+                              : "text-muted-foreground"
+                          }>
+                            {member.worked_days}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </td>
                     </tr>
                   ))}

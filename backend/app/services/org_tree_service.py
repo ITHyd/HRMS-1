@@ -50,6 +50,31 @@ async def build_full_org_tree(branch_location_id: str = None, branch_head_id: st
 
     loc_map, dept_map = await _build_lookup_maps()
 
+    # Filter out Manager and Project Manager from Internal Projects department
+    # Also filter out Admin and IT Admin designations
+    filtered_employees = []
+    for emp in employees:
+        dept = dept_map.get(emp.department_id)
+        dept_name = dept.name if dept else ""
+        designation_lower = emp.designation.lower()
+
+        # Skip if it's a Manager or Project Manager in Internal Projects
+        if dept_name == "Internal Projects" and (
+            "project manager" in designation_lower or
+            designation_lower == "manager"
+        ):
+            continue
+
+        # Skip if designation is Admin or IT Admin (including variations)
+        if (designation_lower == "admin" or 
+            "it admin" in designation_lower or 
+            designation_lower == "itadmin"):
+            continue
+
+        filtered_employees.append(emp)
+
+    employees = filtered_employees
+
     # Build adjacency: manager_id -> [employee_ids]
     children_map = defaultdict(list)
     parent_map = {}
@@ -99,6 +124,8 @@ async def build_full_org_tree(branch_location_id: str = None, branch_head_id: st
     return {"nodes": tree_nodes, "secondary_edges": secondary_edges}
 
 
+
+
 async def get_branch_subtree(location_id: str, branch_head_id: str = None):
     employees = await Employee.find(
         Employee.location_id == location_id,
@@ -109,6 +136,31 @@ async def get_branch_subtree(location_id: str, branch_head_id: str = None):
     ).to_list()
 
     loc_map, dept_map = await _build_lookup_maps()
+    
+    # Filter out Manager and Project Manager from Internal Projects department
+    # Also filter out Admin and IT Admin designations
+    filtered_employees = []
+    for emp in employees:
+        dept = dept_map.get(emp.department_id)
+        dept_name = dept.name if dept else ""
+        designation_lower = emp.designation.lower()
+        
+        # Skip if it's a Manager or Project Manager in Internal Projects
+        if dept_name == "Internal Projects" and (
+            "project manager" in designation_lower or 
+            designation_lower == "manager"
+        ):
+            continue
+        
+        # Skip if designation is Admin or IT Admin (including variations)
+        if (designation_lower == "admin" or 
+            "it admin" in designation_lower or 
+            designation_lower == "itadmin"):
+            continue
+        
+        filtered_employees.append(emp)
+    
+    employees = filtered_employees
 
     branch_emp_ids = {str(e.id) for e in employees}
     emp_map = {str(e.id): e for e in employees}

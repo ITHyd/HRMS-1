@@ -3,6 +3,7 @@ import type {
   ExecutiveDashboard,
   ResourceDashboardResponse,
   ProjectDashboardResponse,
+  AllocationDashboardResponse,
 } from "@/types/dashboard"
 
 export async function getExecutiveDashboard(
@@ -34,6 +35,18 @@ export async function getProjectDashboard(params: {
   page_size?: number
 }): Promise<ProjectDashboardResponse> {
   const res = await client.get<ProjectDashboardResponse>("/dashboard/projects", {
+    params,
+  })
+  return res.data
+}
+
+export async function getAllocationDashboard(params: {
+  period: string
+  search?: string
+  page?: number
+  page_size?: number
+}): Promise<AllocationDashboardResponse> {
+  const res = await client.get<AllocationDashboardResponse>("/dashboard/allocations", {
     params,
   })
   return res.data

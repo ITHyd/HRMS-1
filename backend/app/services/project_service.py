@@ -8,6 +8,8 @@ from app.models.employee import Employee
 from app.models.employee_project import EmployeeProject
 from app.models.location import Location
 from app.models.project import Project
+from app.models.project_allocation import ProjectAllocation
+from app.models.timesheet_entry import TimesheetEntry
 from app.services.audit_service import log_change
 
 
@@ -16,6 +18,7 @@ async def list_projects(
     search: Optional[str] = None,
     project_type: Optional[str] = None,
     status: Optional[str] = None,
+    period: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
 ):
@@ -58,6 +61,33 @@ async def list_projects(
             member_counts[a.project_id] = 0
         member_counts[a.project_id] += 1
 
+    # Compute planned_days, worked_days, and allocated member counts from allocation + timesheet data
+    planned_by_project: dict[str, float] = {}
+    worked_by_project: dict[str, float] = {}
+    allocated_members_by_project: dict[str, int] = {}
+    if period:
+        allocs = await ProjectAllocation.find(
+            ProjectAllocation.period == period,
+        ).to_list()
+        for a in allocs:
+            planned_by_project[a.project_id] = (
+                planned_by_project.get(a.project_id, 0.0) + a.allocated_days
+            )
+            allocated_members_by_project[a.project_id] = (
+                allocated_members_by_project.get(a.project_id, 0) + 1
+            )
+
+        timesheets = await TimesheetEntry.find(
+            TimesheetEntry.period == period,
+            TimesheetEntry.status != "rejected",
+        ).to_list()
+        for t in timesheets:
+            worked_by_project[t.project_id] = (
+                worked_by_project.get(t.project_id, 0.0) + t.hours
+            )
+        # Convert hours to days (8 hours = 1 day)
+        worked_by_project = {k: round(v / 8, 1) for k, v in worked_by_project.items()}
+
     # Status counts
     active_count = sum(1 for p in projects if p.status == "ACTIVE")
     completed_count = sum(1 for p in projects if p.status == "COMPLETED")
@@ -67,14 +97,19 @@ async def list_projects(
     result = []
     for p in projects:
         pid = str(p.id)
-        progress = 0.0
-        if p.start_date and p.end_date:
+        planned_days = planned_by_project.get(pid, 0.0)
+        worked_days = worked_by_project.get(pid, 0.0)
+
+        if period and planned_days > 0:
+            progress = min(100.0, (worked_days / planned_days) * 100)
+        elif p.start_date and p.end_date:
             start = p.start_date.replace(tzinfo=None) if p.start_date.tzinfo else p.start_date
             end = p.end_date.replace(tzinfo=None) if p.end_date.tzinfo else p.end_date
             total = (end - start).total_seconds()
             elapsed = (now - start).total_seconds()
-            if total > 0:
-                progress = min(100.0, max(0.0, (elapsed / total) * 100))
+            progress = min(100.0, max(0.0, (elapsed / total) * 100)) if total > 0 else 0.0
+        else:
+            progress = 0.0
 
         result.append({
             "id": pid,
@@ -85,7 +120,9 @@ async def list_projects(
             "department_name": dept_map.get(p.department_id, "Unknown"),
             "start_date": p.start_date.isoformat() if p.start_date else None,
             "end_date": p.end_date.isoformat() if p.end_date else None,
-            "member_count": member_counts.get(pid, 0),
+            "member_count": allocated_members_by_project.get(pid, 0) if period else member_counts.get(pid, 0),
+            "planned_days": round(planned_days, 1),
+            "worked_days": round(worked_days, 1),
             "progress_percent": round(progress, 1),
         })
 
@@ -189,8 +226,8 @@ async def assign_employees(
     }
 
 
-async def get_project_detail(project_id: str):
-    """Get project detail with members."""
+async def get_project_detail(project_id: str, period: Optional[str] = None):
+    """Get project detail with members and allocation-based progress."""
     project = await Project.get(project_id)
     if not project:
         return None
@@ -218,13 +255,38 @@ async def get_project_detail(project_id: str):
     mdept_map = {str(d.id): d.name for d in member_depts}
     mloc_map = {str(l.id): l for l in member_locs}
 
+    # Fetch per-member allocation and timesheet data for the period
+    alloc_map: dict[str, ProjectAllocation] = {}
+    worked_map: dict[str, float] = {}
+    if period:
+        proj_allocs = await ProjectAllocation.find(
+            ProjectAllocation.project_id == project_id,
+            ProjectAllocation.period == period,
+        ).to_list()
+        for pa in proj_allocs:
+            alloc_map[pa.employee_id] = pa
+
+        proj_timesheets = await TimesheetEntry.find(
+            TimesheetEntry.project_id == project_id,
+            TimesheetEntry.period == period,
+            TimesheetEntry.status != "rejected",
+        ).to_list()
+        for t in proj_timesheets:
+            worked_map[t.employee_id] = worked_map.get(t.employee_id, 0.0) + t.hours
+
     members = []
     for a in assignments:
         emp = emp_map.get(a.employee_id)
         if emp:
+            eid = str(emp.id)
+            alloc = alloc_map.get(eid)
+            worked_hours = worked_map.get(eid, 0.0)
+            # When period is set, only include members with allocation or timesheet data
+            if period and not alloc and worked_hours == 0:
+                continue
             loc = mloc_map.get(emp.location_id)
             members.append({
-                "employee_id": str(emp.id),
+                "employee_id": eid,
                 "employee_name": emp.name,
                 "designation": emp.designation,
                 "department": mdept_map.get(emp.department_id, "Unknown"),
@@ -232,17 +294,27 @@ async def get_project_detail(project_id: str):
                 "location_code": loc.code if loc else "UNK",
                 "role_in_project": a.role_in_project,
                 "assigned_at": a.assigned_at.isoformat() if a.assigned_at else None,
+                "allocation_percentage": alloc.allocation_percentage if alloc else None,
+                "allocated_days": alloc.allocated_days if alloc else None,
+                "worked_days": round(worked_hours / 8, 1) if worked_hours > 0 else None,
             })
 
+    # Project-level progress from allocation + timesheet
+    total_planned = sum(a.allocated_days for a in alloc_map.values()) if alloc_map else 0.0
+    total_worked_hours = sum(worked_map.values()) if worked_map else 0.0
+    total_worked = total_worked_hours / 8
+
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    progress = 0.0
-    if project.start_date and project.end_date:
+    if period and total_planned > 0:
+        progress = min(100.0, (total_worked / total_planned) * 100)
+    elif project.start_date and project.end_date:
         start = project.start_date.replace(tzinfo=None) if project.start_date.tzinfo else project.start_date
         end = project.end_date.replace(tzinfo=None) if project.end_date.tzinfo else project.end_date
         total = (end - start).total_seconds()
         elapsed = (now - start).total_seconds()
-        if total > 0:
-            progress = min(100.0, max(0.0, (elapsed / total) * 100))
+        progress = min(100.0, max(0.0, (elapsed / total) * 100)) if total > 0 else 0.0
+    else:
+        progress = 0.0
 
     return {
         "id": str(project.id),
@@ -253,6 +325,8 @@ async def get_project_detail(project_id: str):
         "department_name": dept.name if dept else "Unknown",
         "start_date": project.start_date.isoformat() if project.start_date else None,
         "end_date": project.end_date.isoformat() if project.end_date else None,
+        "planned_days": round(total_planned, 1),
+        "worked_days": round(total_worked, 1),
         "progress_percent": round(progress, 1),
         "member_count": len(members),
         "members": members,

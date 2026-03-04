@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/shared/StatusBadge"
+import { PeriodSelector } from "@/components/shared/PeriodSelector"
 import { Progress } from "@/components/ui/progress"
 import { listProjects } from "@/api/projects"
 import {
@@ -48,6 +49,7 @@ export function ProjectListPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
+  const [selectedPeriod, setSelectedPeriod] = useState("2025-11")
 
   // Filters
   const [showFilters, setShowFilters] = useState(false)
@@ -63,6 +65,7 @@ export function ProjectListPage() {
         search: search || undefined,
         project_type: projectType || undefined,
         status: status || undefined,
+        period: selectedPeriod,
         page,
         page_size: pageSize,
       })
@@ -78,7 +81,7 @@ export function ProjectListPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, projectType, status, page, pageSize])
+  }, [search, projectType, status, selectedPeriod, page, pageSize])
 
   useEffect(() => {
     fetchData()
@@ -111,20 +114,26 @@ export function ProjectListPage() {
             View all projects assigned to your branch
           </p>
         </div>
-        <Button
-          variant={showFilters ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowFilters((v) => !v)}
-          className="h-8 text-xs relative"
-        >
-          <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
-          Filters
-          {activeFilterCount > 0 && (
-            <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
-              {activeFilterCount}
-            </span>
-          )}
-        </Button>
+        <div className="flex items-center gap-3">
+          <PeriodSelector
+            value={selectedPeriod}
+            onChange={(p) => { setSelectedPeriod(p); setPage(1) }}
+          />
+          <Button
+            variant={showFilters ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowFilters((v) => !v)}
+            className="h-8 text-xs relative"
+          >
+            <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -202,16 +211,16 @@ export function ProjectListPage() {
                     <th className="py-2.5 px-3 font-medium border-l border-border">Type</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border">Status</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border">Department</th>
-                    <th className="py-2.5 px-3 font-medium border-l border-border">Start Date</th>
-                    <th className="py-2.5 px-3 font-medium border-l border-border">End Date</th>
-                    <th className="py-2.5 px-3 font-medium border-l border-border min-w-[150px]">Progress</th>
+                    <th className="py-2.5 px-3 font-medium text-right border-l border-border">Planned Days</th>
+                    <th className="py-2.5 px-3 font-medium text-right border-l border-border">Worked Days</th>
+                    <th className="py-2.5 px-3 font-medium border-l border-border min-w-50">Progress</th>
                     <th className="py-2.5 px-3 font-medium text-right border-l border-border">Members</th>
                   </tr>
                 </thead>
                 <tbody>
                   {projects.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={7} className="py-8 text-center text-muted-foreground">
                         {activeFilterCount > 0
                           ? "No projects match the current filters"
                           : "No projects found"}
@@ -249,23 +258,43 @@ export function ProjectListPage() {
                         <td className="py-2.5 px-3 text-muted-foreground border-l border-border">
                           {proj.department_name}
                         </td>
-                        <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap border-l border-border">
-                          {proj.start_date
-                            ? new Date(proj.start_date).toLocaleDateString()
-                            : "-"}
+                        <td className="py-2.5 px-3 text-right tabular-nums border-l border-border">
+                          {proj.planned_days > 0 ? proj.planned_days : <span className="text-muted-foreground">-</span>}
                         </td>
-                        <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap border-l border-border">
-                          {proj.end_date
-                            ? new Date(proj.end_date).toLocaleDateString()
-                            : "-"}
+                        <td className="py-2.5 px-3 text-right tabular-nums border-l border-border">
+                          {proj.worked_days > 0 ? proj.worked_days : <span className="text-muted-foreground">-</span>}
                         </td>
                         <td className="py-2.5 px-3 border-l border-border">
-                          <div className="flex items-center gap-2">
-                            <Progress value={proj.progress_percent} className="h-2 flex-1" />
-                            <span className="text-xs tabular-nums text-muted-foreground w-10 text-right">
-                              {proj.progress_percent.toFixed(0)}%
-                            </span>
-                          </div>
+                          {proj.planned_days > 0 ? (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Progress
+                                  value={proj.progress_percent}
+                                  className={`h-2 flex-1 ${
+                                    proj.progress_percent >= 80
+                                      ? "[&>div]:bg-green-500"
+                                      : proj.progress_percent >= 40
+                                        ? "[&>div]:bg-amber-500"
+                                        : "[&>div]:bg-red-500"
+                                  }`}
+                                />
+                                <span className={`text-xs font-medium tabular-nums w-10 text-right ${
+                                  proj.progress_percent >= 80
+                                    ? "text-green-700"
+                                    : proj.progress_percent >= 40
+                                      ? "text-amber-700"
+                                      : "text-red-700"
+                                }`}>
+                                  {proj.progress_percent.toFixed(0)}%
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground tabular-nums">
+                                {proj.worked_days} / {proj.planned_days} days
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">No allocation</span>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-right border-l border-border">
                           <div className="flex items-center justify-end gap-1 text-muted-foreground">
