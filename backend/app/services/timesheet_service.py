@@ -219,11 +219,62 @@ async def list_entries(
         lock = await _get_period_lock(period, branch_location_id)
         is_locked = lock.is_locked if lock else False
 
+    # If no entries found, find the latest period that has data for this branch
+    latest_period = None
+    if total == 0 and branch_location_id:
+        latest_entry = await TimesheetEntry.find(
+            {"branch_location_id": branch_location_id}
+        ).sort(-TimesheetEntry.period).limit(1).to_list()
+        if latest_entry:
+            latest_period = latest_entry[0].period
+
+    # Compute summary stats across ALL matching entries (not just paginated page)
+    # Use aggregation pipeline for efficiency
+    base_filters = {}
+    if branch_location_id:
+        base_filters["branch_location_id"] = branch_location_id
+    if period:
+        base_filters["period"] = period
+
+    all_period_entries = await TimesheetEntry.find(base_filters).to_list()
+    total_hours = sum(e.hours for e in all_period_entries)
+    billable_hours = sum(e.hours for e in all_period_entries if e.is_billable)
+    unique_employees = len({e.employee_id for e in all_period_entries})
+    unique_projects = len({e.project_id for e in all_period_entries})
+
+    # Build filter options (distinct employees and projects for dropdowns)
+    filter_emp_ids = list({e.employee_id for e in all_period_entries})
+    filter_proj_ids = list({e.project_id for e in all_period_entries})
+    filter_employees = await Employee.find(
+        {"_id": {"$in": [ObjectId(eid) for eid in filter_emp_ids if ObjectId.is_valid(eid)]}}
+    ).to_list() if filter_emp_ids else []
+    filter_projects = await Project.find(
+        {"_id": {"$in": [ObjectId(pid) for pid in filter_proj_ids if ObjectId.is_valid(pid)]}}
+    ).to_list() if filter_proj_ids else []
+
     return {
         "entries": result,
         "total": total,
         "period": period or "",
         "is_locked": is_locked,
+        "latest_period": latest_period,
+        "summary": {
+            "total_hours": round(total_hours, 1),
+            "billable_hours": round(billable_hours, 1),
+            "billable_percent": round((billable_hours / total_hours * 100) if total_hours > 0 else 0, 1),
+            "employee_count": unique_employees,
+            "project_count": unique_projects,
+        },
+        "filter_options": {
+            "employees": sorted(
+                [{"id": str(e.id), "name": e.name} for e in filter_employees],
+                key=lambda x: x["name"],
+            ),
+            "projects": sorted(
+                [{"id": str(p.id), "name": p.name} for p in filter_projects],
+                key=lambda x: x["name"],
+            ),
+        },
     }
 
 
