@@ -7,8 +7,8 @@ const NODE_HEIGHT = 84
 const GROUP_NODE_WIDTH = 280
 const GROUP_NODE_HEIGHT = 72
 export const DEPT_GROUP_THRESHOLD = 10
-const MAX_CHILDREN_PER_ROW = 8
-const NODES_PER_SIDE = 4
+const MAX_CHILDREN_PER_ROW = 10
+const NODES_PER_SIDE = 5
 
 export interface EmployeeNodeData {
   name: string
@@ -233,18 +233,22 @@ function rearrangeWideRows(rfNodes: Node[], rfEdges: Edge[]) {
       }
 
       const newY = originalY + row * rowHeight
+      const xDelta = newX - children[i].position.x
       const yDelta = newY - children[i].position.y
 
       children[i].position = { x: newX, y: newY }
 
-      // Shift all descendants by the same Y delta
-      if (yDelta !== 0) {
+      // Shift all descendants by the same X and Y delta
+      if (xDelta !== 0 || yDelta !== 0) {
         const descendants = new Set<string>()
         collectDescendants(children[i].id, descendants)
         for (const descId of descendants) {
           const desc = nodeMap.get(descId)
           if (desc) {
-            desc.position = { x: desc.position.x, y: desc.position.y + yDelta }
+            desc.position = {
+              x: desc.position.x + xDelta,
+              y: desc.position.y + yDelta,
+            }
           }
         }
       }
