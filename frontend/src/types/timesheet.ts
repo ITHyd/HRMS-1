@@ -15,11 +15,27 @@ export interface TimesheetEntry {
   updated_at: string
 }
 
+export interface TimesheetSummary {
+  total_hours: number
+  billable_hours: number
+  billable_percent: number
+  employee_count: number
+  project_count: number
+}
+
+export interface TimesheetFilterOptions {
+  employees: Array<{ id: string; name: string }>
+  projects: Array<{ id: string; name: string }>
+}
+
 export interface TimesheetListResponse {
   entries: TimesheetEntry[]
   total: number
   period: string
   is_locked: boolean
+  latest_period?: string
+  summary: TimesheetSummary
+  filter_options: TimesheetFilterOptions
 }
 
 export interface TimesheetEntryCreate {
