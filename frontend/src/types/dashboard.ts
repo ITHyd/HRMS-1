@@ -84,3 +84,22 @@ export interface ProjectDashboardResponse {
   projects: ProjectDashboardEntry[]
   total: number
 }
+
+export interface AllocationEntry {
+  employee_id: string
+  employee_name: string
+  project_id: string
+  project_name: string
+  client_name: string | null
+  allocation_percentage: number
+  allocated_days: number
+  total_working_days: number
+  total_allocated_days: number
+  available_days: number
+}
+
+export interface AllocationDashboardResponse {
+  period: string
+  allocations: AllocationEntry[]
+  total: number
+}

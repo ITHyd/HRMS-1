@@ -36,6 +36,7 @@ async def get_projects(
     search: Optional[str] = Query(None),
     project_type: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    period: Optional[str] = Query(None, description="Period in YYYY-MM format", pattern=r"^\d{4}-\d{2}$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     user: CurrentUser = Depends(get_current_user),
@@ -45,6 +46,7 @@ async def get_projects(
         search=search,
         project_type=project_type,
         status=status,
+        period=period,
         page=page,
         page_size=page_size,
     )
@@ -71,9 +73,10 @@ async def create_new_project(
 @router.get("/{project_id}")
 async def get_project(
     project_id: str,
+    period: Optional[str] = Query(None, description="Period in YYYY-MM format", pattern=r"^\d{4}-\d{2}$"),
     user: CurrentUser = Depends(get_current_user),
 ):
-    detail = await get_project_detail(project_id)
+    detail = await get_project_detail(project_id, period=period)
     if not detail:
         raise HTTPException(status_code=404, detail="Project not found")
     return detail

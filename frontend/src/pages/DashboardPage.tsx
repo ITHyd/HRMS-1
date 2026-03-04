@@ -9,21 +9,24 @@ import { UtilisationTrendChart } from "@/components/dashboard/UtilisationTrendCh
 import { TopProjectsChart } from "@/components/dashboard/TopProjectsChart"
 import { ResourceTable } from "@/components/dashboard/ResourceTable"
 import { ProjectHealthTable } from "@/components/dashboard/ProjectHealthTable"
+import { AllocationsTable } from "@/components/dashboard/AllocationsTable"
 import {
   getExecutiveDashboard,
   getResourceDashboard,
   getProjectDashboard,
+  getAllocationDashboard,
 } from "@/api/dashboard"
 import { computeUtilisation } from "@/api/utilisation"
-import type { ExecutiveDashboard } from "@/types/dashboard"
+import type { ExecutiveDashboard, AllocationEntry } from "@/types/dashboard"
 import type { ResourceDashboardEntry, ProjectDashboardEntry } from "@/types/dashboard"
 
-type TabKey = "executive" | "resources" | "projects"
+type TabKey = "executive" | "resources" | "projects" | "allocations"
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "executive", label: "Executive" },
   { key: "resources", label: "Resources" },
   { key: "projects", label: "Projects" },
+  { key: "allocations", label: "Allocations" },
 ]
 
 const AVAILABILITY_COLORS: Record<string, string> = {
@@ -61,6 +64,12 @@ export function DashboardPage() {
 
   // Projects tab state
   const [projectEntries, setProjectEntries] = useState<ProjectDashboardEntry[]>([])
+
+  // Allocations tab state
+  const [allocationEntries, setAllocationEntries] = useState<AllocationEntry[]>([])
+  const [allocationTotal, setAllocationTotal] = useState(0)
+  const [allocationSearch, setAllocationSearch] = useState("")
+  const [allocationPage, setAllocationPage] = useState(1)
 
   const fetchExecutiveData = useCallback(async (period: string) => {
     setLoading(true)
@@ -112,6 +121,29 @@ export function DashboardPage() {
     }
   }, [])
 
+  const fetchAllocationData = useCallback(
+    async (period: string, search?: string, page?: number) => {
+      setLoading(true)
+      try {
+        const data = await getAllocationDashboard({
+          period,
+          search: search || undefined,
+          page: page || 1,
+          page_size: 20,
+        })
+        setAllocationEntries(data.allocations)
+        setAllocationTotal(data.total)
+      } catch (err) {
+        console.error("Failed to load allocation dashboard:", err)
+        setAllocationEntries([])
+        setAllocationTotal(0)
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
+
   // Fetch data based on active tab
   useEffect(() => {
     switch (activeTab) {
@@ -124,6 +156,9 @@ export function DashboardPage() {
       case "projects":
         fetchProjectData(selectedPeriod)
         break
+      case "allocations":
+        fetchAllocationData(selectedPeriod, allocationSearch, allocationPage)
+        break
     }
   }, [
     activeTab,
@@ -131,9 +166,12 @@ export function DashboardPage() {
     fetchExecutiveData,
     fetchResourceData,
     fetchProjectData,
+    fetchAllocationData,
     resourceSearch,
     resourceClassification,
     resourcePage,
+    allocationSearch,
+    allocationPage,
   ])
 
   const handlePeriodChange = (period: string) => {
@@ -141,6 +179,8 @@ export function DashboardPage() {
     setResourcePage(1)
     setResourceSearch("")
     setResourceClassification("")
+    setAllocationPage(1)
+    setAllocationSearch("")
   }
 
   const handleComputeUtilisation = async () => {
@@ -157,6 +197,9 @@ export function DashboardPage() {
           break
         case "projects":
           await fetchProjectData(selectedPeriod)
+          break
+        case "allocations":
+          await fetchAllocationData(selectedPeriod, allocationSearch, allocationPage)
           break
       }
     } catch (err) {
@@ -180,12 +223,25 @@ export function DashboardPage() {
     setResourcePage(page)
   }
 
+  const handleAllocationSearch = (query: string) => {
+    setAllocationSearch(query)
+    setAllocationPage(1)
+  }
+
+  const handleAllocationPageChange = (page: number) => {
+    setAllocationPage(page)
+  }
+
   const handleTabChange = (tab: TabKey) => {
     setActiveTab(tab)
     if (tab === "resources") {
       setResourcePage(1)
       setResourceSearch("")
       setResourceClassification("")
+    }
+    if (tab === "allocations") {
+      setAllocationPage(1)
+      setAllocationSearch("")
     }
   }
 
@@ -337,6 +393,19 @@ export function DashboardPage() {
           {/* Projects Tab */}
           {activeTab === "projects" && (
             <ProjectHealthTable projects={projectEntries} />
+          )}
+
+          {/* Allocations Tab */}
+          {activeTab === "allocations" && (
+            <AllocationsTable
+              entries={allocationEntries}
+              onSearch={handleAllocationSearch}
+              searchQuery={allocationSearch}
+              total={allocationTotal}
+              page={allocationPage}
+              pageSize={20}
+              onPageChange={handleAllocationPageChange}
+            />
           )}
         </>
       )}

@@ -5,6 +5,7 @@ export async function listProjects(params?: {
   search?: string
   project_type?: string
   status?: string
+  period?: string
   page?: number
   page_size?: number
 }): Promise<ProjectListResponse> {
@@ -24,8 +25,10 @@ export async function createProject(data: {
   return res.data
 }
 
-export async function getProjectDetail(projectId: string): Promise<ProjectDetail> {
-  const res = await client.get<ProjectDetail>(`/projects/${projectId}`)
+export async function getProjectDetail(projectId: string, period?: string): Promise<ProjectDetail> {
+  const res = await client.get<ProjectDetail>(`/projects/${projectId}`, {
+    params: period ? { period } : undefined,
+  })
   return res.data
 }
 

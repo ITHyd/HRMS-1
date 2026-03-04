@@ -52,6 +52,8 @@ function emitDepartmentGroups(
   // Group children by parent_department_id first (two-level hierarchy)
   const parentDeptMap = new Map<string, OrgTreeNode[]>()
   for (const child of parentNode.children) {
+    // Skip employees in "Internal Projects" category
+    if (child.parent_department_name === "Internal Projects") continue
     const key = child.parent_department_id || child.department_id || "general"
     if (!parentDeptMap.has(key)) parentDeptMap.set(key, [])
     parentDeptMap.get(key)!.push(child)

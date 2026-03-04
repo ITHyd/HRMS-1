@@ -9,6 +9,8 @@ export interface ProjectBrief {
   start_date: string | null
   end_date: string | null
   progress_percent: number
+  planned_days: number
+  worked_days: number
 }
 
 export interface ProjectListResponse {
@@ -28,6 +30,8 @@ export interface ProjectDetail {
   department_name: string
   start_date: string | null
   end_date: string | null
+  planned_days: number
+  worked_days: number
   progress_percent: number
   member_count: number
   members: Array<{
@@ -39,6 +43,9 @@ export interface ProjectDetail {
     location_code: string
     role_in_project: string
     assigned_at: string | null
+    allocation_percentage: number | null
+    allocated_days: number | null
+    worked_days: number | null
   }>
 }
 
