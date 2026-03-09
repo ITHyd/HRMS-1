@@ -83,3 +83,37 @@ export interface HrmsSyncLogsResponse {
   logs: HrmsSyncLog[]
   total: number
 }
+
+export interface HeatmapDateMeta {
+  date: string
+  day: number
+  weekday: string
+  is_weekend: boolean
+  is_holiday: boolean
+  holiday_name?: string | null
+}
+
+export interface HeatmapDayCell {
+  hours: number
+  billable_hours: number
+  projects: Record<string, number>
+}
+
+export interface HeatmapEmployeeRow {
+  employee_id: string
+  employee_name: string
+  total_hours: number
+  billable_hours: number
+  days: Record<string, HeatmapDayCell | null>
+}
+
+export interface WorkloadHeatmapResponse {
+  period: string
+  dates: HeatmapDateMeta[]
+  employees: HeatmapEmployeeRow[]
+  summary: {
+    total_employees: number
+    total_hours: number
+    billable_hours: number
+  }
+}

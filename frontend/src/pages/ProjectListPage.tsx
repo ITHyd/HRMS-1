@@ -49,7 +49,11 @@ export function ProjectListPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
-  const [selectedPeriod, setSelectedPeriod] = useState("2025-11")
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    const now = new Date()
+    now.setMonth(now.getMonth() - 1)
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+  })
 
   // Filters
   const [showFilters, setShowFilters] = useState(false)
@@ -220,7 +224,7 @@ export function ProjectListPage() {
                 <tbody>
                   {projects.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
                         {activeFilterCount > 0
                           ? "No projects match the current filters"
                           : "No projects found"}
@@ -265,36 +269,34 @@ export function ProjectListPage() {
                           {proj.worked_days > 0 ? proj.worked_days : <span className="text-muted-foreground">-</span>}
                         </td>
                         <td className="py-2.5 px-3 border-l border-border">
-                          {proj.planned_days > 0 ? (
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <Progress
-                                  value={proj.progress_percent}
-                                  className={`h-2 flex-1 ${
-                                    proj.progress_percent >= 80
-                                      ? "[&>div]:bg-green-500"
-                                      : proj.progress_percent >= 40
-                                        ? "[&>div]:bg-amber-500"
-                                        : "[&>div]:bg-red-500"
-                                  }`}
-                                />
-                                <span className={`text-xs font-medium tabular-nums w-10 text-right ${
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Progress
+                                value={proj.progress_percent}
+                                className={`h-2 flex-1 ${
                                   proj.progress_percent >= 80
-                                    ? "text-green-700"
+                                    ? "[&>div]:bg-green-500"
                                     : proj.progress_percent >= 40
-                                      ? "text-amber-700"
-                                      : "text-red-700"
-                                }`}>
-                                  {proj.progress_percent.toFixed(0)}%
-                                </span>
-                              </div>
+                                      ? "[&>div]:bg-amber-500"
+                                      : "[&>div]:bg-red-500"
+                                }`}
+                              />
+                              <span className={`text-xs font-medium tabular-nums w-10 text-right ${
+                                proj.progress_percent >= 80
+                                  ? "text-green-700"
+                                  : proj.progress_percent >= 40
+                                    ? "text-amber-700"
+                                    : "text-red-700"
+                              }`}>
+                                {proj.progress_percent.toFixed(0)}%
+                              </span>
+                            </div>
+                            {proj.planned_days > 0 && (
                               <p className="text-[11px] text-muted-foreground tabular-nums">
                                 {proj.worked_days} / {proj.planned_days} days
                               </p>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">No allocation</span>
-                          )}
+                            )}
+                          </div>
                         </td>
                         <td className="py-2.5 px-3 text-right border-l border-border">
                           <div className="flex items-center justify-end gap-1 text-muted-foreground">

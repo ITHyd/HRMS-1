@@ -3,7 +3,10 @@ from typing import Optional
 
 from bson import ObjectId
 
+from calendar import monthrange
+
 from app.models.employee import Employee
+from app.models.hrms_holiday import HrmsHoliday
 from app.models.project import Project
 from app.models.timesheet_edit_history import TimesheetEditHistory
 from app.models.timesheet_entry import TimesheetEntry
@@ -473,6 +476,116 @@ async def _get_period_lock(
         TimesheetPeriodLock.period == period,
         TimesheetPeriodLock.branch_location_id == branch_location_id,
     )
+
+
+async def get_workload_heatmap(
+    period: str,
+    branch_location_id: Optional[str] = None,
+) -> dict:
+    """Return per-employee, per-day hours grid for the workload heatmap."""
+    from datetime import date as date_type
+
+    year, month = int(period[:4]), int(period[5:7])
+    _, num_days = monthrange(year, month)
+
+    # All dates in the month
+    all_dates = [date_type(year, month, d) for d in range(1, num_days + 1)]
+
+    # Fetch entries for this period (exclude soft-deleted)
+    filters: dict = {"period": period, "is_deleted": {"$ne": True}}
+    if branch_location_id:
+        filters["branch_location_id"] = branch_location_id
+
+    entries = await TimesheetEntry.find(filters).to_list()
+
+    # Fetch holidays for the month
+    holidays_raw = await HrmsHoliday.find(
+        {"year": year, "is_deleted": {"$ne": True}},
+    ).to_list()
+    holiday_map: dict[str, str] = {}
+    for h in holidays_raw:
+        if h.holiday_date.month == month and h.holiday_date.year == year:
+            holiday_map[h.holiday_date.isoformat()] = h.holiday_name
+
+    # Build employee lookup
+    employee_ids = list({e.employee_id for e in entries})
+    employees = await Employee.find(
+        {"_id": {"$in": [ObjectId(eid) for eid in employee_ids if ObjectId.is_valid(eid)]}}
+    ).to_list() if employee_ids else []
+    emp_map = {str(e.id): e.name for e in employees}
+
+    # Build project lookup
+    project_ids = list({e.project_id for e in entries})
+    projects = await Project.find(
+        {"_id": {"$in": [ObjectId(pid) for pid in project_ids if ObjectId.is_valid(pid)]}}
+    ).to_list() if project_ids else []
+    proj_map = {str(p.id): p.name for p in projects}
+
+    # Aggregate: employee -> date -> {total_hours, billable_hours, projects}
+    grid: dict[str, dict[str, dict]] = {}
+    for entry in entries:
+        eid = entry.employee_id
+        d = entry.date.isoformat()
+        if eid not in grid:
+            grid[eid] = {}
+        if d not in grid[eid]:
+            grid[eid][d] = {"total_hours": 0.0, "billable_hours": 0.0, "projects": {}}
+        cell = grid[eid][d]
+        cell["total_hours"] += entry.hours
+        if entry.is_billable:
+            cell["billable_hours"] += entry.hours
+        pname = proj_map.get(entry.project_id, "Unknown")
+        cell["projects"][pname] = cell["projects"].get(pname, 0.0) + entry.hours
+
+    # Build response rows sorted by employee name
+    rows = []
+    for eid in sorted(employee_ids, key=lambda x: emp_map.get(x, "ZZZ").lower()):
+        emp_grid = grid.get(eid, {})
+        total = sum(c["total_hours"] for c in emp_grid.values())
+        billable = sum(c["billable_hours"] for c in emp_grid.values())
+        days = {}
+        for dt in all_dates:
+            ds = dt.isoformat()
+            cell = emp_grid.get(ds)
+            if cell:
+                days[ds] = {
+                    "hours": round(cell["total_hours"], 1),
+                    "billable_hours": round(cell["billable_hours"], 1),
+                    "projects": {k: round(v, 1) for k, v in cell["projects"].items()},
+                }
+            else:
+                days[ds] = None
+        rows.append({
+            "employee_id": eid,
+            "employee_name": emp_map.get(eid, "Unknown"),
+            "total_hours": round(total, 1),
+            "billable_hours": round(billable, 1),
+            "days": days,
+        })
+
+    # Build dates metadata
+    dates_meta = []
+    for dt in all_dates:
+        ds = dt.isoformat()
+        dates_meta.append({
+            "date": ds,
+            "day": dt.day,
+            "weekday": dt.strftime("%a"),
+            "is_weekend": dt.weekday() >= 5,
+            "is_holiday": ds in holiday_map,
+            "holiday_name": holiday_map.get(ds),
+        })
+
+    return {
+        "period": period,
+        "dates": dates_meta,
+        "employees": rows,
+        "summary": {
+            "total_employees": len(rows),
+            "total_hours": round(sum(r["total_hours"] for r in rows), 1),
+            "billable_hours": round(sum(r["billable_hours"] for r in rows), 1),
+        },
+    }
 
 
 async def _enrich_entry(entry: TimesheetEntry) -> dict:

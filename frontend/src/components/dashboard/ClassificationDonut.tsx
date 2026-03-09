@@ -23,21 +23,9 @@ const LABEL_MAP: Record<string, string> = {
   bench: "Bench",
 }
 
-function renderLabel({
-  cx,
-  cy,
-  midAngle,
-  innerRadius,
-  outerRadius,
-  percent,
-}: {
-  cx: number
-  cy: number
-  midAngle: number
-  innerRadius: number
-  outerRadius: number
-  percent: number
-}) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderLabel(props: any) {
+  const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props
   const RADIAN = Math.PI / 180
   const radius = innerRadius + (outerRadius - innerRadius) * 1.4
   const x = cx + radius * Math.cos(-midAngle * RADIAN)
@@ -60,12 +48,13 @@ function renderLabel({
 }
 
 export function ClassificationDonut({ data }: ClassificationDonutProps) {
-  const chartData = data.map((item) => ({
-    name: LABEL_MAP[item.classification] || item.classification,
-    value: item.count,
-    percent: item.percent,
-    fill: CLASSIFICATION_COLORS[item.classification] || "#6b7280",
-  }))
+  const chartData = data
+    .filter((item) => item.count > 0)
+    .map((item) => ({
+      name: LABEL_MAP[item.classification] || item.classification,
+      value: item.count,
+      fill: CLASSIFICATION_COLORS[item.classification] || "#6b7280",
+    }))
 
   return (
     <Card>
@@ -90,7 +79,7 @@ export function ClassificationDonut({ data }: ClassificationDonutProps) {
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: number, name: string) => [`${value} employees`, name]}
+              formatter={(value, name) => [`${value} employees`, name]}
             />
             <Legend
               verticalAlign="bottom"

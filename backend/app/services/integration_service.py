@@ -155,9 +155,12 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
     configs (live or demo mode based on user), and simulates non-HRMS
     integrations. Updates config last_sync_at / last_sync_status.
     """
-    cfg = await IntegrationConfig.get(config_id)
+    try:
+        cfg = await IntegrationConfig.get(config_id)
+    except Exception:
+        cfg = None
     if not cfg:
-        raise ValueError("Integration config not found")
+        raise ValueError(f"Integration config not found: {config_id}")
 
     now = datetime.now(timezone.utc)
 
@@ -189,6 +192,7 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
                 period=current_period,
                 user_id=user.user_id,
                 integration_config_id=str(cfg.id),
+                months_backfill_override=1,
             )
         else:
             hrms_result = await hrms_sync_service.trigger_sync(

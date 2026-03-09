@@ -62,7 +62,11 @@ async def trigger_sync(
     try:
         return await integration_service.trigger_manual_sync(config_id, user)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        msg = str(e)
+        status = 404 if "not found" in msg.lower() else 400
+        raise HTTPException(status_code=status, detail=msg)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
 
 @router.post("/sync/{sync_id}/retry")

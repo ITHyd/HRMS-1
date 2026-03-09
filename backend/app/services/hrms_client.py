@@ -14,7 +14,7 @@ from app.config import settings
 
 
 class HrmsClient:
-    """Thin wrapper around the HRMS REST API."""
+    """Thin wrapper around the HRMS REST API with connection pooling."""
 
     def __init__(
         self,
@@ -28,6 +28,26 @@ class HrmsClient:
         self._headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
         self.max_retries = max(1, max_retries)
         self.backoff_seconds = max(0.1, backoff_seconds)
+        # Shared client with connection pooling — created lazily
+        self._client: httpx.AsyncClient | None = None
+
+    def _get_client(self, timeout: int) -> httpx.AsyncClient:
+        """Return a shared AsyncClient, creating one if needed."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                timeout=timeout,
+                limits=httpx.Limits(
+                    max_connections=30,
+                    max_keepalive_connections=20,
+                ),
+            )
+        return self._client
+
+    async def close(self) -> None:
+        """Close the underlying HTTP client."""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
 
     async def _request(
         self,
@@ -46,17 +66,19 @@ class HrmsClient:
         if headers:
             merged_headers.update(headers)
 
+        client = self._get_client(timeout)
+
         last_exc: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    resp = await client.request(
-                        method=method,
-                        url=url,
-                        headers=merged_headers or None,
-                        params=params,
-                        data=data,
-                    )
+                resp = await client.request(
+                    method=method,
+                    url=url,
+                    headers=merged_headers or None,
+                    params=params,
+                    data=data,
+                    timeout=timeout,
+                )
 
                 if resp.status_code in {429, 500, 502, 503, 504} and attempt < self.max_retries:
                     await asyncio.sleep(self.backoff_seconds * attempt)
@@ -147,7 +169,7 @@ class HrmsClient:
             "/users/managers",
             timeout=30,
         )
-        # Response: {"managers": [...]} 
+        # Response: {"managers": [...]}
         if isinstance(data, dict) and "managers" in data:
             return data["managers"]
         return data if isinstance(data, list) else []
@@ -158,7 +180,7 @@ class HrmsClient:
             "/users/hrs",
             timeout=30,
         )
-        # Response: {"HRs": [...]} 
+        # Response: {"HRs": [...]}
         if isinstance(data, dict) and "HRs" in data:
             return data["HRs"]
         return data if isinstance(data, list) else []
@@ -186,7 +208,7 @@ class HrmsClient:
         data = await self._request(
             "GET",
             "/attendance/daily",
-            timeout=30,
+            timeout=15,
             params={"employee_id": employee_id, "year": year, "month": month},
         )
         return data if isinstance(data, list) else []

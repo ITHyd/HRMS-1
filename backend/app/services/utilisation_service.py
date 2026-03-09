@@ -227,6 +227,28 @@ async def compute_utilisation(
     for fr in finance_records:
         finance_map[fr.employee_id] = fr.billable_status
 
+    # Batch-fetch all capacity overrides for these employees in this period
+    year, month = int(period[:4]), int(period[5:7])
+    _, days_in_month = calendar.monthrange(year, month)
+    period_start = datetime(year, month, 1, tzinfo=timezone.utc)
+    period_end = datetime(year, month, days_in_month, 23, 59, 59, tzinfo=timezone.utc)
+
+    overrides = await EmployeeCapacityOverride.find(
+        {"employee_id": {"$in": employee_ids}},
+        EmployeeCapacityOverride.branch_location_id == branch_location_id,
+        EmployeeCapacityOverride.effective_from <= period_start,
+        {
+            "$or": [
+                {"effective_to": None},
+                {"effective_to": {"$gte": period_end}},
+            ]
+        },
+    ).to_list()
+    override_map = {o.employee_id: o.custom_hours_per_week for o in overrides}
+
+    default_hours_per_week = config.standard_hours_per_week
+    weeks_in_month = days_in_month / 7.0
+
     # Build snapshots
     snapshots: list[UtilisationSnapshot] = []
     snapshot_responses: list[UtilisationSnapshotResponse] = []
@@ -246,7 +268,8 @@ async def compute_utilisation(
         billable_hours = emp_hours["billable"]
         non_billable_hours = emp_hours["non_billable"]
 
-        capacity = await get_employee_capacity(eid, period, branch_location_id)
+        hours_per_week = override_map.get(eid, default_hours_per_week)
+        capacity = round(hours_per_week * weeks_in_month, 2)
 
         utilisation_percent = (total_hours / capacity * 100) if capacity > 0 else 0.0
         billable_percent = (billable_hours / capacity * 100) if capacity > 0 else 0.0

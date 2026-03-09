@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { ToastContainer } from "@/components/shared/ToastContainer"
 import { AppLayout } from "@/components/layout/AppLayout"
 import { LoginPage } from "@/pages/LoginPage"
 import { OrgChartPage } from "@/pages/OrgChartPage"
@@ -19,6 +20,7 @@ import { useAuthStore } from "@/store/authStore"
 function App() {
   return (
     <BrowserRouter>
+      <ToastContainer />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<AppLayout />}>

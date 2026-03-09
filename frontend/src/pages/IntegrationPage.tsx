@@ -3,6 +3,7 @@ import { Link2 } from "lucide-react"
 import { IntegrationConfigList } from "@/components/integration/IntegrationConfigList"
 import { SyncLogTimeline } from "@/components/integration/SyncLogTimeline"
 import { DynamicsExportPanel } from "@/components/integration/DynamicsExportPanel"
+import { useToastStore } from "@/store/toastStore"
 import {
   getIntegrationConfigs,
   updateIntegrationConfig,
@@ -32,6 +33,9 @@ export function IntegrationPage() {
   const [loadingLogs, setLoadingLogs] = useState(true)
   const [loadingExports, setLoadingExports] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [syncingConfigId, setSyncingConfigId] = useState<string | null>(null)
+  const [retryingLogId, setRetryingLogId] = useState<string | null>(null)
+  const addToast = useToastStore((s) => s.addToast)
 
   // Fetch integration configs
   const fetchConfigs = useCallback(async () => {
@@ -68,8 +72,8 @@ export function IntegrationPage() {
   const fetchDynamicsExports = useCallback(async () => {
     setLoadingExports(true)
     try {
-      const data = await getDynamicsExports({ page_size: 20 })
-      setDynamicsExports(data)
+      const res = await getDynamicsExports({ page_size: 20 })
+      setDynamicsExports(res.exports)
     } catch (err) {
       console.error("Failed to load dynamics exports:", err)
       setDynamicsExports([])
@@ -78,12 +82,12 @@ export function IntegrationPage() {
     }
   }, [])
 
-  // Initial fetch: configs + sync logs
+  // Initial fetch
   useEffect(() => {
     fetchConfigs()
   }, [fetchConfigs])
 
-  // Fetch tab-specific data when tab changes
+  // Tab-specific data
   useEffect(() => {
     if (activeTab === "dynamics") {
       fetchDynamicsExports()
@@ -94,12 +98,44 @@ export function IntegrationPage() {
 
   // Handlers
   const handleSync = async (configId: string) => {
+    setSyncingConfigId(configId)
+    const startTime = Date.now()
     try {
-      await triggerSync(configId)
-      // Refresh configs and logs after triggering sync
+      const result = await triggerSync(configId)
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
       await Promise.all([fetchConfigs(), fetchSyncLogs(activeTab)])
+
+      if (result.status === "completed") {
+        addToast({
+          type: "success",
+          title: "Sync completed",
+          message: `Finished in ${elapsed}s`,
+        })
+      } else if (result.status === "failed") {
+        addToast({
+          type: "error",
+          title: "Sync failed",
+          message: `Failed after ${elapsed}s. Check sync history for details.`,
+          duration: 6000,
+        })
+      } else {
+        addToast({
+          type: "info",
+          title: "Sync triggered",
+          message: `Status: ${result.status} (${elapsed}s)`,
+        })
+      }
     } catch (err) {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
       console.error("Failed to trigger sync:", err)
+      addToast({
+        type: "error",
+        title: "Sync failed",
+        message: `Error after ${elapsed}s. Please try again.`,
+        duration: 6000,
+      })
+    } finally {
+      setSyncingConfigId(null)
     }
   }
 
@@ -107,27 +143,63 @@ export function IntegrationPage() {
     try {
       await updateIntegrationConfig(configId, { status })
       await fetchConfigs()
+      addToast({
+        type: "success",
+        title: status === "active" ? "Integration activated" : "Integration deactivated",
+      })
     } catch (err) {
       console.error("Failed to update config status:", err)
+      addToast({
+        type: "error",
+        title: "Failed to update status",
+        message: "Please try again.",
+      })
     }
   }
 
   const handleRetry = async (syncLogId: string) => {
+    setRetryingLogId(syncLogId)
+    const startTime = Date.now()
     try {
       await retrySync(syncLogId)
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
       await fetchSyncLogs(activeTab)
+      addToast({
+        type: "success",
+        title: "Retry completed",
+        message: `Finished in ${elapsed}s`,
+      })
     } catch (err) {
       console.error("Failed to retry sync:", err)
+      addToast({
+        type: "error",
+        title: "Retry failed",
+        message: "Please try again.",
+      })
+    } finally {
+      setRetryingLogId(null)
     }
   }
 
   const handleExport = async (type: string) => {
     setExporting(true)
+    const startTime = Date.now()
     try {
       await createDynamicsExport(type)
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
       await fetchDynamicsExports()
+      addToast({
+        type: "success",
+        title: `${type.charAt(0).toUpperCase() + type.slice(1)} export ready`,
+        message: `Generated in ${elapsed}s`,
+      })
     } catch (err) {
       console.error("Failed to create export:", err)
+      addToast({
+        type: "error",
+        title: "Export failed",
+        message: "Please try again.",
+      })
     } finally {
       setExporting(false)
     }
@@ -144,20 +216,20 @@ export function IntegrationPage() {
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
+      addToast({ type: "success", title: "Download started" })
     } catch (err) {
       console.error("Failed to download export:", err)
+      addToast({
+        type: "error",
+        title: "Download failed",
+        message: "Please try again.",
+      })
     }
   }
 
-  // Filter configs for current tab
-  const filteredConfigs = configs.filter(
-    (c) => c.integration_type === activeTab
-  )
-
-  // Filter sync logs for current tab
-  const filteredLogs = syncLogs.filter(
-    (l) => l.integration_type === activeTab
-  )
+  // Filter for current tab
+  const filteredConfigs = configs.filter((c) => c.integration_type === activeTab)
+  const filteredLogs = syncLogs.filter((l) => l.integration_type === activeTab)
 
   const loading = loadingConfigs || loadingLogs || loadingExports
 
@@ -207,8 +279,13 @@ export function IntegrationPage() {
                 configs={filteredConfigs}
                 onSync={handleSync}
                 onToggle={handleToggle}
+                syncingConfigId={syncingConfigId}
               />
-              <SyncLogTimeline logs={filteredLogs} onRetry={handleRetry} />
+              <SyncLogTimeline
+                logs={filteredLogs}
+                onRetry={handleRetry}
+                retryingLogId={retryingLogId}
+              />
             </div>
           )}
 
@@ -219,8 +296,13 @@ export function IntegrationPage() {
                 configs={filteredConfigs}
                 onSync={handleSync}
                 onToggle={handleToggle}
+                syncingConfigId={syncingConfigId}
               />
-              <SyncLogTimeline logs={filteredLogs} onRetry={handleRetry} />
+              <SyncLogTimeline
+                logs={filteredLogs}
+                onRetry={handleRetry}
+                retryingLogId={retryingLogId}
+              />
             </div>
           )}
 

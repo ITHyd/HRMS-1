@@ -17,7 +17,11 @@ export function ProjectDetailPage() {
   const [project, setProject] = useState<ProjectDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedPeriod, setSelectedPeriod] = useState("2025-11")
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    const now = new Date()
+    now.setMonth(now.getMonth() - 1)
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+  })
 
   const fetchProject = useCallback(() => {
     if (!projectId) return

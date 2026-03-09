@@ -39,3 +39,8 @@ export interface DynamicsExport {
   processed_at?: string
   error_message?: string
 }
+
+export interface DynamicsExportsResponse {
+  exports: DynamicsExport[]
+  total: number
+}

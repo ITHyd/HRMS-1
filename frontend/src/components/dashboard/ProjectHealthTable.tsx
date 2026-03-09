@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, Fragment } from "react"
 import { useNavigate } from "react-router-dom"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -67,9 +67,8 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                   const isExpanded = expandedRows.has(project.project_id)
                   const overdue = isOverdue(project.end_date)
                   return (
-                    <>
+                    <Fragment key={project.project_id}>
                       <tr
-                        key={project.project_id}
                         className="border-b hover:bg-muted/50 transition-colors"
                       >
                         <td
@@ -142,7 +141,7 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                         </td>
                       </tr>
                       {isExpanded && project.members.length > 0 && (
-                        <tr key={`${project.project_id}-members`}>
+                        <tr>
                           <td colSpan={9} className="p-0">
                             <div className="bg-muted/30 border-b px-8 py-3">
                               <p className="text-xs font-medium text-muted-foreground mb-2">
@@ -209,7 +208,7 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   )
                 })
               )}

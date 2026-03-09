@@ -17,6 +17,7 @@ import {
   getAllocationDashboard,
 } from "@/api/dashboard"
 import { computeUtilisation } from "@/api/utilisation"
+import { useToastStore } from "@/store/toastStore"
 import type { ExecutiveDashboard, AllocationEntry } from "@/types/dashboard"
 import type { ResourceDashboardEntry, ProjectDashboardEntry } from "@/types/dashboard"
 
@@ -41,15 +42,17 @@ const AVAILABILITY_LABELS: Record<string, string> = {
   over_allocated: "Over Allocated",
 }
 
-function getCurrentPeriod(): string {
+function getPreviousPeriod(): string {
   const now = new Date()
+  now.setMonth(now.getMonth() - 1)
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 }
 
 export function DashboardPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod())
+  const [selectedPeriod, setSelectedPeriod] = useState(getPreviousPeriod())
   const [activeTab, setActiveTab] = useState<TabKey>("executive")
   const [loading, setLoading] = useState(true)
+  const addToast = useToastStore((s) => s.addToast)
   const [computing, setComputing] = useState(false)
 
   // Executive tab state
@@ -185,8 +188,15 @@ export function DashboardPage() {
 
   const handleComputeUtilisation = async () => {
     setComputing(true)
+    const startTime = Date.now()
     try {
       await computeUtilisation(selectedPeriod)
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+      addToast({
+        type: "success",
+        title: "Utilisation computed",
+        message: `Completed in ${elapsed}s for ${selectedPeriod}`,
+      })
       // Refresh current tab after computation
       switch (activeTab) {
         case "executive":
@@ -204,6 +214,12 @@ export function DashboardPage() {
       }
     } catch (err) {
       console.error("Failed to compute utilisation:", err)
+      addToast({
+        type: "error",
+        title: "Computation failed",
+        message: "Please try again.",
+        duration: 6000,
+      })
     } finally {
       setComputing(false)
     }
@@ -329,36 +345,42 @@ export function DashboardPage() {
                     <CardTitle className="text-base">Resource Availability</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <PieChart>
-                        <Pie
-                          data={availabilityData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {availabilityData.map((entry, index) => (
-                            <Cell key={index} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value: number, name: string) => [
-                            `${value} employees`,
-                            name,
-                          ]}
-                        />
-                        <Legend
-                          verticalAlign="bottom"
-                          iconType="circle"
-                          formatter={(value: string) => (
-                            <span className="text-xs text-muted-foreground">{value}</span>
-                          )}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    {availabilityData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={280}>
+                        <PieChart>
+                          <Pie
+                            data={availabilityData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={100}
+                            paddingAngle={2}
+                            dataKey="value"
+                          >
+                            {availabilityData.map((entry, index) => (
+                              <Cell key={index} fill={entry.fill} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: number, name: string) => [
+                              `${value} employees`,
+                              name,
+                            ]}
+                          />
+                          <Legend
+                            verticalAlign="bottom"
+                            iconType="circle"
+                            formatter={(value: string) => (
+                              <span className="text-xs text-muted-foreground">{value}</span>
+                            )}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
+                        No availability data for this period
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

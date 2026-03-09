@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils"
 
 const STATUS_STYLES: Record<string, string> = {
+  pending: "bg-gray-100 text-gray-700",
+  processing: "bg-yellow-100 text-yellow-700",
   draft: "bg-gray-100 text-gray-700",
   submitted: "bg-blue-100 text-blue-700",
   approved: "bg-green-100 text-green-700",
@@ -17,6 +19,7 @@ const STATUS_STYLES: Record<string, string> = {
   critical: "bg-red-100 text-red-700",
   active: "bg-blue-100 text-blue-700",
   inactive: "bg-gray-100 text-gray-700",
+  on_hold: "bg-amber-100 text-amber-700",
   error: "bg-red-100 text-red-700",
 }
 

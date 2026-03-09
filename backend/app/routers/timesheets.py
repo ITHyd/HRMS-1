@@ -94,12 +94,15 @@ async def approve_reject_entries(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{entry_id}/history")
-async def get_entry_history(
-    entry_id: str,
+@router.get("/heatmap")
+async def get_workload_heatmap(
+    period: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
     user: CurrentUser = Depends(get_current_user),
 ):
-    return await timesheet_service.get_entry_history(entry_id)
+    return await timesheet_service.get_workload_heatmap(
+        period=period,
+        branch_location_id=user.branch_location_id,
+    )
 
 
 @router.get("/period-lock")
@@ -108,6 +111,14 @@ async def check_period_lock(
     user: CurrentUser = Depends(get_current_user),
 ):
     return await timesheet_service.check_period_lock(period, user.branch_location_id)
+
+
+@router.get("/{entry_id}/history")
+async def get_entry_history(
+    entry_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    return await timesheet_service.get_entry_history(entry_id)
 
 
 @router.post("/period-lock")
