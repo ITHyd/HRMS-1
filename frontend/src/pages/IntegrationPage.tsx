@@ -16,12 +16,13 @@ import {
 } from "@/api/integration"
 import type { IntegrationConfig, SyncLogEntry, DynamicsExport } from "@/types/integration"
 
-type TabKey = "hrms" | "finance" | "dynamics"
+type TabKey = "hrms" | "finance" | "dynamics" | "skills"
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "hrms", label: "HRMS" },
   { key: "finance", label: "Finance" },
   { key: "dynamics", label: "Dynamics" },
+  { key: "skills", label: "Skills" },
 ]
 
 export function IntegrationPage() {
@@ -243,7 +244,7 @@ export function IntegrationPage() {
             Integration Hub
           </h2>
           <p className="text-sm text-muted-foreground">
-            Manage HRMS, Finance, and Dynamics 365 integrations
+            Manage HRMS, Finance, Skills, and Dynamics 365 integrations
           </p>
         </div>
       </div>
@@ -314,6 +315,18 @@ export function IntegrationPage() {
               onDownload={handleDownload}
               exporting={exporting}
             />
+          )}
+
+          {/* Skills Tab */}
+          {activeTab === "skills" && (
+            <div className="space-y-8">
+              <IntegrationConfigList
+                configs={filteredConfigs}
+                onSync={handleSync}
+                onToggle={handleToggle}
+              />
+              <SyncLogTimeline logs={filteredLogs} onRetry={handleRetry} />
+            </div>
           )}
         </>
       )}

@@ -498,20 +498,22 @@ async def seed():
         return days
 
     # ── Determine past 3 months for timesheets, past 2 for finance/utilisation ──
-    # Current date is now (March 2026), so past 3 months = Dec 2025, Jan 2026, Feb 2026
+    # Include current month and past 2 months for better UX
     today = now.date() if hasattr(now, 'date') else now
     past_months_3 = []
     past_months_2 = []
     ref = today.replace(day=1)
+    # Include current month (0) and past 2 months (1, 2)
     for i in range(3, 0, -1):
-        # Go back i months from current month
-        m = ref.month - i
+        # Go back i-1 months from current month (so 2, 1, 0)
+        m = ref.month - (i - 1)
         y = ref.year
         while m <= 0:
             m += 12
             y -= 1
         past_months_3.append((y, m))
-    past_months_2 = past_months_3[1:]  # last 2 of the 3
+    # Use all 3 months for finance/utilisation too
+    past_months_2 = past_months_3  # Use all 3 months instead of just 2
 
     # ── Timesheet Entries (past 3 months) ──
     random.seed(42)  # Reproducibility
@@ -789,56 +791,29 @@ async def seed():
     # ── Phase 2 Module Seed Data ──
 
     # ── Skill Catalog ──
-    skill_catalog_data = [
-        {"name": "python", "category": "language", "display_name": "Python"},
-        {"name": "javascript", "category": "language", "display_name": "JavaScript"},
-        {"name": "typescript", "category": "language", "display_name": "TypeScript"},
-        {"name": "java", "category": "language", "display_name": "Java"},
-        {"name": "csharp", "category": "language", "display_name": "C#"},
-        {"name": "react", "category": "framework", "display_name": "React"},
-        {"name": "angular", "category": "framework", "display_name": "Angular"},
-        {"name": "dotnet", "category": "framework", "display_name": ".NET"},
-        {"name": "spring", "category": "framework", "display_name": "Spring Boot"},
-        {"name": "aws", "category": "cloud", "display_name": "AWS"},
-        {"name": "azure", "category": "cloud", "display_name": "Azure"},
-        {"name": "gcp", "category": "cloud", "display_name": "Google Cloud"},
-        {"name": "docker", "category": "tool", "display_name": "Docker"},
-        {"name": "kubernetes", "category": "tool", "display_name": "Kubernetes"},
-        {"name": "terraform", "category": "tool", "display_name": "Terraform"},
-        {"name": "banking", "category": "domain", "display_name": "Banking & Finance"},
-        {"name": "healthcare", "category": "domain", "display_name": "Healthcare"},
-        {"name": "ecommerce", "category": "domain", "display_name": "E-Commerce"},
-        {"name": "leadership", "category": "soft_skill", "display_name": "Leadership"},
-        {"name": "agile", "category": "soft_skill", "display_name": "Agile/Scrum"},
-    ]
-    for sk in skill_catalog_data:
-        await SkillCatalog(**sk).insert()
-    print(f"Created {len(skill_catalog_data)} skill catalog entries.")
+    # Skills will be synced from Skills Portal API (http://skills.nxzen.com/api/skills/)
+    # Use Integration Hub → Skills tab → "Sync Now" to fetch 100+ real skills
+    # No dummy skills created during seed - use real data from API
+    print("Skill catalog: Use Integration Hub to sync from Skills Portal API")
 
     # ── Employee Skills ──
-    # Fetch all users for added_by reference
-    users = await User.find_all().to_list()
-    proficiencies = ["beginner", "intermediate", "advanced", "expert"]
-    skill_count = 0
-    for emp_obj in all_employees_db:
-        num_skills = random.randint(2, 4)
-        chosen = random.sample(skill_catalog_data, num_skills)
-        for sk in chosen:
-            await EmployeeSkill(
-                employee_id=str(emp_obj.id),
-                skill_name=sk["name"],
-                proficiency=random.choice(proficiencies),
-                added_by=str(users[0].id),
-                added_at=datetime.now(timezone.utc),
-            ).insert()
-            skill_count += 1
-    print(f"Created {skill_count} employee skill tags.")
+    # Employee skills will be assigned after syncing skill catalog from API
+    # No dummy employee skills created during seed
+    print("Employee skills: Assign after syncing skill catalog from API")
 
+    # Get users for integration config
+    users = await User.find_all().to_list()
+    
     # ── Integration Configs ──
-    for itype, iname in [("hrms", "HRMS Connector"), ("finance", "Finance Data Feed"), ("dynamics", "Dynamics 365 Export")]:
-        cfg = {"endpoint": f"https://api.example.com/{itype}", "version": "1.0"}
+    for itype, iname in [
+        ("hrms", "HRMS Connector"),
+        ("finance", "Finance Data Feed"),
+        ("dynamics", "Dynamics 365 Export"),
+        ("skills", "Skills Portal Connector"),
+    ]:
+        config_data = {"endpoint": f"https://api.example.com/{itype}", "version": "1.0"}
         if itype == "hrms":
-            cfg = {
+            config_data = {
                 "provider": "nxzen_hrms",
                 "base_url": "http://149.102.158.71:2342",
                 "auth_mode": "password_grant",
@@ -850,16 +825,23 @@ async def seed():
                     "live_domains": ["nxzen.com"],
                 },
             }
+        elif itype == "skills":
+            config_data = {
+                "endpoint": "http://skills.nxzen.com",
+                "token": "",
+                "sync_frequency": "daily",
+            }
+        
         await IntegrationConfig(
             integration_type=itype,
             name=iname,
-            status="active",
-            config=cfg,
+            status="active" if itype in ["hrms", "skills"] else "inactive",
+            config=config_data,
             created_by=str(users[0].id),
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         ).insert()
-    print("Created 3 integration configs.")
+    print("Created 4 integration configs.")
 
     print("\nSeed data complete!")
     print(f"   Total employees: {len(employees)}")
@@ -870,16 +852,26 @@ async def seed():
     print(f"   Finance billable records: {len(finance_records)}")
     print(f"   Utilisation snapshots: {len(utilisation_records)}")
     print(f"   Period locks: {len(period_locks)}")
-    print(f"   Skill catalog entries: {len(skill_catalog_data)}")
-    print(f"   Employee skill tags: {skill_count}")
-    print(f"   Integration configs: 3")
+    print(f"   Skill catalog: Sync from Skills Portal API (Integration Hub)")
+    print(f"   Employee skills: Assign after syncing skill catalog")
+    print(f"   Integration configs: 4")
     print(f"   Login credentials:")
     print(f"     HYD (demo): vikram.patel@company.com / demo123")
     print(f"     HYD (live): vamsi.krishna@nxzen.com / demo123")
     print(f"     BLR: kavitha.rao@company.com / demo123")
     print(f"     LON: james.mitchell@company.com / demo123")
     print(f"     SYD: michael.torres@company.com / demo123")
+    print(f"\n   ⚠️  To get real skills data:")
+    print(f"     1. Login to http://localhost:5173")
+    print(f"     2. Go to Integration Hub → Skills tab")
+    print(f"     3. Click 'Sync Now' on Skills Portal Connector")
+    print(f"     4. This will fetch 100+ skills from http://skills.nxzen.com/api/skills/")
 
 
 if __name__ == "__main__":
-    asyncio.run(seed())
+    async def run_seed():
+        await seed()
+        # Give time for async operations to complete
+        await asyncio.sleep(1)
+    
+    asyncio.run(run_seed())

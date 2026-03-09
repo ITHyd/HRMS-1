@@ -16,6 +16,7 @@ const TYPE_LABELS: Record<string, string> = {
   hrms: "HRMS",
   finance: "Finance",
   dynamics: "Dynamics",
+  skills: "Skills",
 }
 
 function formatDate(dateStr: string): string {
