@@ -2,9 +2,12 @@ from datetime import datetime
 from typing import Optional
 
 from beanie import Document
+from pydantic import Field
 
 
 class HrmsSyncLog(Document):
+    integration_config_id: Optional[str] = None
+    mode: Optional[str] = None  # demo | live
     batch_id: str
     branch_location_id: str
     period: str  # YYYY-MM
@@ -13,7 +16,9 @@ class HrmsSyncLog(Document):
     imported_count: int = 0
     duplicate_count: int = 0
     error_count: int = 0
-    errors: list[dict] = []
+    errors: list[dict] = Field(default_factory=list)
+    entity_counts: dict = Field(default_factory=dict)
+    cursor: dict = Field(default_factory=dict)
     started_at: datetime
     completed_at: Optional[datetime] = None
     triggered_by: str  # user_id or "system"

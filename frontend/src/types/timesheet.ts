@@ -67,11 +67,14 @@ export interface HrmsSyncLog {
   batch_id: string
   period: string
   status: "running" | "completed" | "failed"
+  mode?: "demo" | "live"
   total_records: number
   imported_count: number
   duplicate_count: number
   error_count: number
-  errors: Array<{ employee_id: string; error: string }>
+  errors: Array<{ employee_id?: string; key?: string; error?: string; message?: string; entity?: string }>
+  entity_counts?: Record<string, Record<string, number>>
+  cursor?: Record<string, unknown>
   started_at: string
   completed_at?: string
 }

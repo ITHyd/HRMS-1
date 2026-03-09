@@ -30,7 +30,22 @@ Create a `.env` file in `backend/`:
 MONGODB_URL=mongodb://localhost:27017
 DATABASE_NAME=branch_command_center
 JWT_SECRET=your-secret-key
+HRMS_BASE_URL=http://149.102.158.71:2342
+HRMS_SYNC_MONTHS_BACKFILL=6
+HRMS_DEMO_USERS=vikram.patel@company.com
+HRMS_LIVE_DOMAINS=nxzen.com
+HRMS_SECRET_NXZEN_MANAGER_USERNAME=
+HRMS_SECRET_NXZEN_MANAGER_PASSWORD=
 ```
+
+### HRMS Connector Notes
+
+- Manual sync only: no webhook/poller.
+- Configure HRMS connector in `Integrations -> HRMS` using `IntegrationConfig.config`.
+- Recommended auth mode is `password_grant` with `secret_ref` (for example `NXZEN_MANAGER`).
+- Credentials are resolved from env vars:
+  - `HRMS_SECRET_<REF>_USERNAME`
+  - `HRMS_SECRET_<REF>_PASSWORD`
 
 Run the server:
 

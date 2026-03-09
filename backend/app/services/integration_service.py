@@ -3,7 +3,9 @@ from typing import Optional
 
 from app.models.integration_config import IntegrationConfig
 from app.models.sync_log import SyncLog
+from app.models.user import User
 from app.services import audit_service
+from app.services import hrms_sync_service
 
 
 async def list_integration_configs() -> list[dict]:
@@ -48,12 +50,15 @@ async def get_integration_config(config_id: str) -> dict:
 async def create_integration_config(data: dict, user) -> dict:
     """Create a new IntegrationConfig document."""
     now = datetime.now(timezone.utc)
+    config_payload = data.get("config", {})
+    if data.get("integration_type") == "hrms":
+        config_payload = hrms_sync_service.normalize_hrms_config(config_payload)
 
     cfg = IntegrationConfig(
         integration_type=data["integration_type"],
         name=data["name"],
         status="inactive",
-        config=data.get("config", {}),
+        config=config_payload,
         created_at=now,
         updated_at=now,
         created_by=user.user_id,
@@ -98,6 +103,8 @@ async def update_integration_config(config_id: str, data: dict, user) -> dict:
         if field in data and data[field] is not None:
             old_value = getattr(cfg, field)
             new_value = data[field]
+            if field == "config" and cfg.integration_type == "hrms":
+                new_value = hrms_sync_service.normalize_hrms_config(new_value)
             if old_value != new_value:
                 changes[field] = (old_value, new_value)
                 setattr(cfg, field, new_value)
@@ -144,9 +151,9 @@ async def update_integration_config(config_id: str, data: dict, user) -> dict:
 async def trigger_manual_sync(config_id: str, user) -> dict:
     """
     Trigger a manual sync for the given IntegrationConfig.
-    Creates a SyncLog with status='running', simulates a sync
-    (marks completed with fake counts), and updates the config's
-    last_sync_at / last_sync_status.
+    Creates a SyncLog with status='running', executes a real sync for HRMS
+    configs (live or demo mode based on user), and simulates non-HRMS
+    integrations. Updates config last_sync_at / last_sync_status.
     """
     cfg = await IntegrationConfig.get(config_id)
     if not cfg:
@@ -171,14 +178,44 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
     )
     await sync_log.insert()
 
-    # Simulate sync completion with fake counts
-    sync_log.status = "completed"
-    sync_log.records_processed = 25
-    sync_log.records_succeeded = 24
-    sync_log.records_failed = 1
-    sync_log.error_details = [
-        {"record": "sample_record", "error": "Simulated validation error"}
-    ]
+    if cfg.integration_type == "hrms":
+        db_user = await User.get(user.user_id)
+        user_email = db_user.email if db_user else None
+        current_period = datetime.now(timezone.utc).strftime("%Y-%m")
+        mode_cfg = (cfg.config or {}).get("mode", {}) if isinstance(cfg.config, dict) else {}
+
+        if hrms_sync_service.is_live_sync_enabled_for_user(user_email, mode_cfg):
+            hrms_result = await hrms_sync_service.trigger_live_sync(
+                period=current_period,
+                user_id=user.user_id,
+                integration_config_id=str(cfg.id),
+            )
+        else:
+            hrms_result = await hrms_sync_service.trigger_sync(
+                period=current_period,
+                branch_location_id=user.branch_location_id,
+                user_id=user.user_id,
+            )
+
+        sync_log.status = hrms_result.get("status", "completed")
+        sync_log.records_processed = int(hrms_result.get("total_records", 0) or 0)
+        sync_log.records_succeeded = int(hrms_result.get("imported_count", 0) or 0)
+        sync_log.records_failed = int(hrms_result.get("error_count", 0) or 0)
+        sync_log.error_details = []
+        if sync_log.records_failed:
+            sync_log.error_details.append(
+                {"record": "hrms_sync", "error": f"{sync_log.records_failed} errors during sync"}
+            )
+    else:
+        # Simulate sync completion with fake counts
+        sync_log.status = "completed"
+        sync_log.records_processed = 25
+        sync_log.records_succeeded = 24
+        sync_log.records_failed = 1
+        sync_log.error_details = [
+            {"record": "sample_record", "error": "Simulated validation error"}
+        ]
+
     sync_log.completed_at = datetime.now(timezone.utc)
     await sync_log.save()
 

@@ -215,7 +215,7 @@ async def seed():
 
     # ── HR Staff ──
     hr1_hyd = await emp("Sunitha Reddy", "sunitha.reddy@company.com", "HR Executive", ("HR", HYD), "mid", HYD, date(2023, 2, 1))
-    hr2_hyd = await emp("Vamsi Krishna", "vamsi.krishna@company.com", "HR Coordinator", ("HR", HYD), "junior", HYD, date(2024, 4, 10))
+    hr2_hyd = await emp("Vamsi Krishna", "vamsi.krishna@nxzen.com", "HR Coordinator", ("HR", HYD), "junior", HYD, date(2024, 4, 10))
     hr1_lon = await emp("Rachel Green", "rachel.green@company.com", "HR Executive", ("HR", LON), "mid", LON, date(2023, 8, 15))
 
     # ── Sales Staff ──
@@ -427,7 +427,7 @@ async def seed():
         ("kavitha.rao@company.com", dir_eng_blr, BLR, "Kavitha Rao"),
         ("james.mitchell@company.com", coo, LON, "James Mitchell"),
         ("michael.torres@company.com", vp_eng_apac, SYD, "Michael Torres"),
-        ("vamsi.krishna@company.com", hr2_hyd, HYD, "Vamsi Krishna"),
+        ("vamsi.krishna@nxzen.com", hr2_hyd, HYD, "Vamsi Krishna"),
     ]
 
     for email, emp_id, loc_id, name in users_data:
@@ -836,11 +836,25 @@ async def seed():
 
     # ── Integration Configs ──
     for itype, iname in [("hrms", "HRMS Connector"), ("finance", "Finance Data Feed"), ("dynamics", "Dynamics 365 Export")]:
+        cfg = {"endpoint": f"https://api.example.com/{itype}", "version": "1.0"}
+        if itype == "hrms":
+            cfg = {
+                "provider": "nxzen_hrms",
+                "base_url": "http://149.102.158.71:2342",
+                "auth_mode": "password_grant",
+                "secret_ref": "NXZEN_MANAGER",
+                "hr_id": 1,
+                "sync_scope": {"months_backfill": 6, "manual_only": True},
+                "mode": {
+                    "demo_users": ["vikram.patel@company.com"],
+                    "live_domains": ["nxzen.com"],
+                },
+            }
         await IntegrationConfig(
             integration_type=itype,
             name=iname,
             status="active",
-            config={"endpoint": f"https://api.example.com/{itype}", "version": "1.0"},
+            config=cfg,
             created_by=str(users[0].id),
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
@@ -860,7 +874,8 @@ async def seed():
     print(f"   Employee skill tags: {skill_count}")
     print(f"   Integration configs: 3")
     print(f"   Login credentials:")
-    print(f"     HYD: vikram.patel@company.com / demo123")
+    print(f"     HYD (demo): vikram.patel@company.com / demo123")
+    print(f"     HYD (live): vamsi.krishna@nxzen.com / demo123")
     print(f"     BLR: kavitha.rao@company.com / demo123")
     print(f"     LON: james.mitchell@company.com / demo123")
     print(f"     SYD: michael.torres@company.com / demo123")

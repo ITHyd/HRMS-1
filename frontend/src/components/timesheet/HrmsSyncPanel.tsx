@@ -274,8 +274,8 @@ export function HrmsSyncPanel({ period }: HrmsSyncPanelProps) {
                             <div className="space-y-1">
                               {log.errors.map((err, idx) => (
                                 <div key={idx} className="text-xs text-red-600 flex items-start gap-2">
-                                  <span className="shrink-0 font-mono">{err.employee_id || "unknown"}</span>
-                                  <span>{err.error}</span>
+                                  <span className="shrink-0 font-mono">{err.employee_id || err.key || "unknown"}</span>
+                                  <span>{err.error || err.message || "Unknown sync error"}</span>
                                 </div>
                               ))}
                             </div>

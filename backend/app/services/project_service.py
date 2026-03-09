@@ -25,11 +25,13 @@ async def list_projects(
     """List projects scoped to branch via employee assignments (paginated)."""
     branch_emps = await Employee.find(
         Employee.location_id == branch_location_id,
+        Employee.is_deleted != True,
     ).to_list()
     branch_emp_ids = [str(e.id) for e in branch_emps]
 
     assignments = await EmployeeProject.find(
-        {"employee_id": {"$in": branch_emp_ids}}
+        {"employee_id": {"$in": branch_emp_ids}},
+        EmployeeProject.is_deleted != True,
     ).to_list()
     proj_ids = list({a.project_id for a in assignments})
 
@@ -41,6 +43,7 @@ async def list_projects(
         filters["status"] = status
     if project_type:
         filters["project_type"] = project_type
+    filters["is_deleted"] = {"$ne": True}
 
     projects = await Project.find(filters).to_list()
 
@@ -68,6 +71,7 @@ async def list_projects(
     if period:
         allocs = await ProjectAllocation.find(
             ProjectAllocation.period == period,
+            ProjectAllocation.is_deleted != True,
         ).to_list()
         for a in allocs:
             planned_by_project[a.project_id] = (
@@ -80,6 +84,7 @@ async def list_projects(
         timesheets = await TimesheetEntry.find(
             TimesheetEntry.period == period,
             TimesheetEntry.status != "rejected",
+            TimesheetEntry.is_deleted != True,
         ).to_list()
         for t in timesheets:
             worked_by_project[t.project_id] = (
@@ -182,7 +187,7 @@ async def assign_employees(
 ):
     """Assign employees to a project, skip duplicates."""
     project = await Project.get(project_id)
-    if not project:
+    if not project or project.is_deleted:
         raise ValueError(f"Project {project_id} not found")
 
     now = datetime.now(timezone.utc)
@@ -192,6 +197,7 @@ async def assign_employees(
         existing = await EmployeeProject.find_one(
             EmployeeProject.employee_id == emp_id,
             EmployeeProject.project_id == project_id,
+            EmployeeProject.is_deleted != True,
         )
         if existing:
             continue
@@ -229,18 +235,20 @@ async def assign_employees(
 async def get_project_detail(project_id: str, period: Optional[str] = None):
     """Get project detail with members and allocation-based progress."""
     project = await Project.get(project_id)
-    if not project:
+    if not project or project.is_deleted:
         return None
 
     dept = await Department.get(project.department_id)
     assignments = await EmployeeProject.find(
-        EmployeeProject.project_id == project_id
+        EmployeeProject.project_id == project_id,
+        EmployeeProject.is_deleted != True,
     ).to_list()
 
     # Batch-fetch employees and lookups for members
     emp_ids = [a.employee_id for a in assignments]
     emps = await Employee.find(
-        {"_id": {"$in": [ObjectId(eid) for eid in emp_ids if ObjectId.is_valid(eid)]}}
+        {"_id": {"$in": [ObjectId(eid) for eid in emp_ids if ObjectId.is_valid(eid)]}},
+        Employee.is_deleted != True,
     ).to_list() if emp_ids else []
     emp_map = {str(e.id): e for e in emps}
 
@@ -262,6 +270,7 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
         proj_allocs = await ProjectAllocation.find(
             ProjectAllocation.project_id == project_id,
             ProjectAllocation.period == period,
+            ProjectAllocation.is_deleted != True,
         ).to_list()
         for pa in proj_allocs:
             alloc_map[pa.employee_id] = pa
@@ -270,6 +279,7 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
             TimesheetEntry.project_id == project_id,
             TimesheetEntry.period == period,
             TimesheetEntry.status != "rejected",
+            TimesheetEntry.is_deleted != True,
         ).to_list()
         for t in proj_timesheets:
             worked_map[t.employee_id] = worked_map.get(t.employee_id, 0.0) + t.hours
