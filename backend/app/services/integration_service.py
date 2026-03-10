@@ -47,27 +47,6 @@ async def get_integration_config(config_id: str) -> dict:
     }
 
 
-async def get_integration_config_by_type(integration_type: str) -> dict | None:
-    """Get an IntegrationConfig by integration_type."""
-    cfg = await IntegrationConfig.find_one(
-        IntegrationConfig.integration_type == integration_type
-    )
-    if not cfg:
-        return None
-
-    return {
-        "id": str(cfg.id),
-        "integration_type": cfg.integration_type,
-        "name": cfg.name,
-        "status": cfg.status,
-        "config": cfg.config,
-        "last_sync_at": cfg.last_sync_at,
-        "last_sync_status": cfg.last_sync_status,
-        "created_at": cfg.created_at,
-        "updated_at": cfg.updated_at,
-    }
-
-
 async def create_integration_config(data: dict, user) -> dict:
     """Create a new IntegrationConfig document."""
     now = datetime.now(timezone.utc)
@@ -173,56 +152,19 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
     """
     Trigger a manual sync for the given IntegrationConfig.
     Creates a SyncLog with status='running', executes a real sync for HRMS
-    configs (live or demo mode based on user), Skills configs, and simulates 
-    other integrations. Updates config last_sync_at / last_sync_status.
+    configs (live or demo mode based on user), and simulates non-HRMS
+    integrations. Updates config last_sync_at / last_sync_status.
     """
     try:
         cfg = await IntegrationConfig.get(config_id)
-    except Exception as e:
-        print(f"Error retrieving config {config_id}: {e}")
-        raise ValueError(f"Integration config not found: {e}")
-    
+    except Exception:
+        cfg = None
     if not cfg:
-        print(f"Config {config_id} not found in database")
-        raise ValueError("Integration config not found")
+        raise ValueError(f"Integration config not found: {config_id}")
 
-    print(f"Found config: {cfg.name} ({cfg.integration_type})")
     now = datetime.now(timezone.utc)
 
-    # Route to appropriate sync service based on integration_type
-    if cfg.integration_type == "skills":
-        # Import here to avoid circular dependency
-        from app.services import skills_sync_service
-        
-        token = cfg.config.get("token", "")
-        # Token is optional for Skills API
-        
-        # Trigger skill catalog sync
-        try:
-            print(f"Starting Skills sync...")
-            catalog_result = await skills_sync_service.sync_skill_catalog(token, user.user_id)
-            print(f"Skills sync completed: {catalog_result}")
-            
-            # Update the integration config with last sync info
-            cfg.last_sync_at = now
-            cfg.last_sync_status = "completed"
-            cfg.updated_at = datetime.now(timezone.utc)
-            await cfg.save()
-            
-            return {
-                "sync_log_id": catalog_result["batch_id"],
-                "status": "completed",
-                "message": f"Synced {catalog_result['imported_count']} skills (catalog)",
-            }
-        except Exception as e:
-            print(f"Skills sync failed: {e}")
-            cfg.last_sync_at = now
-            cfg.last_sync_status = "failed"
-            cfg.updated_at = datetime.now(timezone.utc)
-            await cfg.save()
-            raise
-    
-    # Create the sync log entry for HRMS and other types
+    # Create the sync log entry
     sync_log = SyncLog(
         integration_type=cfg.integration_type,
         integration_config_id=str(cfg.id),

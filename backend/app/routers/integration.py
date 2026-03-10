@@ -9,7 +9,6 @@ from app.schemas.integration import (
 )
 from app.services import integration_service
 from app.services import dynamics_service
-from app.services import skills_sync_service
 
 router = APIRouter(prefix="/integrations", tags=["Integrations"])
 
@@ -164,71 +163,3 @@ async def download_dynamics_export(
         media_type="application/json",
         headers={"Content-Disposition": f"attachment; filename=dynamics_export_{export_id}.json"},
     )
-
-
-# ---------------------------------------------------------------------------
-# Skills Portal Integration
-# ---------------------------------------------------------------------------
-
-
-@router.post("/skills/sync/catalog")
-async def sync_skills_catalog(
-    user: CurrentUser = Depends(get_current_user),
-):
-    """Sync skill catalog from Skills Portal."""
-    try:
-        # Get Skills integration config to retrieve token
-        config = await integration_service.get_integration_config_by_type("skills")
-        if not config:
-            raise HTTPException(
-                status_code=404,
-                detail="Skills integration not configured. Please configure it first."
-            )
-        
-        token = config.get("config", {}).get("token", "")
-        if not token:
-            raise HTTPException(
-                status_code=400,
-                detail="Skills API token not configured"
-            )
-        
-        return await skills_sync_service.sync_skill_catalog(token, user.id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/skills/sync/employee-skills")
-async def sync_employee_skills(
-    user: CurrentUser = Depends(get_current_user),
-):
-    """Sync employee skills from Skills Portal."""
-    try:
-        # Get Skills integration config to retrieve token
-        config = await integration_service.get_integration_config_by_type("skills")
-        if not config:
-            raise HTTPException(
-                status_code=404,
-                detail="Skills integration not configured. Please configure it first."
-            )
-        
-        token = config.get("config", {}).get("token", "")
-        if not token:
-            raise HTTPException(
-                status_code=400,
-                detail="Skills API token not configured"
-            )
-        
-        return await skills_sync_service.sync_employee_skills(token, user.id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/skills/sync-logs")
-async def list_skills_sync_logs(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    user: CurrentUser = Depends(get_current_user),
-):
-    """List Skills sync logs."""
-    return await skills_sync_service.get_skills_sync_logs(page=page, page_size=page_size)
-
