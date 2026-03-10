@@ -11,8 +11,9 @@ import {
   Database,
   Copy,
   Download,
+  Users,
 } from "lucide-react"
-import { triggerHrmsSync, getHrmsSyncLogs } from "@/api/timesheets"
+import { triggerHrmsSync, triggerMasterDataSync, getHrmsSyncLogs } from "@/api/timesheets"
 import { useAuthStore } from "@/store/authStore"
 import type { HrmsSyncLog } from "@/types/timesheet"
 
@@ -41,18 +42,33 @@ function formatDuration(start: string, end?: string): string {
   return `${minutes}m ${rem}s`
 }
 
+function isMasterDataError(error: unknown): boolean {
+  if (!error) return false
+  const msg = typeof error === "string"
+    ? error
+    : (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || ""
+  return msg.toLowerCase().includes("master mapping") || msg.toLowerCase().includes("master-data")
+}
+
 export function HrmsSyncPanel({ period }: HrmsSyncPanelProps) {
   const user = useAuthStore((s) => s.user)
   const [logs, setLogs] = useState<HrmsSyncLog[]>([])
   const [loading, setLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [syncingMaster, setSyncingMaster] = useState(false)
+  const [needsMasterData, setNeedsMasterData] = useState(false)
   const [syncResult, setSyncResult] = useState<{
     type: "success" | "error"
+    message: string
     batch_id: string
     imported_count: number
     duplicate_count: number
     error_count: number
     total_records: number
+  } | null>(null)
+  const [masterResult, setMasterResult] = useState<{
+    type: "success" | "error"
+    message: string
   } | null>(null)
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
 
@@ -60,7 +76,16 @@ export function HrmsSyncPanel({ period }: HrmsSyncPanelProps) {
     if (!user) return
     setLoading(true)
     getHrmsSyncLogs()
-      .then((data) => setLogs(data.logs))
+      .then((data) => {
+        setLogs(data.logs)
+        // Check if any successful master-data sync exists
+        const hasMasterSync = data.logs.some(
+          (l) => l.period === "master-data" && l.status === "completed"
+        )
+        if (!hasMasterSync && data.logs.length === 0) {
+          setNeedsMasterData(true)
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [user])
@@ -68,6 +93,31 @@ export function HrmsSyncPanel({ period }: HrmsSyncPanelProps) {
   useEffect(() => {
     fetchLogs()
   }, [fetchLogs, period])
+
+  const handleMasterSync = async () => {
+    if (!user) return
+    setSyncingMaster(true)
+    setMasterResult(null)
+    try {
+      const result = await triggerMasterDataSync()
+      setMasterResult({
+        type: result.error_count > 0 ? "error" : "success",
+        message: result.error_count > 0
+          ? `Master data sync completed with ${result.error_count} errors. ${result.imported_count} records imported.`
+          : `Master data synced successfully. ${result.imported_count} records imported (employees, projects, locations, etc.)`,
+      })
+      setNeedsMasterData(false)
+      fetchLogs()
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setMasterResult({
+        type: "error",
+        message: detail || "Failed to sync master data. Please check HRMS credentials and try again.",
+      })
+    } finally {
+      setSyncingMaster(false)
+    }
+  }
 
   const handleSync = async () => {
     if (!user) return
@@ -77,22 +127,41 @@ export function HrmsSyncPanel({ period }: HrmsSyncPanelProps) {
       const result = await triggerHrmsSync(period)
       setSyncResult({
         type: result.error_count > 0 ? "error" : "success",
+        message: result.error_count > 0
+          ? "Sync completed with errors"
+          : "Sync completed successfully",
         batch_id: result.batch_id,
         imported_count: result.imported_count,
         duplicate_count: result.duplicate_count,
         error_count: result.error_count,
         total_records: result.total_records,
       })
+      setNeedsMasterData(false)
       fetchLogs()
-    } catch {
-      setSyncResult({
-        type: "error",
-        batch_id: "",
-        imported_count: 0,
-        duplicate_count: 0,
-        error_count: 0,
-        total_records: 0,
-      })
+    } catch (err) {
+      if (isMasterDataError(err)) {
+        setNeedsMasterData(true)
+        setSyncResult({
+          type: "error",
+          message: "HRMS master data (employees, projects) must be synced before importing timesheets.",
+          batch_id: "",
+          imported_count: 0,
+          duplicate_count: 0,
+          error_count: 0,
+          total_records: 0,
+        })
+      } else {
+        const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        setSyncResult({
+          type: "error",
+          message: detail || "Sync failed. Please try again.",
+          batch_id: "",
+          imported_count: 0,
+          duplicate_count: 0,
+          error_count: 0,
+          total_records: 0,
+        })
+      }
     } finally {
       setSyncing(false)
     }
@@ -102,6 +171,59 @@ export function HrmsSyncPanel({ period }: HrmsSyncPanelProps) {
 
   return (
     <div className="space-y-4">
+      {/* Master Data Required Banner */}
+      {needsMasterData && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg p-2 bg-amber-100 shrink-0">
+              <Database className="h-5 w-5 text-amber-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-amber-900">Master Data Sync Required</h3>
+              <p className="text-xs text-amber-700 mt-1">
+                Before importing timesheets, HRMS master data (employees, projects, locations, departments) must be synced first.
+                This is a one-time setup that maps HRMS records to your local database.
+              </p>
+              <div className="mt-3">
+                <Button
+                  onClick={handleMasterSync}
+                  disabled={syncingMaster}
+                  size="sm"
+                  className="cursor-pointer bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  <Users className={`mr-1.5 h-4 w-4 ${syncingMaster ? "animate-spin" : ""}`} />
+                  {syncingMaster ? "Syncing Master Data..." : "Sync Master Data"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Master Data Result Banner */}
+      {masterResult && (
+        <div className={`rounded-lg border px-4 py-3 ${
+          masterResult.type === "success"
+            ? "border-green-200 bg-green-50"
+            : "border-red-200 bg-red-50"
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {masterResult.type === "success"
+                ? <CheckCircle2 className="h-4 w-4 text-green-600" />
+                : <AlertCircle className="h-4 w-4 text-red-600" />
+              }
+              <span className="text-sm font-medium">
+                {masterResult.message}
+              </span>
+            </div>
+            <button onClick={() => setMasterResult(null)} className="cursor-pointer">
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Sync Action Card */}
       <Card>
         <CardContent className="p-4">
@@ -117,10 +239,22 @@ export function HrmsSyncPanel({ period }: HrmsSyncPanelProps) {
                 </p>
               </div>
             </div>
-            <Button onClick={handleSync} disabled={syncing} className="cursor-pointer">
-              <RefreshCw className={`mr-1.5 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-              {syncing ? "Syncing..." : "Trigger Sync"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleMasterSync}
+                disabled={syncingMaster || syncing}
+                variant="outline"
+                size="sm"
+                className="cursor-pointer"
+              >
+                <Database className={`mr-1.5 h-4 w-4 ${syncingMaster ? "animate-spin" : ""}`} />
+                {syncingMaster ? "Syncing..." : "Master Data"}
+              </Button>
+              <Button onClick={handleSync} disabled={syncing || syncingMaster} className="cursor-pointer">
+                <RefreshCw className={`mr-1.5 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Syncing..." : "Trigger Sync"}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -139,12 +273,7 @@ export function HrmsSyncPanel({ period }: HrmsSyncPanelProps) {
                 : <AlertCircle className="h-4 w-4 text-red-600" />
               }
               <span className="text-sm font-medium">
-                {syncResult.type === "success"
-                  ? "Sync completed successfully"
-                  : syncResult.batch_id
-                    ? "Sync completed with errors"
-                    : "Sync failed"
-                }
+                {syncResult.message}
               </span>
             </div>
             <button onClick={() => setSyncResult(null)} className="cursor-pointer">
@@ -224,6 +353,7 @@ export function HrmsSyncPanel({ period }: HrmsSyncPanelProps) {
                     <th className="w-8 px-2 py-2.5" />
                     <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">Batch ID</th>
                     <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">Period</th>
+                    <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">Mode</th>
                     <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">Status</th>
                     <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">Imported</th>
                     <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">Duplicates</th>
@@ -250,6 +380,17 @@ export function HrmsSyncPanel({ period }: HrmsSyncPanelProps) {
                         </td>
                         <td className="px-3 py-2.5 font-mono text-xs">{log.batch_id.slice(0, 8)}...</td>
                         <td className="px-3 py-2.5">{log.period}</td>
+                        <td className="px-3 py-2.5">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            log.mode === "live"
+                              ? "bg-blue-100 text-blue-700"
+                              : log.mode === "demo"
+                                ? "bg-gray-100 text-gray-700"
+                                : "bg-gray-50 text-gray-500"
+                          }`}>
+                            {log.mode || "—"}
+                          </span>
+                        </td>
                         <td className="px-3 py-2.5"><StatusBadge status={log.status} /></td>
                         <td className="px-3 py-2.5 text-right font-mono">{log.imported_count}</td>
                         <td className="px-3 py-2.5 text-right font-mono">{log.duplicate_count}</td>
@@ -267,14 +408,14 @@ export function HrmsSyncPanel({ period }: HrmsSyncPanelProps) {
                       </tr>
                       {expandedLogId === log.batch_id && log.errors?.length > 0 && (
                         <tr>
-                          <td colSpan={9} className="px-6 py-3 bg-red-50/50">
+                          <td colSpan={10} className="px-6 py-3 bg-red-50/50">
                             <p className="text-xs font-medium text-red-700 mb-2">
                               Error Details ({log.errors.length})
                             </p>
                             <div className="space-y-1">
                               {log.errors.map((err, idx) => (
                                 <div key={idx} className="text-xs text-red-600 flex items-start gap-2">
-                                  <span className="shrink-0 font-mono">{err.employee_id || err.key || "unknown"}</span>
+                                  <span className="shrink-0 font-mono">{err.employee_id || err.key || err.entity || "unknown"}</span>
                                   <span>{err.error || err.message || "Unknown sync error"}</span>
                                 </div>
                               ))}

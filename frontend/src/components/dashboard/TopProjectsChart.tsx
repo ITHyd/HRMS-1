@@ -17,6 +17,13 @@ function CustomContent(props: any) {
   const { x, y, width, height, name, total_hours, index } = props
   if (width < 30 || height < 30) return null
 
+  const displayName = name || "Unknown Project"
+  const maxChars = Math.max(4, Math.floor(width / 8))
+  const truncatedName =
+    displayName.length > maxChars
+      ? displayName.slice(0, maxChars - 1) + "…"
+      : displayName
+
   return (
     <g>
       <rect
@@ -25,7 +32,7 @@ function CustomContent(props: any) {
         width={width}
         height={height}
         rx={6}
-        fill={COLORS[index % COLORS.length]}
+        fill={COLORS[(index ?? 0) % COLORS.length]}
         stroke="#fff"
         strokeWidth={2}
       />
@@ -39,9 +46,7 @@ function CustomContent(props: any) {
             fontSize={12}
             fontWeight={600}
           >
-            {name && name.length > Math.floor(width / 8)
-              ? name.slice(0, Math.floor(width / 8) - 1) + "…"
-              : name}
+            {truncatedName}
           </text>
           <text
             x={x + width / 2}
@@ -50,7 +55,7 @@ function CustomContent(props: any) {
             fill="rgba(255,255,255,0.85)"
             fontSize={11}
           >
-            {total_hours} hrs
+            {typeof total_hours === "number" ? total_hours.toFixed(1) : total_hours} hrs
           </text>
         </>
       )}
@@ -59,8 +64,23 @@ function CustomContent(props: any) {
 }
 
 export function TopProjectsChart({ data }: TopProjectsChartProps) {
+  if (!data || data.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Top Consuming Projects</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
+            No project data for this period
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   const treeData = data.map((p, i) => ({
-    name: p.project_name,
+    name: p.project_name || "Unknown Project",
     size: p.total_hours,
     total_hours: p.total_hours,
     member_count: p.member_count,
@@ -81,7 +101,7 @@ export function TopProjectsChart({ data }: TopProjectsChartProps) {
             content={<CustomContent />}
           >
             <Tooltip
-              formatter={(value: number) => [`${value} hrs`, "Total Hours"]}
+              formatter={(value: number) => [`${value.toFixed(1)} hrs`, "Total Hours"]}
               labelFormatter={(_label, payload) => {
                 if (payload && payload.length > 0) {
                   const item = payload[0].payload

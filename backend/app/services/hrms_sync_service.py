@@ -6,13 +6,14 @@ HRMS sync service.
 - trigger_sync() / get_sync_logs(): Legacy demo sync support.
 """
 
+import asyncio
 import calendar
 import os
 import random
 import re
 import uuid
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import bcrypt
@@ -834,21 +835,28 @@ async def _sync_single_period(
     if not isinstance(attendance_raw, list):
         attendance_raw = []
 
-    # Pull daily attendance only for employees with hours.
+    # Pull daily attendance only for employees with hours (batched concurrently).
     daily_raw: dict[int, list[dict]] = {}
-    for a in attendance_raw:
-        hrms_eid = a.get("employee_id")
-        if hrms_eid is None or a.get("total_hours", 0) <= 0:
-            continue
-        try:
-            daily_raw[int(hrms_eid)] = await client.get_daily_attendance(
-                employee_id=int(hrms_eid),
-                year=year,
-                month=month,
-            )
-        except Exception:
-            # Keep sync resilient and continue with other users.
-            continue
+    active_eids = [
+        int(a["employee_id"])
+        for a in attendance_raw
+        if a.get("employee_id") is not None and (a.get("total_hours", 0) or 0) > 0
+    ]
+    BATCH_SIZE = 50
+    for batch_start in range(0, len(active_eids), BATCH_SIZE):
+        batch = active_eids[batch_start : batch_start + BATCH_SIZE]
+
+        async def _fetch(eid: int) -> tuple[int, list[dict]]:
+            try:
+                data = await client.get_daily_attendance(employee_id=eid, year=year, month=month)
+                return eid, data if isinstance(data, list) else []
+            except Exception:
+                return eid, []
+
+        results = await asyncio.gather(*[_fetch(eid) for eid in batch])
+        for eid, data in results:
+            if data:
+                daily_raw[eid] = data
 
     allocations_raw = await client.get_allocations(period)
     if not isinstance(allocations_raw, dict):
@@ -1042,11 +1050,13 @@ async def trigger_live_sync(
     period: str,
     user_id: str,
     integration_config_id: str | None = None,
+    months_backfill_override: int | None = None,
 ) -> dict:
     return await _trigger_live_sync_impl(
         period=period,
         user_id=user_id,
         integration_config_id=integration_config_id,
+        months_backfill_override=months_backfill_override,
     )
 
     # Legacy implementation retained below for reference.
@@ -1468,6 +1478,9 @@ async def _sync_master_data_impl(
         sync_log.completed_at = datetime.now(timezone.utc)
         await sync_log.save()
         raise
+    finally:
+        if "client" in dir():
+            await client.close()
 
     return {
         "batch_id": batch_id,
@@ -1568,14 +1581,28 @@ async def _sync_single_period_upsert(
         attendance_raw = []
 
     daily_raw: dict[int, list[dict]] = {}
-    for a in attendance_raw:
-        hrms_eid = a.get("employee_id")
-        if hrms_eid is None or float(a.get("total_hours", 0) or 0) <= 0:
-            continue
-        try:
-            daily_raw[int(hrms_eid)] = await client.get_daily_attendance(employee_id=int(hrms_eid), year=year, month=month)
-        except Exception:
-            continue
+    active_eids = [
+        int(a["employee_id"])
+        for a in attendance_raw
+        if a.get("employee_id") is not None and float(a.get("total_hours", 0) or 0) > 0
+    ]
+
+    # Fetch daily attendance concurrently in batches of 50
+    BATCH_SIZE = 50
+    for batch_start in range(0, len(active_eids), BATCH_SIZE):
+        batch = active_eids[batch_start : batch_start + BATCH_SIZE]
+
+        async def _fetch_daily(eid: int) -> tuple[int, list[dict]]:
+            try:
+                data = await client.get_daily_attendance(employee_id=eid, year=year, month=month)
+                return eid, data if isinstance(data, list) else []
+            except Exception:
+                return eid, []
+
+        results = await asyncio.gather(*[_fetch_daily(eid) for eid in batch])
+        for eid, data in results:
+            if data:
+                daily_raw[eid] = data
 
     allocations_raw = await client.get_allocations(period)
     if not isinstance(allocations_raw, dict):
@@ -1790,15 +1817,19 @@ async def _trigger_live_sync_impl(
     period: str,
     user_id: str,
     integration_config_id: str | None = None,
+    months_backfill_override: int | None = None,
 ) -> dict:
     cfg_doc, hrms_cfg = await get_hrms_integration_config(integration_config_id)
 
     batch_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
-    months_backfill = _to_int(
-        hrms_cfg.get("sync_scope", {}).get("months_backfill"),
-        settings.HRMS_SYNC_MONTHS_BACKFILL,
-    )
+    if months_backfill_override is not None:
+        months_backfill = months_backfill_override
+    else:
+        months_backfill = _to_int(
+            hrms_cfg.get("sync_scope", {}).get("months_backfill"),
+            settings.HRMS_SYNC_MONTHS_BACKFILL,
+        )
     periods = _recent_periods(period, max(1, months_backfill))
 
     sync_log = HrmsSyncLog(
@@ -1872,12 +1903,18 @@ async def _trigger_live_sync_impl(
             _add_error(errors, entity="holidays", key="calendar", error=str(holiday_err))
 
         branch_ids = [str(loc.id) for loc in await Location.find({"is_deleted": False}).to_list()]
-        for p in periods:
-            for branch_id in branch_ids:
-                try:
-                    await compute_utilisation(period=p, branch_location_id=branch_id)
-                except Exception as util_err:
-                    _add_error(errors, entity="utilisation", key=f"{branch_id}:{p}", error=str(util_err))
+
+        async def _safe_compute(p: str, branch_id: str):
+            try:
+                await compute_utilisation(period=p, branch_location_id=branch_id)
+            except Exception as util_err:
+                _add_error(errors, entity="utilisation", key=f"{branch_id}:{p}", error=str(util_err))
+
+        await asyncio.gather(*[
+            _safe_compute(p, branch_id)
+            for p in periods
+            for branch_id in branch_ids
+        ])
 
         sync_log.status = "completed"
         sync_log.total_records = total_records
@@ -1899,6 +1936,9 @@ async def _trigger_live_sync_impl(
         sync_log.completed_at = datetime.now(timezone.utc)
         await sync_log.save()
         raise
+    finally:
+        if "client" in dir():
+            await client.close()
 
     return {
         "batch_id": batch_id,
@@ -2097,12 +2137,29 @@ async def trigger_sync(period: str, branch_location_id: str, user_id: str) -> di
     }
 
 
+async def _mark_stale_running_logs() -> None:
+    """Mark any sync logs stuck in 'running' for more than 10 minutes as 'failed'."""
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
+    stale_logs = await HrmsSyncLog.find(
+        HrmsSyncLog.status == "running",
+        {"started_at": {"$lt": cutoff}},
+    ).to_list()
+    for log in stale_logs:
+        log.status = "failed"
+        log.error_count = max(log.error_count, 1)
+        if not log.errors:
+            log.errors = [{"entity": "system", "key": "timeout", "error": "Sync timed out (exceeded 10 minutes)"}]
+        log.completed_at = datetime.now(timezone.utc)
+        await log.save()
+
+
 async def get_sync_logs(
     branch_location_id: str | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> dict:
     """Return paginated list of HRMS sync logs."""
+    await _mark_stale_running_logs()
     skip = (page - 1) * page_size
 
     filters = []

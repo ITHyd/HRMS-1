@@ -7,6 +7,7 @@ import type {
   TimesheetEditHistory,
   HrmsSyncLog,
   HrmsSyncLogsResponse,
+  WorkloadHeatmapResponse,
 } from "@/types/timesheet"
 
 export async function getTimesheets(params: {
@@ -91,6 +92,11 @@ export async function triggerHrmsSync(period: string): Promise<HrmsSyncLog> {
   return res.data
 }
 
+export async function triggerMasterDataSync(): Promise<HrmsSyncLog> {
+  const res = await client.post<HrmsSyncLog>("/hrms-sync/master-data")
+  return res.data
+}
+
 export async function getHrmsSyncLogs(params?: {
   page?: number
   page_size?: number
@@ -135,5 +141,14 @@ export async function getEmployees(
   _locationId: string
 ): Promise<{ id: string; name: string }[]> {
   const res = await client.get<{ id: string; name: string }[]>("/org/employees")
+  return res.data
+}
+
+export async function getWorkloadHeatmap(
+  period: string
+): Promise<WorkloadHeatmapResponse> {
+  const res = await client.get<WorkloadHeatmapResponse>("/timesheets/heatmap", {
+    params: { period },
+  })
   return res.data
 }

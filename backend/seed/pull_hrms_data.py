@@ -267,6 +267,7 @@ def map_all(raw: dict, period: str) -> dict:
 
         employees.append({
             "id": oid,
+            "hrms_employee_id": hid,
             "name": name,
             "email": email,
             "designation": role,
@@ -308,10 +309,13 @@ def map_all(raw: dict, period: str) -> dict:
         oid = new_oid()
         proj_id_map[hpid] = oid
 
+        project_type = "internal" if account == "Internal" else "client"
         projects.append({
             "id": oid,
+            "hrms_project_id": hpid,
             "name": pname,
             "status": status,
+            "project_type": project_type,
             "department_id": dept_id,
             "start_date": start_raw or now_iso,
             "end_date": end_raw,

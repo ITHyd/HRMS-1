@@ -105,11 +105,16 @@ async def get_executive_dashboard(
         for pid, hours in sorted_projects
     ]
 
-    # Resource availability
+    # Resource availability – derived from utilisation percent
+    over_allocated_count = sum(1 for s in snapshots if s.utilisation_percent > 100)
+    fully_allocated_non_over = sum(
+        1 for s in snapshots
+        if s.classification == "fully_billed" and s.utilisation_percent <= 100
+    )
     resource_availability = {
-        "available": bench_count,
-        "fully_allocated": billable_count,
-        "over_allocated": non_billable_count,
+        "available": bench_count + non_billable_count,
+        "fully_allocated": fully_allocated_non_over,
+        "over_allocated": over_allocated_count,
     }
 
     # Classification breakdown
@@ -490,6 +495,7 @@ async def get_allocation_dashboard(
     """HRMS project allocation data for a given period."""
     allocations = await ProjectAllocation.find(
         ProjectAllocation.period == period,
+        ProjectAllocation.is_deleted != True,
     ).to_list()
 
     if search:

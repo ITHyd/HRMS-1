@@ -131,7 +131,7 @@ async def list_projects(
             "department_name": dept_map.get(p.department_id, "Unknown"),
             "start_date": p.start_date.isoformat() if p.start_date else None,
             "end_date": p.end_date.isoformat() if p.end_date else None,
-            "member_count": allocated_members_by_project.get(pid, 0) if period else member_counts.get(pid, 0),
+            "member_count": member_counts.get(pid, 0),
             "planned_days": round(planned_days, 1),
             "worked_days": round(worked_days, 1),
             "progress_percent": round(progress, 1),
@@ -299,9 +299,6 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
             eid = str(emp.id)
             alloc = alloc_map.get(eid)
             worked_hours = worked_map.get(eid, 0.0)
-            # When period is set, only include members with allocation or timesheet data
-            if period and not alloc and worked_hours == 0:
-                continue
             loc = mloc_map.get(emp.location_id)
             members.append({
                 "employee_id": eid,

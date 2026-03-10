@@ -3,6 +3,7 @@ import type {
   IntegrationConfig,
   SyncLogsResponse,
   DynamicsExport,
+  DynamicsExportsResponse,
 } from "@/types/integration"
 
 export async function getIntegrationConfigs(): Promise<IntegrationConfig[]> {
@@ -74,8 +75,8 @@ export async function createDynamicsExport(
 export async function getDynamicsExports(params?: {
   page?: number
   page_size?: number
-}): Promise<DynamicsExport[]> {
-  const res = await client.get<DynamicsExport[]>(
+}): Promise<DynamicsExportsResponse> {
+  const res = await client.get<DynamicsExportsResponse>(
     "/integrations/dynamics/exports",
     { params }
   )

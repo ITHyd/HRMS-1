@@ -19,6 +19,7 @@ export function ProjectDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState(() => {
     const now = new Date()
+    now.setMonth(now.getMonth() - 1)
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   })
 
