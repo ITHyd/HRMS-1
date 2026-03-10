@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useSearchParams } from "react-router-dom"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,13 +11,10 @@ import {
   UserX,
   SlidersHorizontal,
   Search,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
+  X,
 } from "lucide-react"
-import { Select } from "@/components/ui/select"
-import { DEPARTMENT_COLORS } from "@/lib/constants"
+import { Pagination } from "@/components/shared/Pagination"
+import { SelectDropdown } from "@/components/shared/SelectDropdown"
 import type { EmployeeMasterEntry } from "@/types/employee"
 
 const LEVEL_OPTIONS = [
@@ -37,27 +34,8 @@ const STATUS_OPTIONS = [
   { value: "inactive", label: "Inactive" },
 ]
 
-const STATUS_COLORS: Record<string, string> = {
-  Active: "#22c55e",
-  Inactive: "#ef4444",
-}
-
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
-function getPageNumbers(current: number, total: number): (number | "ellipsis")[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-  const pages: (number | "ellipsis")[] = [1]
-  if (current <= 4) {
-    for (let i = 2; i <= 5; i++) pages.push(i)
-    pages.push("ellipsis", total)
-  } else if (current >= total - 3) {
-    pages.push("ellipsis")
-    for (let i = total - 4; i <= total; i++) pages.push(i)
-  } else {
-    pages.push("ellipsis", current - 1, current, current + 1, "ellipsis", total)
-  }
-  return pages
-}
 
 export function EmployeeMasterPage() {
   const [searchParams] = useSearchParams()
@@ -116,13 +94,30 @@ export function EmployeeMasterPage() {
     getEmployeeDepartments().then(setDepartments).catch(console.error)
   }, [])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setSearch(searchInput)
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleSearchInput = (value: string) => {
+    setSearchInput(value)
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    searchDebounce.current = setTimeout(() => {
+      setSearch(value)
+      setPage(1)
+    }, 300)
+  }
+
+  const resetFilters = () => {
+    setSearchInput("")
+    setSearch("")
+    setDepartmentId("")
+    setLevel("")
+    setStatusFilter("")
     setPage(1)
   }
 
-  const totalPages = Math.ceil(total / pageSize)
+  const handleCardFilter = (status: string) => {
+    setStatusFilter((prev) => prev === status ? "" : status)
+    setPage(1)
+    setShowFilters(true)
+  }
 
   const activeFilterCount = [
     search,
@@ -132,9 +127,9 @@ export function EmployeeMasterPage() {
   ].filter(Boolean).length
 
   const summaryCards = [
-    { title: "Total Employees", value: total, icon: Users2, color: "text-blue-600", bgColor: "bg-blue-50" },
-    { title: "Active", value: activeCount, icon: UserCheck, color: "text-green-600", bgColor: "bg-green-50" },
-    { title: "Inactive", value: inactiveCount, icon: UserX, color: "text-red-600", bgColor: "bg-red-50" },
+    { title: "Total Employees", value: total, icon: Users2, color: "text-blue-600", bgColor: "bg-blue-50", filterKey: "" },
+    { title: "Active", value: activeCount, icon: UserCheck, color: "text-green-600", bgColor: "bg-green-50", filterKey: "active" },
+    { title: "Inactive", value: inactiveCount, icon: UserX, color: "text-red-600", bgColor: "bg-red-50", filterKey: "inactive" },
   ]
 
   return (
@@ -166,7 +161,21 @@ export function EmployeeMasterPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {summaryCards.map((card) => (
-          <Card key={card.title}>
+          <Card
+            key={card.title}
+            className={`cursor-pointer transition-all hover:shadow-md ${
+              statusFilter === card.filterKey && card.filterKey !== ""
+                ? "ring-2 ring-primary"
+                : ""
+            }`}
+            onClick={() => {
+              if (card.filterKey === "") {
+                resetFilters()
+              } else {
+                handleCardFilter(card.filterKey)
+              }
+            }}
+          >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className={`rounded-lg p-2 ${card.bgColor}`}>
@@ -188,39 +197,43 @@ export function EmployeeMasterPage() {
       {showFilters && (
         <Card>
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <form onSubmit={handleSearch} className="relative">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="relative w-56">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
                   placeholder="Search name, email, designation..."
                   value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
+                  onChange={(e) => handleSearchInput(e.target.value)}
                   className="w-full h-8 rounded-md border border-input bg-transparent pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
-              </form>
-              <Select
+              </div>
+              <SelectDropdown
                 options={[
                   { value: "", label: "All Departments" },
                   ...departments.map((d) => ({ value: d.id, label: d.name })),
                 ]}
                 value={departmentId}
-                onChange={(e) => { setDepartmentId(e.target.value); setPage(1) }}
-                colorMap={DEPARTMENT_COLORS}
-                className="h-8 text-sm"
+                onChange={(v) => { setDepartmentId(v); setPage(1) }}
               />
-              <Select
+              <SelectDropdown
                 options={LEVEL_OPTIONS}
                 value={level}
-                onChange={(e) => { setLevel(e.target.value); setPage(1) }}
-                className="h-8 text-sm"
+                onChange={(v) => { setLevel(v); setPage(1) }}
               />
-              <Select
+              <SelectDropdown
                 options={STATUS_OPTIONS}
                 value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-                colorMap={STATUS_COLORS}
-                className="h-8 text-sm"
+                onChange={(v) => { setStatusFilter(v); setPage(1) }}
               />
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={resetFilters}
+                  className="cursor-pointer inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                  Clear
+                </button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -261,15 +274,13 @@ export function EmployeeMasterPage() {
                     employees.map((emp) => (
                       <tr
                         key={emp.id}
-                        className="border-b last:border-0 hover:bg-muted/50 transition-colors"
+                        onClick={() => selectEmployee(emp.id)}
+                        className="border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer group"
                       >
                         <td className="py-2.5 px-3">
-                          <button
-                            onClick={() => selectEmployee(emp.id)}
-                            className="font-medium text-primary hover:underline text-left"
-                          >
+                          <span className="font-medium text-primary group-hover:underline">
                             {emp.name}
-                          </button>
+                          </span>
                         </td>
                         <td className="py-2.5 px-3 text-muted-foreground border-l border-border">
                           {emp.email}
@@ -301,80 +312,14 @@ export function EmployeeMasterPage() {
               </table>
             </div>
 
-            {total > 0 && (
-              <div className="flex items-center justify-between px-3 py-3 border-t">
-                <p className="text-xs text-muted-foreground tabular-nums min-w-[140px]">
-                  Showing {(page - 1) * pageSize + 1}&ndash;{Math.min(page * pageSize, total)} of{" "}
-                  {total}
-                </p>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setPage(1)}
-                    disabled={page <= 1}
-                    className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronsLeft className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setPage(page - 1)}
-                    disabled={page <= 1}
-                    className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                  </button>
-
-                  {getPageNumbers(page, totalPages).map((item, idx) =>
-                    item === "ellipsis" ? (
-                      <span
-                        key={`ellipsis-${idx}`}
-                        className="px-1.5 text-xs text-muted-foreground select-none"
-                      >
-                        &hellip;
-                      </span>
-                    ) : (
-                      <button
-                        key={item}
-                        onClick={() => setPage(item)}
-                        className={`rounded-md min-w-7 px-1.5 py-1 text-xs font-medium transition-colors ${
-                          item === page
-                            ? "bg-primary text-primary-foreground"
-                            : "border hover:bg-accent"
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    )
-                  )}
-
-                  <button
-                    onClick={() => setPage(page + 1)}
-                    disabled={page >= totalPages}
-                    className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setPage(totalPages)}
-                    disabled={page >= totalPages}
-                    className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronsRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2 min-w-[140px] justify-end">
-                  <span className="text-xs text-muted-foreground">Rows</span>
-                  <Select
-                    options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: String(size) }))}
-                    value={String(pageSize)}
-                    onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}
-                    className="h-7 text-xs w-[70px]"
-                    maxRows={4}
-                  />
-                </div>
-              </div>
-            )}
+            <Pagination
+              total={total}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+            />
           </CardContent>
         </Card>
       )}

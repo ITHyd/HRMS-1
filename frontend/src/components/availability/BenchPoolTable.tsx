@@ -1,30 +1,16 @@
 import { useState } from "react"
-import { Settings2, Briefcase, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
+import { Settings2, Briefcase } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { SkillBadge } from "@/components/availability/SkillBadge"
 import { SkillTagManager } from "@/components/availability/SkillTagManager"
 import { AssignProjectModal } from "@/components/availability/AssignProjectModal"
+import { Pagination } from "@/components/shared/Pagination"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import type { AvailableEmployee } from "@/types/availability"
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
-
-function getPageNumbers(current: number, total: number): (number | "ellipsis")[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-  const pages: (number | "ellipsis")[] = [1]
-  if (current <= 4) {
-    for (let i = 2; i <= 5; i++) pages.push(i)
-    pages.push("ellipsis", total)
-  } else if (current >= total - 3) {
-    pages.push("ellipsis")
-    for (let i = total - 4; i <= total; i++) pages.push(i)
-  } else {
-    pages.push("ellipsis", current - 1, current, current + 1, "ellipsis", total)
-  }
-  return pages
-}
 
 interface BenchPoolTableProps {
   employees: AvailableEmployee[]
@@ -240,91 +226,14 @@ export function BenchPoolTable({
             </table>
           </div>
 
-          {total > 0 && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t">
-              {/* Left: showing count */}
-              <p className="text-xs text-muted-foreground tabular-nums min-w-[140px]">
-                Showing {(page - 1) * pageSize + 1}&ndash;{Math.min(page * pageSize, total)} of{" "}
-                {total}
-              </p>
-
-              {/* Center: page navigation */}
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => onPageChange(1)}
-                  disabled={page <= 1}
-                  className="cursor-pointer rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="First page"
-                >
-                  <ChevronsLeft className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={() => onPageChange(page - 1)}
-                  disabled={page <= 1}
-                  className="cursor-pointer rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Previous page"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-
-                {getPageNumbers(page, totalPages).map((item, idx) =>
-                  item === "ellipsis" ? (
-                    <span
-                      key={`ellipsis-${idx}`}
-                      className="px-1.5 text-xs text-muted-foreground select-none"
-                    >
-                      &hellip;
-                    </span>
-                  ) : (
-                    <button
-                      key={item}
-                      onClick={() => onPageChange(item)}
-                      className={`cursor-pointer rounded-md min-w-7 px-1.5 py-1 text-xs font-medium transition-colors ${
-                        item === page
-                          ? "bg-primary text-primary-foreground"
-                          : "border hover:bg-accent"
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  )
-                )}
-
-                <button
-                  onClick={() => onPageChange(page + 1)}
-                  disabled={page >= totalPages}
-                  className="cursor-pointer rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Next page"
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={() => onPageChange(totalPages)}
-                  disabled={page >= totalPages}
-                  className="cursor-pointer rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Last page"
-                >
-                  <ChevronsRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              {/* Right: rows per page dropdown */}
-              <div className="flex items-center gap-2 min-w-[140px] justify-end">
-                <span className="text-xs text-muted-foreground">Rows</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => onPageSizeChange(Number(e.target.value))}
-                  className="cursor-pointer h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  {PAGE_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
+          <Pagination
+            total={total}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+          />
         </CardContent>
       </Card>
 

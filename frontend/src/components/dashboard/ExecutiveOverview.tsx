@@ -38,14 +38,14 @@ export function ExecutiveOverview({ data }: ExecutiveOverviewProps) {
     },
     {
       label: "Overall Utilisation",
-      value: `${data.overall_utilisation_percent.toFixed(1)}%`,
+      value: `${(data.overall_utilisation_percent ?? 0).toFixed(1)}%`,
       icon: Percent,
       color: "text-indigo-600",
       bg: "bg-indigo-50",
     },
     {
       label: "Billable %",
-      value: `${data.overall_billable_percent.toFixed(1)}%`,
+      value: `${(data.overall_billable_percent ?? 0).toFixed(1)}%`,
       icon: DollarSign,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
