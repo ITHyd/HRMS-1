@@ -112,8 +112,7 @@
       "level": "manager",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-10-22T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 10
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000000f",
@@ -124,8 +123,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-07-28T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 337
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000010",
@@ -136,8 +134,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1221
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000011",
@@ -148,8 +145,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1227
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000012",
@@ -160,8 +156,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1232
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000013",
@@ -172,8 +167,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1135
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000014",
@@ -184,8 +178,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1125
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000015",
@@ -196,8 +189,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-08-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 338
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000016",
@@ -208,8 +200,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-08-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1192
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000017",
@@ -220,8 +211,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1197
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000018",
@@ -232,8 +222,7 @@
       "level": "manager",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-06-04T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1248
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000019",
@@ -244,8 +233,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 371
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000001a",
@@ -256,8 +244,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-05-19T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1195
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000001b",
@@ -268,8 +255,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 334
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000001c",
@@ -280,8 +266,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-26T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1143
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000001d",
@@ -292,8 +277,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1136
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000001e",
@@ -304,8 +288,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1270
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000001f",
@@ -316,8 +299,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1244
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000020",
@@ -328,8 +310,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1179
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000021",
@@ -340,8 +321,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1170
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000022",
@@ -352,8 +332,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 332
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000023",
@@ -364,8 +343,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1233
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000024",
@@ -376,8 +354,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1256
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000025",
@@ -388,8 +365,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1166
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000026",
@@ -400,8 +376,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1215
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000027",
@@ -412,8 +387,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-08-13T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 343
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000028",
@@ -424,8 +398,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-09-08T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 359
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000029",
@@ -436,8 +409,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1163
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000002a",
@@ -448,8 +420,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 360
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000002b",
@@ -460,8 +431,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 352
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000002c",
@@ -472,8 +442,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1082
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000002d",
@@ -484,8 +453,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1145
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000002e",
@@ -496,8 +464,7 @@
       "level": "manager",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2023-11-09T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1152
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000002f",
@@ -508,8 +475,7 @@
       "level": "manager",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-06-04T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1247
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000030",
@@ -520,8 +486,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1155
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000031",
@@ -532,8 +497,7 @@
       "level": "manager",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1127
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000032",
@@ -544,8 +508,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1242
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000033",
@@ -556,8 +519,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1156
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000034",
@@ -568,8 +530,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1158
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000035",
@@ -580,8 +541,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1211
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000036",
@@ -592,8 +552,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 355
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000037",
@@ -604,8 +563,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1271
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000038",
@@ -616,8 +574,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1178
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000039",
@@ -628,8 +585,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 336
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000003a",
@@ -640,8 +596,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-06-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1259
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000003b",
@@ -652,8 +607,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1123
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000003c",
@@ -664,8 +618,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1253
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000003d",
@@ -676,8 +629,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1203
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000003e",
@@ -688,8 +640,7 @@
       "level": "manager",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": false,
-      "hrms_employee_id": 1
+      "is_active": false
     },
     {
       "id": "69a7f039a0b1c2000000003f",
@@ -700,8 +651,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1274
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000040",
@@ -712,8 +662,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1216
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000041",
@@ -724,8 +673,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1120
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000042",
@@ -736,8 +684,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2025-08-13T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 350
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000043",
@@ -748,8 +695,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1250
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000044",
@@ -760,8 +706,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 347
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000045",
@@ -772,8 +717,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-01-22T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1148
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000046",
@@ -784,8 +728,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-08-13T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 345
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000047",
@@ -796,8 +739,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1173
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000048",
@@ -808,8 +750,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-08-13T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 349
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000049",
@@ -820,8 +761,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1217
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000004a",
@@ -832,8 +772,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 358
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000004b",
@@ -844,8 +783,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1160
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000004c",
@@ -856,8 +794,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 366
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000004d",
@@ -868,8 +805,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1157
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000004e",
@@ -880,8 +816,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1154
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000004f",
@@ -892,8 +827,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1264
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000050",
@@ -904,8 +838,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1183
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000051",
@@ -916,8 +849,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1144
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000052",
@@ -928,8 +860,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1207
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000053",
@@ -940,8 +871,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1206
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000054",
@@ -952,8 +882,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1131
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000055",
@@ -964,8 +893,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1129
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000056",
@@ -976,8 +904,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1165
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000057",
@@ -988,8 +915,7 @@
       "level": "manager",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2025-10-09T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 4
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000058",
@@ -1000,20 +926,18 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2025-10-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 12
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000059",
-      "name": "Mangisetty\u00c2\u00a0Lakshmi Venkata Pawan Kumar",
+      "name": "Mangisetty Lakshmi Venkata Pawan Kumar",
       "email": "pawankumar.mangisetty@nxzen.com",
       "designation": "Employee",
       "department_id": "0db377921f4ce762c6252613",
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-10-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 369
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000005a",
@@ -1024,8 +948,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1234
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000005b",
@@ -1036,8 +959,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 353
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000005c",
@@ -1048,8 +970,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1134
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000005d",
@@ -1060,8 +981,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1150
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000005e",
@@ -1072,8 +992,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 368
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000005f",
@@ -1084,8 +1003,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 363
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000060",
@@ -1096,8 +1014,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-02-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1182
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000061",
@@ -1108,8 +1025,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1210
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000062",
@@ -1120,8 +1036,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1132
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000063",
@@ -1132,8 +1047,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 331
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000064",
@@ -1144,8 +1058,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1239
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000065",
@@ -1156,8 +1069,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1198
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000066",
@@ -1168,8 +1080,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1212
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000067",
@@ -1180,8 +1091,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1218
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000068",
@@ -1192,8 +1102,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-08-28T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 367
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000069",
@@ -1204,8 +1113,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-10-06T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 370
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000006a",
@@ -1216,8 +1124,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1118
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000006b",
@@ -1228,8 +1135,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-03-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1189
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000006c",
@@ -1240,8 +1146,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1177
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000006d",
@@ -1252,8 +1157,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1124
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000006e",
@@ -1264,8 +1168,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 344
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000006f",
@@ -1276,8 +1179,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1164
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000070",
@@ -1288,8 +1190,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1187
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000071",
@@ -1300,8 +1201,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1209
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000072",
@@ -1312,8 +1212,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1196
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000073",
@@ -1324,8 +1223,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1168
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000074",
@@ -1336,8 +1234,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1222
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000075",
@@ -1348,8 +1245,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1252
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000076",
@@ -1360,8 +1256,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1251
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000077",
@@ -1372,8 +1267,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1117
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000078",
@@ -1384,8 +1278,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1272
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000079",
@@ -1396,8 +1289,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1171
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000007a",
@@ -1408,8 +1300,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-06-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1204
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000007b",
@@ -1420,8 +1311,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1128
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000007c",
@@ -1432,8 +1322,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-07-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1254
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000007d",
@@ -1444,8 +1333,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1147
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000007e",
@@ -1456,8 +1344,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 339
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000007f",
@@ -1468,8 +1355,7 @@
       "level": "manager",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2025-10-23T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1246
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000080",
@@ -1480,8 +1366,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1176
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000081",
@@ -1492,8 +1377,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1175
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000082",
@@ -1504,8 +1388,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-06-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1231
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000083",
@@ -1516,8 +1399,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 364
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000084",
@@ -1528,8 +1410,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 365
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000085",
@@ -1540,8 +1421,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1186
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000086",
@@ -1552,8 +1432,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1199
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000087",
@@ -1564,8 +1443,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1230
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000088",
@@ -1576,8 +1454,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 340
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000089",
@@ -1588,8 +1465,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1240
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000008a",
@@ -1600,8 +1476,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1174
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000008b",
@@ -1612,8 +1487,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1121
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000008c",
@@ -1624,8 +1498,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1119
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000008d",
@@ -1636,8 +1509,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1205
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000008e",
@@ -1648,8 +1520,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-26T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1137
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000008f",
@@ -1660,8 +1531,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1172
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000090",
@@ -1672,8 +1542,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1149
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000091",
@@ -1684,8 +1553,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1269
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000092",
@@ -1696,8 +1564,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2025-08-03T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 335
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000093",
@@ -1708,8 +1575,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 354
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000094",
@@ -1720,8 +1586,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1169
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000095",
@@ -1732,8 +1597,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1245
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000096",
@@ -1744,8 +1608,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 362
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000097",
@@ -1756,8 +1619,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1224
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000098",
@@ -1768,8 +1630,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2025-08-13T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 348
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c20000000099",
@@ -1780,8 +1641,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1220
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000009a",
@@ -1792,8 +1652,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1115
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000009b",
@@ -1804,8 +1663,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1188
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000009c",
@@ -1816,8 +1674,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1142
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000009d",
@@ -1828,8 +1685,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1235
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000009e",
@@ -1840,8 +1696,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-04-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1190
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c2000000009f",
@@ -1852,8 +1707,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1181
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000a0",
@@ -1864,8 +1718,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-26T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1141
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000a1",
@@ -1876,8 +1729,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1214
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000a2",
@@ -1888,8 +1740,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 341
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000a3",
@@ -1900,8 +1751,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1208
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000a4",
@@ -1912,8 +1762,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2025-06-25T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1243
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000a5",
@@ -1924,8 +1773,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-08-13T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 357
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000a6",
@@ -1936,8 +1784,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1139
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000a7",
@@ -1948,8 +1795,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1273
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000a8",
@@ -1960,8 +1806,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1126
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000a9",
@@ -1972,8 +1817,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1262
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000aa",
@@ -1984,8 +1828,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-06-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1258
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000ab",
@@ -1996,8 +1839,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1130
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000ac",
@@ -2008,8 +1850,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1167
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000ad",
@@ -2020,8 +1861,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 356
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000ae",
@@ -2032,8 +1872,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1255
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000af",
@@ -2044,8 +1883,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1200
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000b0",
@@ -2056,8 +1894,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1219
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000b1",
@@ -2068,8 +1905,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1180
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000b2",
@@ -2080,8 +1916,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1241
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000b3",
@@ -2092,8 +1927,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1114
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000b4",
@@ -2104,8 +1938,7 @@
       "level": "manager",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2025-06-12T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1081
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000b5",
@@ -2116,8 +1949,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2025-10-22T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 333
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000b6",
@@ -2128,8 +1960,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1159
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000b7",
@@ -2140,8 +1971,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-11-26T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1151
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000b8",
@@ -2152,8 +1982,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1229
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000b9",
@@ -2164,8 +1993,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1201
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000ba",
@@ -2176,8 +2004,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1236
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000bb",
@@ -2188,8 +2015,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1237
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000bc",
@@ -2200,8 +2026,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1185
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000bd",
@@ -2212,8 +2037,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1226
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000be",
@@ -2224,8 +2048,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-08-13T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 346
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000bf",
@@ -2236,8 +2059,7 @@
       "level": "manager",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-10-23T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1249
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000c0",
@@ -2248,8 +2070,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-26T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1138
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000c1",
@@ -2260,8 +2081,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-01-22T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1146
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000c2",
@@ -2272,8 +2092,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1213
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000c3",
@@ -2284,8 +2103,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1261
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000c4",
@@ -2296,8 +2114,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-26T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1140
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000c5",
@@ -2308,8 +2125,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-06-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1260
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000c6",
@@ -2320,8 +2136,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 351
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000c7",
@@ -2332,8 +2147,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-01-21T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1116
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000c8",
@@ -2344,8 +2158,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1223
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000c9",
@@ -2356,8 +2169,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-06-01T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1257
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000ca",
@@ -2368,8 +2180,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1191
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000cb",
@@ -2380,8 +2191,7 @@
       "level": "manager",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2024-02-05T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1153
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000cc",
@@ -2392,8 +2202,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 361
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000cd",
@@ -2404,8 +2213,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-04-21T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1193
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000ce",
@@ -2416,8 +2224,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1228
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000cf",
@@ -2428,8 +2235,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1122
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000d0",
@@ -2440,8 +2246,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1161
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000d1",
@@ -2452,8 +2257,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1184
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000d2",
@@ -2464,8 +2268,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-05-12T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1194
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000d3",
@@ -2476,8 +2279,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2024-10-24T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 1133
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000d4",
@@ -2488,8 +2290,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1225
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000d5",
@@ -2500,8 +2301,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1202
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000d6",
@@ -2512,8 +2312,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000001",
       "join_date": "2025-08-25T00:00:00",
-      "is_active": true,
-      "hrms_employee_id": 342
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000d7",
@@ -2524,8 +2323,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1238
+      "is_active": true
     },
     {
       "id": "69a7f039a0b1c200000000d8",
@@ -2536,8 +2334,7 @@
       "level": "mid",
       "location_id": "69a7f039a0b1c20000000002",
       "join_date": "2026-03-04T08:41:29.357885+00:00",
-      "is_active": true,
-      "hrms_employee_id": 1162
+      "is_active": true
     }
   ],
   "reporting_relationships": [
@@ -5213,8 +5010,7 @@
       "status": "ACTIVE",
       "department_id": "0473547e11c72bd8ebd12fc7",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000da",
@@ -5222,8 +5018,7 @@
       "status": "ACTIVE",
       "department_id": "0afd169704f1da28d2b8cef2",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000db",
@@ -5231,9 +5026,7 @@
       "status": "ACTIVE",
       "department_id": "0db377921f4ce762c6252613",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "hrms_project_id": 159,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000dc",
@@ -5241,8 +5034,7 @@
       "status": "ACTIVE",
       "department_id": "0db377921f4ce762c6252613",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000dd",
@@ -5250,8 +5042,7 @@
       "status": "ACTIVE",
       "department_id": "4eb7187c9cc2c77b76c7c41f",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000de",
@@ -5259,8 +5050,7 @@
       "status": "ACTIVE",
       "department_id": "4eb7187c9cc2c77b76c7c41f",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000df",
@@ -5268,8 +5058,7 @@
       "status": "ACTIVE",
       "department_id": "ce2fa20cacb9a8065c59eac5",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000e0",
@@ -5277,9 +5066,7 @@
       "status": "ACTIVE",
       "department_id": "4eb7187c9cc2c77b76c7c41f",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "hrms_project_id": 89,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000e1",
@@ -5287,9 +5074,7 @@
       "status": "ACTIVE",
       "department_id": "0473547e11c72bd8ebd12fc7",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "hrms_project_id": 88,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000e2",
@@ -5297,9 +5082,7 @@
       "status": "ACTIVE",
       "department_id": "72d13886bdef136f566c992a",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "hrms_project_id": 87,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000e3",
@@ -5307,8 +5090,7 @@
       "status": "ACTIVE",
       "department_id": "72d13886bdef136f566c992a",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000e4",
@@ -5316,8 +5098,7 @@
       "status": "ACTIVE",
       "department_id": "a5c001fe252d1b5862bfcd09",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000e5",
@@ -5325,8 +5106,7 @@
       "status": "ACTIVE",
       "department_id": "98a236a1ee6fa8562d4b6f29",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000e6",
@@ -5334,8 +5114,7 @@
       "status": "ACTIVE",
       "department_id": "98a236a1ee6fa8562d4b6f29",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000e7",
@@ -5343,8 +5122,7 @@
       "status": "ACTIVE",
       "department_id": "0473547e11c72bd8ebd12fc7",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000e8",
@@ -5352,8 +5130,7 @@
       "status": "ACTIVE",
       "department_id": "0473547e11c72bd8ebd12fc7",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000e9",
@@ -5361,9 +5138,7 @@
       "status": "ACTIVE",
       "department_id": "0473547e11c72bd8ebd12fc7",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "hrms_project_id": 80,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000ea",
@@ -5371,8 +5146,7 @@
       "status": "ACTIVE",
       "department_id": "0afd169704f1da28d2b8cef2",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000eb",
@@ -5380,8 +5154,7 @@
       "status": "ACTIVE",
       "department_id": "18c74cf0dfee6f3474fbc422",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000ec",
@@ -5389,8 +5162,7 @@
       "status": "ACTIVE",
       "department_id": "18c74cf0dfee6f3474fbc422",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000ed",
@@ -5398,9 +5170,7 @@
       "status": "ACTIVE",
       "department_id": "035b512a4a724f23b39fc25e",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "hrms_project_id": 76,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000ee",
@@ -5408,8 +5178,7 @@
       "status": "ACTIVE",
       "department_id": "18c74cf0dfee6f3474fbc422",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000ef",
@@ -5417,9 +5186,7 @@
       "status": "ACTIVE",
       "department_id": "035b512a4a724f23b39fc25e",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "hrms_project_id": 74,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000f0",
@@ -5427,8 +5194,7 @@
       "status": "ACTIVE",
       "department_id": "72d13886bdef136f566c992a",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "project_type": "client"
+      "end_date": null
     },
     {
       "id": "69a7f039a0b1c200000000f1",
@@ -5436,9 +5202,7 @@
       "status": "ACTIVE",
       "department_id": "72d13886bdef136f566c992a",
       "start_date": "2026-03-04T08:41:29.357885+00:00",
-      "end_date": null,
-      "hrms_project_id": 72,
-      "project_type": "client"
+      "end_date": null
     }
   ],
   "employee_projects": [
@@ -8189,7 +7953,7 @@
       "period": "2025-11",
       "employee_id": "69a7f039a0b1c20000000059",
       "hrms_employee_id": 369,
-      "employee_name": "Mangisetty\u00c2\u00a0Lakshmi Venkata Pawan Kumar",
+      "employee_name": "Mangisetty Lakshmi Venkata Pawan Kumar",
       "present_days": 11,
       "wfh_days": 9,
       "leave_days": 0,
