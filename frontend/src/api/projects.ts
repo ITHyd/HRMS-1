@@ -1,5 +1,5 @@
 import client from "./client"
-import type { ProjectListResponse, ProjectDetail, AssignToProjectRequest, AssignmentResponse, EmployeeTimeline } from "@/types/project"
+import type { ProjectListResponse, ProjectDetail, AssignToProjectRequest, AssignmentResponse, EmployeeTimeline, ProjectTimelineResponse } from "@/types/project"
 
 export async function listProjects(params?: {
   search?: string
@@ -47,6 +47,11 @@ export async function getProjectDetail(projectId: string, period?: string): Prom
   const res = await client.get<ProjectDetail>(`/projects/${projectId}`, {
     params: period ? { period } : undefined,
   })
+  return res.data
+}
+
+export async function getProjectTimeline(): Promise<ProjectTimelineResponse> {
+  const res = await client.get<ProjectTimelineResponse>("/projects/timeline")
   return res.data
 }
 

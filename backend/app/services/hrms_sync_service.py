@@ -190,8 +190,8 @@ def is_live_sync_enabled_for_user(user_email: str | None, mode_config: dict | No
     if email and email in demo_users:
         return False
 
-    if email and live_users:
-        return email in live_users
+    if email and email in live_users:
+        return True
 
     if email and live_domains and "@" in email:
         domain = email.split("@", 1)[1]

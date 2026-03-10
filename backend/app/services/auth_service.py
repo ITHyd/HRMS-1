@@ -18,11 +18,15 @@ async def authenticate_user(email: str, password: str) -> dict | None:
     if not user or not verify_password(password, user.password_hash):
         return None
 
-    location = await Location.get(user.branch_location_id)
-    branch_code = location.code if location else "UNK"
+    try:
+        location = await Location.get(user.branch_location_id)
+        branch_code = location.code if location else "UNK"
+    except Exception:
+        branch_code = "UNK"
 
     token_data = {
         "user_id": str(user.id),
+        "email": user.email,
         "employee_id": user.employee_id,
         "branch_location_id": user.branch_location_id,
         "name": user.name,

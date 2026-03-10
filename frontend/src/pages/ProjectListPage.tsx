@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -41,6 +41,7 @@ function getPageNumbers(current: number, total: number): (number | "ellipsis")[]
 
 export function ProjectListPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [projects, setProjects] = useState<ProjectBrief[]>([])
   const [total, setTotal] = useState(0)
   const [activeCount, setActiveCount] = useState(0)
@@ -55,13 +56,13 @@ export function ProjectListPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   })
 
-  // Filters
-  const [showFilters, setShowFilters] = useState(false)
+  // Filters — pre-filled from URL params (e.g. ?client_name=ENWL from Match Projects)
+  const [showFilters, setShowFilters] = useState(() => !!searchParams.get("client_name"))
   const [search, setSearch] = useState("")
   const [searchInput, setSearchInput] = useState("")
   const [projectType, setProjectType] = useState("")
   const [status, setStatus] = useState("")
-  const [clientFilter, setClientFilter] = useState("")
+  const [clientFilter, setClientFilter] = useState(() => searchParams.get("client_name") ?? "")
   const [clients, setClients] = useState<string[]>([])
 
   useEffect(() => {

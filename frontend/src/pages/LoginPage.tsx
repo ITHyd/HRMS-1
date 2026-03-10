@@ -95,22 +95,22 @@ export function LoginPage() {
           <div className="mt-6 border-t pt-4">
             <p className="text-xs text-muted-foreground text-center mb-2">Demo Accounts</p>
             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <div className="rounded border p-2">
-                <p className="font-medium">HYD Branch</p>
-                <p>vikram.patel@company.com</p>
-              </div>
-              <div className="rounded border p-2">
-                <p className="font-medium">BLR Branch</p>
-                <p>kavitha.rao@company.com</p>
-              </div>
-              <div className="rounded border p-2">
-                <p className="font-medium">LON Branch</p>
-                <p>james.mitchell@company.com</p>
-              </div>
-              <div className="rounded border p-2">
-                <p className="font-medium">SYD Branch</p>
-                <p>michael.torres@company.com</p>
-              </div>
+              {[
+                { label: "HYD Branch", email: "vikram.patel@company.com" },
+                { label: "BLR Branch", email: "kavitha.rao@company.com" },
+                { label: "LON Branch", email: "james.mitchell@company.com" },
+                { label: "SYD Branch", email: "michael.torres@company.com" },
+              ].map((account) => (
+                <button
+                  key={account.email}
+                  type="button"
+                  onClick={() => { setEmail(account.email); setPassword("demo123") }}
+                  className="rounded border p-2 text-left hover:bg-muted/50 transition-colors cursor-pointer"
+                >
+                  <p className="font-medium">{account.label}</p>
+                  <p>{account.email}</p>
+                </button>
+              ))}
             </div>
             <p className="text-xs text-muted-foreground text-center mt-2">Password: demo123</p>
           </div>

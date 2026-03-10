@@ -150,6 +150,143 @@ async def list_projects(
     }
 
 
+async def get_project_timeline(branch_location_id: str) -> dict:
+    """Return active/on-hold projects with end-dates, freeing-up employees, and client opportunities."""
+    now = datetime.now(timezone.utc)
+
+    branch_emps = await Employee.find(
+        Employee.location_id == branch_location_id,
+        Employee.is_deleted != True,
+    ).to_list()
+    branch_emp_ids = [str(e.id) for e in branch_emps]
+    emp_map = {str(e.id): e for e in branch_emps}
+
+    assignments = await EmployeeProject.find(
+        {"employee_id": {"$in": branch_emp_ids}},
+        EmployeeProject.is_deleted != True,
+    ).to_list()
+    proj_ids = list({a.project_id for a in assignments})
+
+    if not proj_ids:
+        return {"projects": [], "freeing_up_by_month": {}, "client_opportunities": []}
+
+    projects = await Project.find(
+        {
+            "_id": {"$in": [ObjectId(pid) for pid in proj_ids if ObjectId.is_valid(pid)]},
+            "status": {"$in": ["ACTIVE", "ON_HOLD"]},
+            "is_deleted": {"$ne": True},
+        }
+    ).to_list()
+
+    dept_ids = list({p.department_id for p in projects if p.department_id})
+    depts = await Department.find(
+        {"_id": {"$in": [ObjectId(d) for d in dept_ids if ObjectId.is_valid(d)]}}
+    ).to_list()
+    dept_map = {str(d.id): d.name for d in depts}
+
+    proj_assignments: dict[str, list] = {}
+    for a in assignments:
+        proj_assignments.setdefault(a.project_id, []).append(a)
+
+    result_projects = []
+    freeing_up_by_month: dict[str, dict] = {}
+
+    for proj in projects:
+        proj_id = str(proj.id)
+        members = []
+        for a in proj_assignments.get(proj_id, []):
+            emp = emp_map.get(a.employee_id)
+            if emp:
+                members.append({
+                    "employee_id": a.employee_id,
+                    "employee_name": emp.name,
+                    "designation": emp.designation or "",
+                    "role_in_project": a.role_in_project,
+                })
+
+        days_until_end = None
+        urgency = "no_date"
+        if proj.end_date:
+            end_aware = proj.end_date.replace(tzinfo=timezone.utc) if proj.end_date.tzinfo is None else proj.end_date
+            days_until_end = (end_aware - now).days
+            if days_until_end < 0:
+                urgency = "overdue"
+            elif days_until_end <= 30:
+                urgency = "critical"
+            elif days_until_end <= 60:
+                urgency = "warning"
+            elif days_until_end <= 90:
+                urgency = "upcoming"
+            else:
+                urgency = "future"
+
+            # Collect freeing-up data for projects ending within 90 days (including overdue)
+            if days_until_end <= 90:
+                month_key = end_aware.strftime("%Y-%m")
+                for m in members:
+                    emp_id = m["employee_id"]
+                    if month_key not in freeing_up_by_month:
+                        freeing_up_by_month[month_key] = {}
+                    if emp_id not in freeing_up_by_month[month_key]:
+                        freeing_up_by_month[month_key][emp_id] = {**m, "projects_ending": []}
+                    freeing_up_by_month[month_key][emp_id]["projects_ending"].append(proj.name)
+
+        result_projects.append({
+            "project_id": proj_id,
+            "name": proj.name,
+            "status": proj.status,
+            "project_type": proj.project_type,
+            "client_name": proj.client_name,
+            "department_name": dept_map.get(proj.department_id or "", ""),
+            "start_date": proj.start_date.isoformat() if proj.start_date else None,
+            "end_date": proj.end_date.isoformat() if proj.end_date else None,
+            "days_until_end": days_until_end,
+            "urgency": urgency,
+            "member_count": len(members),
+            "members": members,
+        })
+
+    result_projects.sort(key=lambda p: (p["end_date"] or "9999-99-99"))
+
+    freeing_sorted = {
+        month: list(emp_dict.values())
+        for month, emp_dict in sorted(freeing_up_by_month.items())
+    }
+
+    # Client renewal opportunities: clients with projects ending within 90 days
+    client_opp: dict[str, dict] = {}
+    for p in result_projects:
+        if p["client_name"] and p["urgency"] in ("overdue", "critical", "warning", "upcoming"):
+            cn = p["client_name"]
+            if cn not in client_opp:
+                client_opp[cn] = {
+                    "client_name": cn,
+                    "projects": [],
+                    "earliest_end_date": None,
+                    "total_freeing_employees": 0,
+                }
+            client_opp[cn]["projects"].append({
+                "project_id": p["project_id"],
+                "name": p["name"],
+                "end_date": p["end_date"],
+                "urgency": p["urgency"],
+                "member_count": p["member_count"],
+            })
+            client_opp[cn]["total_freeing_employees"] += p["member_count"]
+            if not client_opp[cn]["earliest_end_date"] or (
+                p["end_date"] and p["end_date"] < client_opp[cn]["earliest_end_date"]
+            ):
+                client_opp[cn]["earliest_end_date"] = p["end_date"]
+
+    return {
+        "projects": result_projects,
+        "freeing_up_by_month": freeing_sorted,
+        "client_opportunities": sorted(
+            client_opp.values(), key=lambda c: c["earliest_end_date"] or "9999-99-99"
+        ),
+    }
+
+
 async def create_project(
     name: str,
     project_type: str,
