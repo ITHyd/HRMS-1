@@ -9,10 +9,9 @@ from app.models.project import Project
 from app.models.reporting_relationship import ReportingRelationship
 from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
-from app.services import hrms_mode_service
 
 
-async def get_employee_detail(employee_id: str, requester_branch_location_id: str, sync_mode: str = "live"):
+async def get_employee_detail(employee_id: str, requester_branch_location_id: str):
     emp = await Employee.get(employee_id)
     if not emp:
         return None
@@ -137,10 +136,8 @@ async def get_employee_detail(employee_id: str, requester_branch_location_id: st
 
     # Utilisation — latest snapshot (own branch only)
     if is_own_branch:
-        snapshot_visibility_filter = hrms_mode_service.get_snapshot_visibility_filter(sync_mode)
         latest_util = await UtilisationSnapshot.find(
             UtilisationSnapshot.employee_id == employee_id,
-            snapshot_visibility_filter,
         ).sort([("period", -1)]).limit(1).to_list()
 
         if latest_util:
@@ -164,7 +161,6 @@ async def get_employee_detail(employee_id: str, requester_branch_location_id: st
             TimesheetEntry.employee_id == employee_id,
             TimesheetEntry.period == current_period,
             TimesheetEntry.status != "rejected",
-            hrms_mode_service.get_timesheet_visibility_filter(sync_mode),
         ).to_list()
 
         if ts_entries:

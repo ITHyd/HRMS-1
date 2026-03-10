@@ -8,7 +8,6 @@ from app.schemas.timesheet import (
     TimesheetApprovalRequest,
     PeriodLockRequest,
 )
-from app.services import hrms_mode_service
 from app.services import timesheet_service
 
 router = APIRouter(prefix="/timesheets", tags=["Timesheets"])
@@ -60,17 +59,12 @@ async def list_entries(
     page_size: int = Query(50, ge=1, le=200),
     user: CurrentUser = Depends(get_current_user),
 ):
-    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
-        user_id=user.user_id,
-        user_email=getattr(user, "email", None),
-    )
     return await timesheet_service.list_entries(
         employee_id=employee_id,
         project_id=project_id,
         period=period,
         status=status,
         branch_location_id=user.branch_location_id,
-        sync_mode=sync_mode,
         page=page,
         page_size=page_size,
     )
@@ -105,14 +99,9 @@ async def get_workload_heatmap(
     period: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
     user: CurrentUser = Depends(get_current_user),
 ):
-    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
-        user_id=user.user_id,
-        user_email=getattr(user, "email", None),
-    )
     return await timesheet_service.get_workload_heatmap(
         period=period,
         branch_location_id=user.branch_location_id,
-        sync_mode=sync_mode,
     )
 
 

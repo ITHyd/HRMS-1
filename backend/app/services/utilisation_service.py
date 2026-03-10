@@ -18,7 +18,6 @@ from app.schemas.utilisation import (
     UtilisationSummary,
 )
 from app.services import audit_service
-from app.services import hrms_mode_service
 
 
 async def get_or_create_capacity_config(branch_location_id: str) -> CapacityConfig:
@@ -164,7 +163,6 @@ async def get_employee_capacity(
 async def compute_utilisation(
     period: str,
     branch_location_id: str,
-    sync_mode: str = "live",
 ) -> UtilisationSummary:
     """
     Core utilisation computation.
@@ -178,7 +176,6 @@ async def compute_utilisation(
     - Upsert UtilisationSnapshot (delete old + insert new).
     - Return an aggregated UtilisationSummary.
     """
-    mode = hrms_mode_service.normalize_sync_mode(sync_mode)
     config = await get_or_create_capacity_config(branch_location_id)
 
     # Fetch active employees in this branch (exclude corporate-level roles)
@@ -236,7 +233,6 @@ async def compute_utilisation(
         TimesheetEntry.period == period,
         TimesheetEntry.status != "rejected",
         {"employee_id": {"$in": employee_ids}},
-        hrms_mode_service.get_timesheet_visibility_filter(mode),
     ).to_list()
 
     # Group by employee
@@ -326,7 +322,6 @@ async def compute_utilisation(
         finance_status = finance_map.get(eid)
 
         snapshot = UtilisationSnapshot(
-            sync_mode=mode,
             employee_id=eid,
             employee_name=emp.name,
             employee_level=emp.level,
@@ -361,11 +356,9 @@ async def compute_utilisation(
         )
 
     # Upsert: delete old snapshots for this branch+period, then insert new ones
-    snapshot_visibility_filter = hrms_mode_service.get_snapshot_visibility_filter(mode)
     await UtilisationSnapshot.find(
         UtilisationSnapshot.branch_location_id == branch_location_id,
         UtilisationSnapshot.period == period,
-        snapshot_visibility_filter,
     ).delete()
 
     if snapshots:
@@ -390,15 +383,11 @@ async def compute_utilisation(
 async def get_cached_utilisation(
     period: str,
     branch_location_id: str,
-    sync_mode: str = "live",
 ) -> Optional[UtilisationSummary]:
     """Read utilisation data from UtilisationSnapshot without recomputing."""
-    mode = hrms_mode_service.normalize_sync_mode(sync_mode)
-    snapshot_visibility_filter = hrms_mode_service.get_snapshot_visibility_filter(mode)
     snapshots = await UtilisationSnapshot.find(
         UtilisationSnapshot.branch_location_id == branch_location_id,
         UtilisationSnapshot.period == period,
-        snapshot_visibility_filter,
     ).to_list()
 
     if not snapshots:

@@ -13,7 +13,6 @@ from app.models.timesheet_entry import TimesheetEntry
 from app.models.timesheet_period_lock import TimesheetPeriodLock
 from app.models.user import User
 from app.services import audit_service
-from app.services import hrms_mode_service
 
 
 async def create_entry(data: dict, user) -> dict:
@@ -159,7 +158,6 @@ async def list_entries(
     period: Optional[str] = None,
     status: Optional[str] = None,
     branch_location_id: Optional[str] = None,
-    sync_mode: str = "live",
     page: int = 1,
     page_size: int = 50,
 ) -> dict:
@@ -176,7 +174,6 @@ async def list_entries(
         filters["period"] = period
     if status:
         filters["status"] = status
-    filters.update(hrms_mode_service.get_timesheet_visibility_filter(sync_mode))
 
     skip = (page - 1) * page_size
 
@@ -228,10 +225,8 @@ async def list_entries(
     # If no entries found, find the latest period that has data for this branch
     latest_period = None
     if total == 0 and branch_location_id:
-        latest_filters = {"branch_location_id": branch_location_id}
-        latest_filters.update(hrms_mode_service.get_timesheet_visibility_filter(sync_mode))
         latest_entry = await TimesheetEntry.find(
-            latest_filters
+            {"branch_location_id": branch_location_id}
         ).sort(-TimesheetEntry.period).limit(1).to_list()
         if latest_entry:
             latest_period = latest_entry[0].period
@@ -243,7 +238,6 @@ async def list_entries(
         base_filters["branch_location_id"] = branch_location_id
     if period:
         base_filters["period"] = period
-    base_filters.update(hrms_mode_service.get_timesheet_visibility_filter(sync_mode))
 
     all_period_entries = await TimesheetEntry.find(base_filters).to_list()
     total_hours = sum(e.hours for e in all_period_entries)
@@ -487,7 +481,6 @@ async def _get_period_lock(
 async def get_workload_heatmap(
     period: str,
     branch_location_id: Optional[str] = None,
-    sync_mode: str = "live",
 ) -> dict:
     """Return per-employee, per-day hours grid for the workload heatmap."""
     from datetime import date as date_type
@@ -502,7 +495,6 @@ async def get_workload_heatmap(
     filters: dict = {"period": period, "is_deleted": {"$ne": True}}
     if branch_location_id:
         filters["branch_location_id"] = branch_location_id
-    filters.update(hrms_mode_service.get_timesheet_visibility_filter(sync_mode))
 
     entries = await TimesheetEntry.find(filters).to_list()
 

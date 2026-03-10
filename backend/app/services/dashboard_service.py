@@ -10,7 +10,6 @@ from app.models.project import Project
 from app.models.project_allocation import ProjectAllocation
 from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
-from app.services import hrms_mode_service
 
 
 CORPORATE_LEVELS = {"c-suite", "vp"}
@@ -33,7 +32,6 @@ def _previous_periods(period: str, count: int) -> list[str]:
 async def get_executive_dashboard(
     period: str,
     branch_location_id: str,
-    sync_mode: str = "live",
 ) -> dict:
     """
     Executive-level dashboard aggregated from UtilisationSnapshot.
@@ -41,15 +39,11 @@ async def get_executive_dashboard(
     Returns headline KPIs, classification breakdown, top projects, resource
     availability, and a 6-period trend.
     """
-    snapshot_visibility_filter = hrms_mode_service.get_snapshot_visibility_filter(sync_mode)
-    timesheet_visibility_filter = hrms_mode_service.get_timesheet_visibility_filter(sync_mode)
-
     # Current period snapshots (exclude corporate-level employees)
     snapshots = await UtilisationSnapshot.find(
         UtilisationSnapshot.branch_location_id == branch_location_id,
         UtilisationSnapshot.period == period,
         {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
-        snapshot_visibility_filter,
     ).to_list()
 
     total_active = len(snapshots)
@@ -80,7 +74,6 @@ async def get_executive_dashboard(
         TimesheetEntry.period == period,
         TimesheetEntry.status != "rejected",
         {"employee_id": {"$in": branch_emp_ids}},
-        timesheet_visibility_filter,
     ).to_list()
 
     project_hours: dict[str, float] = defaultdict(float)
@@ -144,7 +137,6 @@ async def get_executive_dashboard(
         UtilisationSnapshot.branch_location_id == branch_location_id,
         {"period": {"$in": trend_periods}},
         {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
-        snapshot_visibility_filter,
     ).to_list()
 
     period_groups: dict[str, list[UtilisationSnapshot]] = defaultdict(list)
@@ -182,7 +174,6 @@ async def get_executive_dashboard(
 async def get_resource_dashboard(
     period: str,
     branch_location_id: str,
-    sync_mode: str = "live",
     search: str | None = None,
     classification: str | None = None,
     page: int = 1,
@@ -195,15 +186,11 @@ async def get_resource_dashboard(
     Supports text search by name and filter by classification.
     Includes per-employee project hours from TimesheetEntry.
     """
-    snapshot_visibility_filter = hrms_mode_service.get_snapshot_visibility_filter(sync_mode)
-    timesheet_visibility_filter = hrms_mode_service.get_timesheet_visibility_filter(sync_mode)
-
     # Build query filters (exclude corporate-level employees)
     filters: list = [
         UtilisationSnapshot.branch_location_id == branch_location_id,
         UtilisationSnapshot.period == period,
         {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
-        snapshot_visibility_filter,
     ]
     if classification:
         filters.append(UtilisationSnapshot.classification == classification)
@@ -248,7 +235,6 @@ async def get_resource_dashboard(
         TimesheetEntry.period == period,
         TimesheetEntry.status != "rejected",
         {"employee_id": {"$in": emp_ids}},
-        timesheet_visibility_filter,
     ).to_list()
 
     # Resolve project names
@@ -310,7 +296,6 @@ async def get_resource_dashboard(
 async def get_project_dashboard(
     period: str,
     branch_location_id: str,
-    sync_mode: str = "live",
     project_id: str | None = None,
     page: int = 1,
     page_size: int = 20,
@@ -321,9 +306,6 @@ async def get_project_dashboard(
     Aggregates timesheet hours by project, lists members and billable
     breakdown, computes health status and identifies over-utilised members.
     """
-    timesheet_visibility_filter = hrms_mode_service.get_timesheet_visibility_filter(sync_mode)
-    snapshot_visibility_filter = hrms_mode_service.get_snapshot_visibility_filter(sync_mode)
-
     # First get branch-level employee IDs (exclude corporate)
     branch_employees = await Employee.find(
         Employee.location_id == branch_location_id,
@@ -338,7 +320,6 @@ async def get_project_dashboard(
         TimesheetEntry.period == period,
         TimesheetEntry.status != "rejected",
         {"employee_id": {"$in": branch_emp_ids}},
-        timesheet_visibility_filter,
     ]
     if project_id:
         ts_filters.append(TimesheetEntry.project_id == project_id)
@@ -405,7 +386,6 @@ async def get_project_dashboard(
             UtilisationSnapshot.branch_location_id == branch_location_id,
             {"employee_id": {"$in": list(all_member_ids)}},
             {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
-            snapshot_visibility_filter,
         ).to_list()
         if all_member_ids
         else []
@@ -508,7 +488,6 @@ async def get_project_dashboard(
 
 async def get_allocation_dashboard(
     period: str,
-    sync_mode: str = "live",
     search: str | None = None,
     page: int = 1,
     page_size: int = 20,
@@ -517,7 +496,6 @@ async def get_allocation_dashboard(
     allocations = await ProjectAllocation.find(
         ProjectAllocation.period == period,
         ProjectAllocation.is_deleted != True,
-        hrms_mode_service.get_allocation_visibility_filter(sync_mode),
     ).to_list()
 
     if search:

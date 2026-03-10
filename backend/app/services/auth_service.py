@@ -23,7 +23,6 @@ async def authenticate_user(email: str, password: str) -> dict | None:
 
     token_data = {
         "user_id": str(user.id),
-        "email": user.email,
         "employee_id": user.employee_id,
         "branch_location_id": user.branch_location_id,
         "name": user.name,

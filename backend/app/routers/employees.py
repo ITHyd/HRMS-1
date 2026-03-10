@@ -3,7 +3,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.middleware.auth_middleware import CurrentUser, get_current_user
-from app.services import hrms_mode_service
 from app.services.employee_service import (
     get_employee_departments,
     get_employee_detail,
@@ -59,15 +58,7 @@ async def get_employee(
     employee_id: str,
     user: CurrentUser = Depends(get_current_user),
 ):
-    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
-        user_id=user.user_id,
-        user_email=getattr(user, "email", None),
-    )
-    result = await get_employee_detail(
-        employee_id,
-        user.branch_location_id,
-        sync_mode=sync_mode,
-    )
+    result = await get_employee_detail(employee_id, user.branch_location_id)
     if not result:
         raise HTTPException(status_code=404, detail="Employee not found")
     return result

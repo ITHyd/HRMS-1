@@ -11,12 +11,10 @@ from app.models.project import Project
 from app.models.project_allocation import ProjectAllocation
 from app.models.timesheet_entry import TimesheetEntry
 from app.services.audit_service import log_change
-from app.services import hrms_mode_service
 
 
 async def list_projects(
     branch_location_id: str,
-    sync_mode: str = "live",
     search: Optional[str] = None,
     project_type: Optional[str] = None,
     status: Optional[str] = None,
@@ -79,7 +77,6 @@ async def list_projects(
         allocs = await ProjectAllocation.find(
             ProjectAllocation.period == period,
             ProjectAllocation.is_deleted != True,
-            hrms_mode_service.get_allocation_visibility_filter(sync_mode),
         ).to_list()
         for a in allocs:
             planned_by_project[a.project_id] = (
@@ -93,7 +90,6 @@ async def list_projects(
             TimesheetEntry.period == period,
             TimesheetEntry.status != "rejected",
             TimesheetEntry.is_deleted != True,
-            hrms_mode_service.get_timesheet_visibility_filter(sync_mode),
         ).to_list()
         for t in timesheets:
             worked_by_project[t.project_id] = (
@@ -244,7 +240,7 @@ async def assign_employees(
     }
 
 
-async def get_project_detail(project_id: str, period: Optional[str] = None, sync_mode: str = "live"):
+async def get_project_detail(project_id: str, period: Optional[str] = None):
     """Get project detail with members and allocation-based progress."""
     project = await Project.get(project_id)
     if not project or project.is_deleted:
@@ -283,7 +279,6 @@ async def get_project_detail(project_id: str, period: Optional[str] = None, sync
             ProjectAllocation.project_id == project_id,
             ProjectAllocation.period == period,
             ProjectAllocation.is_deleted != True,
-            hrms_mode_service.get_allocation_visibility_filter(sync_mode),
         ).to_list()
         for pa in proj_allocs:
             alloc_map[pa.employee_id] = pa
@@ -293,7 +288,6 @@ async def get_project_detail(project_id: str, period: Optional[str] = None, sync
             TimesheetEntry.period == period,
             TimesheetEntry.status != "rejected",
             TimesheetEntry.is_deleted != True,
-            hrms_mode_service.get_timesheet_visibility_filter(sync_mode),
         ).to_list()
         for t in proj_timesheets:
             worked_map[t.employee_id] = worked_map.get(t.employee_id, 0.0) + t.hours
@@ -385,7 +379,6 @@ async def get_employee_timeline(
     employee_id: str,
     from_period: str,
     to_period: str,
-    sync_mode: str = "live",
 ) -> dict:
     """
     Returns a month-by-month project timeline for an employee.
@@ -400,7 +393,6 @@ async def get_employee_timeline(
         ProjectAllocation.period >= from_period,
         ProjectAllocation.period <= to_period,
         ProjectAllocation.is_deleted != True,
-        hrms_mode_service.get_allocation_visibility_filter(sync_mode),
     ).sort("+period").to_list()
 
     assignments = await EmployeeProject.find(

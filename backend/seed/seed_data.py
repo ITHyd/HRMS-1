@@ -48,16 +48,9 @@ ALL_MODELS = [
     ProjectAllocation, SkillCatalog, EmployeeSkill, IntegrationConfig,
 ]
 
-DEFAULT_DEMO_PASSWORD = "demo123"
-NXZEN_PASSWORD = "password123"
-
 
 def date(y, m, d):
     return datetime(y, m, d, tzinfo=timezone.utc)
-
-
-def _password_for_email(email: str) -> str:
-    return NXZEN_PASSWORD if (email or "").lower().endswith("@nxzen.com") else DEFAULT_DEMO_PASSWORD
 
 
 async def seed():
@@ -483,6 +476,8 @@ async def seed():
     print(f"Created {len(assignments)} project assignments.")
 
     # ── Users (Login Accounts) ──
+    password_hash = bcrypt.hashpw(b"demo123", bcrypt.gensalt()).decode("utf-8")
+
     users_data = [
         ("vikram.patel@company.com", vp_eng_india, HYD, "Vikram Patel"),
         ("kavitha.rao@company.com", dir_eng_blr, BLR, "Kavitha Rao"),
@@ -494,7 +489,7 @@ async def seed():
     for email, emp_id, loc_id, name in users_data:
         user = User(
             email=email,
-            password_hash=bcrypt.hashpw(_password_for_email(email).encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
+            password_hash=password_hash,
             employee_id=emp_id,
             branch_location_id=loc_id,
             name=name,
@@ -956,7 +951,6 @@ async def seed():
                 "mode": {
                     "demo_users": ["vikram.patel@company.com"],
                     "live_domains": ["nxzen.com"],
-                    "live_users": ["vamsi.krishna@nxzen.com"],
                 },
             }
         await IntegrationConfig(

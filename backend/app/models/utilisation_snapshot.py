@@ -5,7 +5,6 @@ from beanie import Document
 
 
 class UtilisationSnapshot(Document):
-    sync_mode: str = "live"  # live | demo
     employee_id: str
     employee_name: str
     employee_level: str = ""  # mirrors Employee.level for filtering
@@ -24,7 +23,7 @@ class UtilisationSnapshot(Document):
     class Settings:
         name = "utilisation_snapshots"
         indexes = [
-            [("branch_location_id", 1), ("period", 1), ("sync_mode", 1)],
+            [("branch_location_id", 1), ("period", 1)],
             [("employee_id", 1), ("period", 1)],
             [("period", 1), ("classification", 1)],
         ]

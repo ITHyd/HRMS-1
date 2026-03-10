@@ -9,7 +9,6 @@ from app.models.employee import Employee
 from app.models.project import Project
 from app.models.timesheet_entry import TimesheetEntry
 from app.services import audit_service
-from app.services import hrms_mode_service
 
 
 async def create_dynamics_export(export_type: str, branch_location_id: str, user) -> dict:
@@ -22,10 +21,6 @@ async def create_dynamics_export(export_type: str, branch_location_id: str, user
         raise ValueError(f"Invalid export_type: {export_type}. Must be one of: employee, project, timesheet")
 
     now = datetime.now(timezone.utc)
-    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
-        user_id=user.user_id,
-        user_email=getattr(user, "email", None),
-    )
 
     export_doc = DynamicsExport(
         export_type=export_type,
@@ -43,7 +38,7 @@ async def create_dynamics_export(export_type: str, branch_location_id: str, user
         elif export_type == "project":
             data = await _export_projects(branch_location_id)
         else:
-            data = await _export_timesheets(branch_location_id, sync_mode=sync_mode)
+            data = await _export_timesheets(branch_location_id)
 
         export_doc.data_snapshot = data
         export_doc.record_count = len(data.get("records", []))
@@ -219,7 +214,7 @@ async def _export_projects(branch_location_id: str) -> dict:
     }
 
 
-async def _export_timesheets(branch_location_id: str, sync_mode: str = "live") -> dict:
+async def _export_timesheets(branch_location_id: str) -> dict:
     """
     Query timesheet entries for the branch for the current period
     and transform to D365 msdyn_timeentry schema.
@@ -229,7 +224,6 @@ async def _export_timesheets(branch_location_id: str, sync_mode: str = "live") -
     entries = await TimesheetEntry.find(
         TimesheetEntry.branch_location_id == branch_location_id,
         TimesheetEntry.period == current_period,
-        hrms_mode_service.get_timesheet_visibility_filter(sync_mode),
     ).to_list()
 
     records = []

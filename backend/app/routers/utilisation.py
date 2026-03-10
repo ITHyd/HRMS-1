@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.middleware.auth_middleware import CurrentUser, get_current_user
 from app.schemas.utilisation import CapacityConfigUpdate, EmployeeCapacityOverrideCreate
-from app.services import hrms_mode_service
 from app.services.utilisation_service import (
     compute_utilisation,
     create_employee_override,
@@ -97,11 +96,7 @@ async def compute(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Compute utilisation for all employees in the branch for the given period."""
-    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
-        user_id=user.user_id,
-        user_email=getattr(user, "email", None),
-    )
-    summary = await compute_utilisation(period, user.branch_location_id, sync_mode=sync_mode)
+    summary = await compute_utilisation(period, user.branch_location_id)
     return summary.model_dump()
 
 
@@ -111,11 +106,7 @@ async def get_summary(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Get cached utilisation summary without recomputing."""
-    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
-        user_id=user.user_id,
-        user_email=getattr(user, "email", None),
-    )
-    summary = await get_cached_utilisation(period, user.branch_location_id, sync_mode=sync_mode)
+    summary = await get_cached_utilisation(period, user.branch_location_id)
     if not summary:
         raise HTTPException(
             status_code=404,
@@ -132,17 +123,11 @@ async def get_employee_utilisation(
 ):
     """Get utilisation snapshot for a single employee."""
     from app.models.utilisation_snapshot import UtilisationSnapshot
-    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
-        user_id=user.user_id,
-        user_email=getattr(user, "email", None),
-    )
-    snapshot_visibility_filter = hrms_mode_service.get_snapshot_visibility_filter(sync_mode)
 
     snapshot = await UtilisationSnapshot.find_one(
         UtilisationSnapshot.employee_id == employee_id,
         UtilisationSnapshot.period == period,
         UtilisationSnapshot.branch_location_id == user.branch_location_id,
-        snapshot_visibility_filter,
     )
 
     if not snapshot:
