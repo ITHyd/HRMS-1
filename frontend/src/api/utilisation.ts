@@ -35,15 +35,6 @@ export async function getCapacityOverrides(): Promise<EmployeeCapacityOverride[]
   return res.data
 }
 
-export async function computeUtilisation(
-  period: string
-): Promise<UtilisationSummary> {
-  const res = await client.post<UtilisationSummary>("/utilisation/compute", null, {
-    params: { period },
-  })
-  return res.data
-}
-
 export async function getUtilisationSummary(
   period: string
 ): Promise<UtilisationSummary> {

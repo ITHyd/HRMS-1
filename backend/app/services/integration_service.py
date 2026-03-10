@@ -197,7 +197,6 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
                 period=current_period,
                 user_id=user.user_id,
                 integration_config_id=str(cfg.id),
-                months_backfill_override=1,
             )
             # Combine counts from both steps
             master_status = master_result.get("status", "completed")

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Search, X, Filter } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
@@ -141,9 +141,13 @@ export function BenchFilters({
     return () => clearTimeout(timer)
   }, [localSkill])
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSearch(localSearch)
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleSearchInput = (value: string) => {
+    setLocalSearch(value)
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    searchDebounce.current = setTimeout(() => {
+      onSearch(value)
+    }, 300)
   }
 
   const handleSkillSubmit = (e: React.FormEvent) => {
@@ -189,15 +193,15 @@ export function BenchFilters({
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
               Search
             </label>
-            <form onSubmit={handleSearchSubmit} className="relative">
+            <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name..."
                 value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
+                onChange={(e) => handleSearchInput(e.target.value)}
                 className="pl-9 h-8 text-sm"
               />
-            </form>
+            </div>
           </div>
 
           {/* Skill */}

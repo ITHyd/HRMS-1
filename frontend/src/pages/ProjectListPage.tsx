@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,30 +14,14 @@ import {
   Pause,
   SlidersHorizontal,
   Search,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Users,
+  X,
 } from "lucide-react"
+import { SelectDropdown } from "@/components/shared/SelectDropdown"
+import { Pagination } from "@/components/shared/Pagination"
 import type { ProjectBrief } from "@/types/project"
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
-
-function getPageNumbers(current: number, total: number): (number | "ellipsis")[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-  const pages: (number | "ellipsis")[] = [1]
-  if (current <= 4) {
-    for (let i = 2; i <= 5; i++) pages.push(i)
-    pages.push("ellipsis", total)
-  } else if (current >= total - 3) {
-    pages.push("ellipsis")
-    for (let i = total - 4; i <= total; i++) pages.push(i)
-  } else {
-    pages.push("ellipsis", current - 1, current, current + 1, "ellipsis", total)
-  }
-  return pages
-}
 
 export function ProjectListPage() {
   const navigate = useNavigate()
@@ -52,7 +36,6 @@ export function ProjectListPage() {
   const [loading, setLoading] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState(() => {
     const now = new Date()
-    now.setMonth(now.getMonth() - 1)
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   })
 
@@ -99,21 +82,38 @@ export function ProjectListPage() {
     fetchData()
   }, [fetchData])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setSearch(searchInput)
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handleSearchInput = (value: string) => {
+    setSearchInput(value)
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    searchDebounce.current = setTimeout(() => {
+      setSearch(value)
+      setPage(1)
+    }, 300)
+  }
+
+  const resetFilters = () => {
+    setSearchInput("")
+    setSearch("")
+    setProjectType("")
+    setStatus("")
+    setClientFilter("")
     setPage(1)
   }
 
-  const totalPages = Math.ceil(total / pageSize)
+  const handleCardFilter = (statusValue: string) => {
+    setStatus((prev) => prev === statusValue ? "" : statusValue)
+    setPage(1)
+    setShowFilters(true)
+  }
 
   const activeFilterCount = [search, projectType, status, clientFilter].filter(Boolean).length
 
   const summaryCards = [
-    { title: "Total Projects", value: total, icon: FolderKanban, color: "text-blue-600", bgColor: "bg-blue-50" },
-    { title: "Active", value: activeCount, icon: FolderClock, color: "text-green-600", bgColor: "bg-green-50" },
-    { title: "Completed", value: completedCount, icon: FolderCheck, color: "text-gray-600", bgColor: "bg-gray-50" },
-    { title: "On Hold", value: onHoldCount, icon: Pause, color: "text-amber-600", bgColor: "bg-amber-50" },
+    { title: "Total Projects", value: total, icon: FolderKanban, color: "text-blue-600", bgColor: "bg-blue-50", filterKey: "" },
+    { title: "Active", value: activeCount, icon: FolderClock, color: "text-green-600", bgColor: "bg-green-50", filterKey: "ACTIVE" },
+    { title: "Completed", value: completedCount, icon: FolderCheck, color: "text-gray-600", bgColor: "bg-gray-50", filterKey: "COMPLETED" },
+    { title: "On Hold", value: onHoldCount, icon: Pause, color: "text-amber-600", bgColor: "bg-amber-50", filterKey: "ON_HOLD" },
   ]
 
   return (
@@ -151,7 +151,21 @@ export function ProjectListPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {summaryCards.map((card) => (
-          <Card key={card.title}>
+          <Card
+            key={card.title}
+            className={`cursor-pointer transition-all hover:shadow-md ${
+              status === card.filterKey && card.filterKey !== ""
+                ? "ring-2 ring-primary"
+                : ""
+            }`}
+            onClick={() => {
+              if (card.filterKey === "") {
+                resetFilters()
+              } else {
+                handleCardFilter(card.filterKey)
+              }
+            }}
+          >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className={`rounded-lg p-2 ${card.bgColor}`}>
@@ -173,45 +187,58 @@ export function ProjectListPage() {
       {showFilters && (
         <Card>
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <form onSubmit={handleSearch} className="relative">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="relative w-56">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
                   placeholder="Search project name..."
                   value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
+                  onChange={(e) => handleSearchInput(e.target.value)}
                   className="w-full h-8 rounded-md border border-input bg-transparent pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
-              </form>
-              <select
+              </div>
+              <SelectDropdown
                 value={projectType}
-                onChange={(e) => { setProjectType(e.target.value); setPage(1) }}
-                className="h-8 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">All Types</option>
-                <option value="client">Client</option>
-                <option value="internal">Internal</option>
-              </select>
-              <select
+                onChange={(v) => { setProjectType(v); setPage(1) }}
+                options={[
+                  { value: "", label: "All Types" },
+                  { value: "client", label: "Client" },
+                  { value: "internal", label: "Internal" },
+                ]}
+                placeholder="All Types"
+                maxVisible={5}
+              />
+              <SelectDropdown
                 value={status}
-                onChange={(e) => { setStatus(e.target.value); setPage(1) }}
-                className="h-8 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">All Status</option>
-                <option value="ACTIVE">Active</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="ON_HOLD">On Hold</option>
-              </select>
-              <select
+                onChange={(v) => { setStatus(v); setPage(1) }}
+                options={[
+                  { value: "", label: "All Status" },
+                  { value: "ACTIVE", label: "Active" },
+                  { value: "COMPLETED", label: "Completed" },
+                  { value: "ON_HOLD", label: "On Hold" },
+                ]}
+                placeholder="All Status"
+                maxVisible={5}
+              />
+              <SelectDropdown
                 value={clientFilter}
-                onChange={(e) => { setClientFilter(e.target.value); setPage(1) }}
-                className="h-8 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">All Clients</option>
-                {clients.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+                onChange={(v) => { setClientFilter(v); setPage(1) }}
+                options={[
+                  { value: "", label: "All Clients" },
+                  ...clients.map((c) => ({ value: c, label: c })),
+                ]}
+                placeholder="All Clients"
+                maxVisible={5}
+              />
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={resetFilters}
+                  className="cursor-pointer inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                  Clear
+                </button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -253,15 +280,13 @@ export function ProjectListPage() {
                     projects.map((proj) => (
                       <tr
                         key={proj.id}
-                        className="border-b last:border-0 hover:bg-muted/50 transition-colors"
+                        onClick={() => navigate(`/projects/${proj.id}`)}
+                        className="border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer group"
                       >
                         <td className="py-2.5 px-3">
-                          <button
-                            onClick={() => navigate(`/projects/${proj.id}`)}
-                            className="font-medium text-primary hover:underline text-left"
-                          >
+                          <span className="font-medium text-primary group-hover:underline">
                             {proj.name}
-                          </button>
+                          </span>
                         </td>
                         <td className="py-2.5 px-3 border-l border-border text-sm">
                           {proj.client_name ? (
@@ -337,82 +362,14 @@ export function ProjectListPage() {
               </table>
             </div>
 
-            {total > 0 && (
-              <div className="flex items-center justify-between px-3 py-3 border-t">
-                <p className="text-xs text-muted-foreground tabular-nums min-w-[140px]">
-                  Showing {(page - 1) * pageSize + 1}&ndash;{Math.min(page * pageSize, total)} of{" "}
-                  {total}
-                </p>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setPage(1)}
-                    disabled={page <= 1}
-                    className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronsLeft className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setPage(page - 1)}
-                    disabled={page <= 1}
-                    className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                  </button>
-
-                  {getPageNumbers(page, totalPages).map((item, idx) =>
-                    item === "ellipsis" ? (
-                      <span
-                        key={`ellipsis-${idx}`}
-                        className="px-1.5 text-xs text-muted-foreground select-none"
-                      >
-                        &hellip;
-                      </span>
-                    ) : (
-                      <button
-                        key={item}
-                        onClick={() => setPage(item)}
-                        className={`rounded-md min-w-7 px-1.5 py-1 text-xs font-medium transition-colors ${
-                          item === page
-                            ? "bg-primary text-primary-foreground"
-                            : "border hover:bg-accent"
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    )
-                  )}
-
-                  <button
-                    onClick={() => setPage(page + 1)}
-                    disabled={page >= totalPages}
-                    className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setPage(totalPages)}
-                    disabled={page >= totalPages}
-                    className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronsRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2 min-w-[140px] justify-end">
-                  <span className="text-xs text-muted-foreground">Rows</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}
-                    className="h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <option key={size} value={size}>{size}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
+            <Pagination
+              total={total}
+              page={page}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+              pageSizeOptions={PAGE_SIZE_OPTIONS}
+            />
           </CardContent>
         </Card>
       )}

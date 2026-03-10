@@ -19,7 +19,6 @@ export function ProjectDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState(() => {
     const now = new Date()
-    now.setMonth(now.getMonth() - 1)
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   })
 
@@ -52,10 +51,10 @@ export function ProjectDetailPage() {
       <div className="p-6">
         <button
           onClick={() => navigate("/projects")}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
+          className="cursor-pointer inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors group mb-4"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Projects
+          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+          <span className="group-hover:underline">Back to Projects</span>
         </button>
         <div className="flex h-48 items-center justify-center text-muted-foreground">
           {error || "Project not found"}
@@ -76,10 +75,10 @@ export function ProjectDetailPage() {
       {/* Back button */}
       <button
         onClick={() => navigate("/projects")}
-        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className="cursor-pointer inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors group"
       >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Projects
+        <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+        <span className="group-hover:underline">Back to Projects</span>
       </button>
 
       {/* Project Header */}
@@ -257,15 +256,13 @@ export function ProjectDetailPage() {
                   {project.members.map((member) => (
                     <tr
                       key={member.employee_id}
-                      className="border-b last:border-0 hover:bg-muted/50 transition-colors"
+                      onClick={() => selectEmployee(member.employee_id)}
+                      className="border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer group"
                     >
                       <td className="py-2.5 px-3">
-                        <button
-                          onClick={() => selectEmployee(member.employee_id)}
-                          className="font-medium text-primary hover:underline text-left"
-                        >
+                        <span className="font-medium text-primary group-hover:underline">
                           {member.employee_name}
-                        </button>
+                        </span>
                       </td>
                       <td className="py-2.5 px-3 text-muted-foreground border-l border-border">
                         {member.designation}
