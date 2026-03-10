@@ -1,15 +1,33 @@
 import client from "./client"
-import type { ProjectListResponse, ProjectDetail, AssignToProjectRequest, AssignmentResponse } from "@/types/project"
+import type { ProjectListResponse, ProjectDetail, AssignToProjectRequest, AssignmentResponse, EmployeeTimeline } from "@/types/project"
 
 export async function listProjects(params?: {
   search?: string
   project_type?: string
   status?: string
+  client_name?: string
   period?: string
   page?: number
   page_size?: number
 }): Promise<ProjectListResponse> {
   const res = await client.get<ProjectListResponse>("/projects/", { params })
+  return res.data
+}
+
+export async function listProjectClients(): Promise<string[]> {
+  const res = await client.get<string[]>("/projects/clients")
+  return res.data
+}
+
+export async function getEmployeeTimeline(
+  employeeId: string,
+  fromPeriod?: string,
+  toPeriod?: string,
+): Promise<EmployeeTimeline> {
+  const res = await client.get<EmployeeTimeline>(
+    `/projects/employees/${employeeId}/timeline`,
+    { params: { from_period: fromPeriod, to_period: toPeriod } },
+  )
   return res.data
 }
 

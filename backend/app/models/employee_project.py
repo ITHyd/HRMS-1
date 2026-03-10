@@ -14,6 +14,8 @@ class EmployeeProject(Document):
     employee_id: str
     project_id: str
     role_in_project: str
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
     assigned_at: Optional[datetime] = None
     assigned_by: Optional[str] = None
 

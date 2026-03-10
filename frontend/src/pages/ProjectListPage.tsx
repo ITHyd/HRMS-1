@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { PeriodSelector } from "@/components/shared/PeriodSelector"
 import { Progress } from "@/components/ui/progress"
-import { listProjects } from "@/api/projects"
+import { listProjects, listProjectClients } from "@/api/projects"
 import {
   FolderKanban,
   FolderCheck,
@@ -49,7 +49,10 @@ export function ProjectListPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
-  const [selectedPeriod, setSelectedPeriod] = useState("2025-11")
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+  })
 
   // Filters
   const [showFilters, setShowFilters] = useState(false)
@@ -57,6 +60,12 @@ export function ProjectListPage() {
   const [searchInput, setSearchInput] = useState("")
   const [projectType, setProjectType] = useState("")
   const [status, setStatus] = useState("")
+  const [clientFilter, setClientFilter] = useState("")
+  const [clients, setClients] = useState<string[]>([])
+
+  useEffect(() => {
+    listProjectClients().then(setClients).catch(() => setClients([]))
+  }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -65,6 +74,7 @@ export function ProjectListPage() {
         search: search || undefined,
         project_type: projectType || undefined,
         status: status || undefined,
+        client_name: clientFilter || undefined,
         period: selectedPeriod,
         page,
         page_size: pageSize,
@@ -81,7 +91,7 @@ export function ProjectListPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, projectType, status, selectedPeriod, page, pageSize])
+  }, [search, projectType, status, clientFilter, selectedPeriod, page, pageSize])
 
   useEffect(() => {
     fetchData()
@@ -95,7 +105,7 @@ export function ProjectListPage() {
 
   const totalPages = Math.ceil(total / pageSize)
 
-  const activeFilterCount = [search, projectType, status].filter(Boolean).length
+  const activeFilterCount = [search, projectType, status, clientFilter].filter(Boolean).length
 
   const summaryCards = [
     { title: "Total Projects", value: total, icon: FolderKanban, color: "text-blue-600", bgColor: "bg-blue-50" },
@@ -161,7 +171,7 @@ export function ProjectListPage() {
       {showFilters && (
         <Card>
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <form onSubmit={handleSearch} className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
@@ -190,6 +200,16 @@ export function ProjectListPage() {
                 <option value="COMPLETED">Completed</option>
                 <option value="ON_HOLD">On Hold</option>
               </select>
+              <select
+                value={clientFilter}
+                onChange={(e) => { setClientFilter(e.target.value); setPage(1) }}
+                className="h-8 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">All Clients</option>
+                {clients.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
           </CardContent>
         </Card>
@@ -208,6 +228,7 @@ export function ProjectListPage() {
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="py-2.5 px-3 font-medium">Project Name</th>
+                    <th className="py-2.5 px-3 font-medium border-l border-border">Client</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border">Type</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border">Status</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border">Department</th>
@@ -220,7 +241,7 @@ export function ProjectListPage() {
                 <tbody>
                   {projects.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
                         {activeFilterCount > 0
                           ? "No projects match the current filters"
                           : "No projects found"}
@@ -239,6 +260,13 @@ export function ProjectListPage() {
                           >
                             {proj.name}
                           </button>
+                        </td>
+                        <td className="py-2.5 px-3 border-l border-border text-sm">
+                          {proj.client_name ? (
+                            <span className="font-medium">{proj.client_name}</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 border-l border-border">
                           <Badge

@@ -8,6 +8,8 @@ from app.middleware.auth_middleware import CurrentUser, get_current_user
 from app.services.project_service import (
     assign_employees,
     create_project,
+    get_distinct_clients,
+    get_employee_timeline,
     get_project_detail,
     list_projects,
 )
@@ -18,6 +20,7 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 class ProjectCreateRequest(BaseModel):
     name: str
     project_type: str = "client"
+    client_name: Optional[str] = None
     description: Optional[str] = None
     department_id: str
     start_date: datetime
@@ -31,11 +34,18 @@ class AssignRequest(BaseModel):
     role_in_project: str = "contributor"
 
 
+@router.get("/clients")
+async def list_clients(user: CurrentUser = Depends(get_current_user)):
+    """Return distinct client names for projects in this branch."""
+    return await get_distinct_clients(user.branch_location_id)
+
+
 @router.get("/")
 async def get_projects(
     search: Optional[str] = Query(None),
     project_type: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    client_name: Optional[str] = Query(None),
     period: Optional[str] = Query(None, description="Period in YYYY-MM format", pattern=r"^\d{4}-\d{2}$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -46,6 +56,7 @@ async def get_projects(
         search=search,
         project_type=project_type,
         status=status,
+        client_name=client_name,
         period=period,
         page=page,
         page_size=page_size,
@@ -60,6 +71,7 @@ async def create_new_project(
     project = await create_project(
         name=data.name,
         project_type=data.project_type,
+        client_name=data.client_name,
         department_id=data.department_id,
         start_date=data.start_date,
         end_date=data.end_date,
@@ -93,6 +105,7 @@ async def assign_to_project(
         project = await create_project(
             name=data.new_project.name,
             project_type=data.new_project.project_type,
+            client_name=data.new_project.client_name,
             department_id=data.new_project.department_id,
             start_date=data.new_project.start_date,
             end_date=data.new_project.end_date,
@@ -116,3 +129,25 @@ async def assign_to_project(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/employees/{employee_id}/timeline")
+async def employee_timeline(
+    employee_id: str,
+    from_period: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}$"),
+    to_period: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}$"),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Return month-by-month project timeline for an employee."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    if not to_period:
+        to_period = now.strftime("%Y-%m")
+    if not from_period:
+        # Default: 12 months back
+        y, m = now.year, now.month - 11
+        if m <= 0:
+            m += 12
+            y -= 1
+        from_period = f"{y:04d}-{m:02d}"
+    return await get_employee_timeline(employee_id, from_period, to_period)

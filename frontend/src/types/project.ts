@@ -3,6 +3,7 @@ export interface ProjectBrief {
   name: string
   status: string
   project_type: string
+  client_name: string | null
   department_name: string
   description?: string
   member_count: number
@@ -11,6 +12,26 @@ export interface ProjectBrief {
   progress_percent: number
   planned_days: number
   worked_days: number
+}
+
+export interface EmployeeTimelineEntry {
+  period: string
+  status: "allocated" | "bench" | "fully_billed" | "partially_billed"
+  projects: Array<{
+    project_id: string
+    project_name: string
+    client_name: string | null
+    allocated_days: number
+    allocation_percentage: number
+    role: string
+  }>
+}
+
+export interface EmployeeTimeline {
+  employee_id: string
+  from_period: string
+  to_period: string
+  timeline: EmployeeTimelineEntry[]
 }
 
 export interface ProjectListResponse {
@@ -26,6 +47,7 @@ export interface ProjectDetail {
   name: string
   status: string
   project_type: string
+  client_name: string | null
   description?: string
   department_name: string
   start_date: string | null

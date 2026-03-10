@@ -8,7 +8,9 @@ from bson import ObjectId
 from app.models.capacity_config import CapacityConfig
 from app.models.employee import Employee
 from app.models.employee_capacity_override import EmployeeCapacityOverride
+from app.models.employee_project import EmployeeProject
 from app.models.finance_billable import FinanceBillable
+from app.models.project import Project
 from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
 from app.schemas.utilisation import (
@@ -199,6 +201,32 @@ async def compute_utilisation(
     employee_ids = [str(e.id) for e in employees]
     emp_map = {str(e.id): e for e in employees}
 
+    # Auto-detect bench: employees whose only projects have passed end_date
+    now_dt = datetime.now(timezone.utc)
+    active_assignments = await EmployeeProject.find(
+        {"employee_id": {"$in": employee_ids}},
+        EmployeeProject.is_deleted != True,
+    ).to_list()
+
+    if active_assignments:
+        proj_ids_in_use = list({a.project_id for a in active_assignments})
+        live_projects = await Project.find(
+            {"_id": {"$in": [ObjectId(p) for p in proj_ids_in_use if ObjectId.is_valid(p)]}},
+            Project.is_deleted != True,
+        ).to_list()
+        live_proj_ids = {
+            str(p.id) for p in live_projects
+            if not p.end_date or p.end_date.replace(tzinfo=None) >= now_dt.replace(tzinfo=None)
+        }
+        emp_live_projs: dict[str, set] = defaultdict(set)
+        for a in active_assignments:
+            if a.project_id in live_proj_ids:
+                emp_live_projs[a.employee_id].add(a.project_id)
+        # Employees with no live project are forced to bench
+        forced_bench_ids = {eid for eid in employee_ids if not emp_live_projs.get(eid)}
+    else:
+        forced_bench_ids = set(employee_ids)
+
     # Aggregate timesheet entries for the period (any status except rejected)
     entries = await TimesheetEntry.find(
         TimesheetEntry.branch_location_id == branch_location_id,
@@ -251,8 +279,11 @@ async def compute_utilisation(
         utilisation_percent = (total_hours / capacity * 100) if capacity > 0 else 0.0
         billable_percent = (billable_hours / capacity * 100) if capacity > 0 else 0.0
 
-        # Classify
-        if billable_percent >= config.partial_billing_threshold:
+        # Classify — forced bench if all assigned projects have passed end_date
+        if eid in forced_bench_ids:
+            classification = "bench"
+            bench_count += 1
+        elif billable_percent >= config.partial_billing_threshold:
             classification = "fully_billed"
             fully_billed_count += 1
         elif billable_percent >= config.bench_threshold_percent:

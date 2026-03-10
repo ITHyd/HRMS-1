@@ -15,6 +15,7 @@ class Project(Document):
     name: str
     status: str  # "ACTIVE" | "COMPLETED" | "ON_HOLD"
     project_type: str = "client"  # "client" | "internal"
+    client_name: Optional[str] = None
     description: Optional[str] = None
     department_id: Optional[str] = None
     start_date: datetime

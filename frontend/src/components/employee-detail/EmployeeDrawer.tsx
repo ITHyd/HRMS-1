@@ -6,7 +6,9 @@ import { useOrgChartStore } from "@/store/orgChartStore"
 import { useAuthStore } from "@/store/authStore"
 import { getEmployee } from "@/api/employees"
 import { getReportingChain } from "@/api/org"
+import { getEmployeeTimeline } from "@/api/projects"
 import type { EmployeeDetail } from "@/types/employee"
+import type { EmployeeTimeline } from "@/types/project"
 import { LOCATION_COLORS, LEVEL_LABELS } from "@/lib/constants"
 import {
   User,
@@ -21,6 +23,7 @@ import {
   Wrench,
   BarChart3,
   FileText,
+  TrendingUp,
 } from "lucide-react"
 
 const PROFICIENCY_COLORS: Record<string, string> = {
@@ -44,6 +47,7 @@ export function EmployeeDrawer() {
   const loggedInUser = useAuthStore((s) => s.user)
   const [employee, setEmployee] = useState<EmployeeDetail | null>(null)
   const [chain, setChain] = useState<Record<string, unknown>[]>([])
+  const [timeline, setTimeline] = useState<EmployeeTimeline | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -53,6 +57,7 @@ export function EmployeeDrawer() {
     setError(null)
     setEmployee(null)
     setChain([])
+    setTimeline(null)
 
     const loadEmployee = async () => {
       try {
@@ -68,6 +73,13 @@ export function EmployeeDrawer() {
         setChain(chainRes.chain || [])
       } catch (err) {
         console.error("Failed to load chain:", err)
+      }
+
+      try {
+        const tl = await getEmployeeTimeline(selectedId)
+        setTimeline(tl)
+      } catch (err) {
+        console.error("Failed to load timeline:", err)
       }
 
       setLoading(false)
@@ -343,6 +355,58 @@ export function EmployeeDrawer() {
                           </p>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Project Timeline */}
+                {timeline && timeline.timeline.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
+                      <TrendingUp className="h-4 w-4" /> Project Timeline
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <div className="flex gap-0.5 min-w-max">
+                        {timeline.timeline.map((entry) => {
+                          const [yr, mo] = entry.period.split("-")
+                          const label = new Date(Number(yr), Number(mo) - 1).toLocaleDateString("en", { month: "short", year: "2-digit" })
+                          const isBench = entry.status === "bench" || entry.projects.length === 0
+                          const projectNames = entry.projects.map((p) => p.project_name).join(", ")
+                          return (
+                            <div
+                              key={entry.period}
+                              title={isBench ? `${entry.period}: Bench` : `${entry.period}: ${projectNames}`}
+                              className="flex flex-col items-center gap-1"
+                            >
+                              <div
+                                className={`w-8 h-8 rounded-sm transition-opacity hover:opacity-80 ${
+                                  isBench
+                                    ? "bg-red-200"
+                                    : entry.status === "fully_billed"
+                                    ? "bg-green-400"
+                                    : entry.status === "partially_billed"
+                                    ? "bg-amber-300"
+                                    : "bg-blue-300"
+                                }`}
+                              />
+                              <span className="text-[9px] text-muted-foreground leading-none">{label}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="flex gap-3 mt-2 flex-wrap">
+                        {[
+                          { color: "bg-green-400", label: "Fully Billed" },
+                          { color: "bg-amber-300", label: "Partial" },
+                          { color: "bg-blue-300", label: "Allocated" },
+                          { color: "bg-red-200", label: "Bench" },
+                        ].map((item) => (
+                          <div key={item.label} className="flex items-center gap-1">
+                            <div className={`w-3 h-3 rounded-sm ${item.color}`} />
+                            <span className="text-[10px] text-muted-foreground">{item.label}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

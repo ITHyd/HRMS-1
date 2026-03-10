@@ -15,6 +15,7 @@ from pathlib import Path
 from pymongo import AsyncMongoClient
 from beanie import init_beanie
 import bcrypt
+from dateutil.relativedelta import relativedelta
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -34,6 +35,7 @@ from app.models.capacity_config import CapacityConfig
 from app.models.finance_billable import FinanceBillable
 from app.models.finance_upload_log import FinanceUploadLog
 from app.models.utilisation_snapshot import UtilisationSnapshot
+from app.models.project_allocation import ProjectAllocation
 from app.models.skill_catalog import SkillCatalog
 from app.models.employee_skill import EmployeeSkill
 from app.models.integration_config import IntegrationConfig
@@ -43,7 +45,7 @@ ALL_MODELS = [
     AuditLog, User,
     TimesheetEntry, TimesheetPeriodLock, CapacityConfig,
     FinanceBillable, FinanceUploadLog, UtilisationSnapshot,
-    SkillCatalog, EmployeeSkill, IntegrationConfig,
+    ProjectAllocation, SkillCatalog, EmployeeSkill, IntegrationConfig,
 ]
 
 
@@ -337,82 +339,136 @@ async def seed():
 
     print(f"Created {len(secondary)} secondary reporting relationships.")
 
-    # ── Projects ──
+    # ── Projects (dates relative to seed run, client names populated) ──
     now = datetime.now(timezone.utc)
+    from dateutil.relativedelta import relativedelta
+
+    def moff(months: int) -> datetime:
+        """Return UTC datetime offset by N months from now, day=1."""
+        d = (now + relativedelta(months=months)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        return d
+
+    def mend(months: int) -> datetime:
+        """Return last-day-of-month datetime for now + N months."""
+        import calendar as _cal
+        d = now + relativedelta(months=months)
+        last_day = _cal.monthrange(d.year, d.month)[1]
+        return d.replace(day=last_day, hour=23, minute=59, second=59, microsecond=0)
+
+    # Client name map — internal projects have None
+    CLIENT_MAP = {
+        "Platform Modernization": "Accenture",
+        "Cloud Migration": "Infosys",
+        "Customer Dashboard": "HSBC",
+        "EMEA Market Launch": "Vodafone",
+        "APAC Expansion": "ANZ Bank",
+        "Mobile App v2": None,          # internal
+        "HR Portal Redesign": None,     # internal / completed
+        "Design System v3": None,       # internal
+        "Data Analytics Pipeline": None,  # internal / on hold
+        "Employee Wellness Program": None,  # internal
+    }
+
+    # (name, status, type, dept_key, start_offset_months, end_offset_months)
     projects_data = [
-        ("Platform Modernization", "ACTIVE", "client", ("Engineering", HYD), date(2025, 1, 1), date(2026, 6, 30)),
-        ("Mobile App v2", "ACTIVE", "internal", ("Engineering", HYD), date(2025, 3, 1), date(2025, 12, 31)),
-        ("EMEA Market Launch", "ACTIVE", "client", ("Product", LON), date(2025, 4, 1), date(2026, 3, 31)),
-        ("HR Portal Redesign", "COMPLETED", "internal", ("HR", HYD), date(2024, 6, 1), date(2025, 2, 28)),
-        ("Cloud Migration", "ACTIVE", "client", ("Engineering", BLR), date(2025, 2, 1), date(2026, 1, 31)),
-        ("Design System v3", "ACTIVE", "internal", ("Design", HYD), date(2025, 5, 1), date(2026, 4, 30)),
-        ("Customer Dashboard", "ACTIVE", "client", ("Engineering", LON), date(2025, 6, 1), date(2026, 2, 28)),
-        ("APAC Expansion", "ACTIVE", "client", ("Sales", SYD), date(2025, 7, 1), date(2026, 6, 30)),
-        ("Data Analytics Pipeline", "ON_HOLD", "internal", ("Engineering", HYD), date(2025, 8, 1), date(2026, 7, 31)),
-        ("Employee Wellness Program", "ACTIVE", "internal", ("HR", LON), date(2025, 9, 1), date(2026, 3, 31)),
+        # Active client — spans from 14 months ago to +4 months ahead
+        ("Platform Modernization", "ACTIVE",     "client",   ("Engineering", HYD), -14, +4),
+        # Completed internal — ended 3 months ago
+        ("Mobile App v2",          "COMPLETED",  "internal", ("Engineering", HYD), -12, -3),
+        # Active client — ending next month (EMEA)
+        ("EMEA Market Launch",     "ACTIVE",     "client",   ("Product", LON),     -11, +1),
+        # Completed internal — ended 13 months ago
+        ("HR Portal Redesign",     "COMPLETED",  "internal", ("HR", HYD),          -21, -13),
+        # Completed client — ended 1 month ago
+        ("Cloud Migration",        "COMPLETED",  "client",   ("Engineering", BLR), -13, -1),
+        # Active internal — ends +2 months ahead
+        ("Design System v3",       "ACTIVE",     "internal", ("Design", HYD),      -10, +2),
+        # Active client — ends +3 months ahead
+        ("Customer Dashboard",     "ACTIVE",     "client",   ("Engineering", LON),  -9, +3),
+        # Active client — ends +4 months ahead
+        ("APAC Expansion",         "ACTIVE",     "client",   ("Sales", SYD),        -8, +4),
+        # On hold internal — planned end +5 months
+        ("Data Analytics Pipeline","ON_HOLD",    "internal", ("Engineering", HYD),  -7, +5),
+        # Active internal — ends next month
+        ("Employee Wellness Program","ACTIVE",   "internal", ("HR", LON),           -6, +1),
     ]
 
     project_ids = {}
-    for name, status, ptype, dept_key, start, end in projects_data:
-        p = Project(name=name, status=status, project_type=ptype, department_id=depts[dept_key], start_date=start, end_date=end)
+    project_dates = {}  # name -> (start_dt, end_dt)
+    for name, status, ptype, dept_key, s_off, e_off in projects_data:
+        start_dt = moff(s_off)
+        end_dt = mend(e_off)
+        p = Project(
+            name=name,
+            status=status,
+            project_type=ptype,
+            client_name=CLIENT_MAP.get(name),
+            department_id=depts[dept_key],
+            start_date=start_dt,
+            end_date=end_dt,
+        )
         await p.insert()
         project_ids[name] = str(p.id)
+        project_dates[name] = (start_dt, end_dt)
 
     print(f"Created {len(project_ids)} projects.")
 
-    # ── Employee-Project Assignments ──
+    # ── Employee-Project Assignments (with start/end dates from project) ──
     assignments = [
-        # Platform Modernization
+        # Platform Modernization (active, ongoing)
         (se1_hyd, "Platform Modernization", "Tech Lead"),
         (se4_hyd, "Platform Modernization", "Senior Developer"),
         (me1_hyd, "Platform Modernization", "Developer"),
         (me4_hyd, "Platform Modernization", "Developer"),
         (je1_hyd, "Platform Modernization", "Junior Developer"),
-        # Mobile App v2
+        # Mobile App v2 (completed -3 months ago)
         (se3_hyd, "Mobile App v2", "Tech Lead"),
         (me3_hyd, "Mobile App v2", "Developer"),
-        (d1_hyd, "Mobile App v2", "UI Designer"),
-        (int2_hyd, "Mobile App v2", "Intern"),
-        # EMEA Market Launch
-        (pm_lon, "EMEA Market Launch", "Product Lead"),
-        (pa1_lon, "EMEA Market Launch", "Analyst"),
+        (d1_hyd,  "Mobile App v2", "UI Designer"),
+        (int2_hyd,"Mobile App v2", "Intern"),
+        # EMEA Market Launch (active, ending soon)
+        (pm_lon,     "EMEA Market Launch", "Product Lead"),
+        (pa1_lon,    "EMEA Market Launch", "Analyst"),
         (sales2_lon, "EMEA Market Launch", "Sales Lead"),
-        (me1_lon, "EMEA Market Launch", "Developer"),
-        # HR Portal Redesign
+        (me1_lon,    "EMEA Market Launch", "Developer"),
+        # HR Portal Redesign (completed -13 months)
         (mgr_hr_hyd, "HR Portal Redesign", "Project Owner"),
-        (hr1_hyd, "HR Portal Redesign", "HR Lead"),
-        (se2_hyd, "HR Portal Redesign", "Developer"),
-        # Cloud Migration
+        (hr1_hyd,    "HR Portal Redesign", "HR Lead"),
+        (se2_hyd,    "HR Portal Redesign", "Developer"),
+        # Cloud Migration (completed -1 month) — se2_hyd also had HR Portal but is done
         (se2_blr, "Cloud Migration", "DevOps Lead"),
         (se1_blr, "Cloud Migration", "Engineer"),
         (me1_blr, "Cloud Migration", "Engineer"),
         (je2_blr, "Cloud Migration", "Junior DevOps"),
-        # Design System v3
+        # Design System v3 (active)
         (lead_design_hyd, "Design System v3", "Design Lead"),
-        (d1_hyd, "Design System v3", "UI Designer"),
-        (d2_hyd, "Design System v3", "UX Researcher"),
-        (se2_hyd, "Design System v3", "Frontend Developer"),
-        # Customer Dashboard
+        (d1_hyd,          "Design System v3", "UI Designer"),
+        (d2_hyd,          "Design System v3", "UX Researcher"),
+        (se2_hyd,         "Design System v3", "Frontend Developer"),
+        # Customer Dashboard (active)
         (se1_lon, "Customer Dashboard", "Tech Lead"),
         (me2_lon, "Customer Dashboard", "Developer"),
         (je1_lon, "Customer Dashboard", "Junior Developer"),
-        # APAC Expansion
+        # APAC Expansion (active)
         (sales1_syd, "APAC Expansion", "Sales Lead"),
-        (ops1_syd, "APAC Expansion", "Ops Coordinator"),
-        # Data Analytics Pipeline
+        (ops1_syd,   "APAC Expansion", "Ops Coordinator"),
+        # Data Analytics Pipeline (on hold)
         (mgr_backend_hyd, "Data Analytics Pipeline", "Project Lead"),
-        (me1_hyd, "Data Analytics Pipeline", "Developer"),
-        # Employee Wellness Program
+        (me1_hyd,         "Data Analytics Pipeline", "Developer"),
+        # Employee Wellness Program (active, ending next month)
         (mgr_hr_lon, "Employee Wellness Program", "HR Lead"),
-        (hr1_lon, "Employee Wellness Program", "Coordinator"),
+        (hr1_lon,    "Employee Wellness Program", "Coordinator"),
     ]
 
     for emp_id, proj_name, role in assignments:
+        p_start, p_end = project_dates[proj_name]
         ep = EmployeeProject(
             employee_id=emp_id,
             project_id=project_ids[proj_name],
             role_in_project=role,
-            assigned_at=now,
+            start_date=p_start,
+            end_date=p_end,
+            assigned_at=p_start,
             assigned_by="system",
         )
         await ep.insert()
@@ -573,13 +629,12 @@ async def seed():
                             )
                             timesheet_entries.append(entry)
                 else:
-                    # Bench employee - minimal hours, non-billable
-                    first_proj_id = list(project_ids.values())[0]  # placeholder project
+                    # Bench employee - minimal hours, non-billable, project_id="bench"
                     for wd in working_days:
                         bench_hours = round(random.uniform(4.0, 6.0), 1)
                         entry = TimesheetEntry(
                             employee_id=eid,
-                            project_id=first_proj_id,
+                            project_id="bench",
                             date=wd,
                             hours=bench_hours,
                             is_billable=False,
@@ -603,6 +658,54 @@ async def seed():
         batch = timesheet_entries[i : i + BATCH_SIZE]
         await TimesheetEntry.insert_many(batch)
     print(f"Created {len(timesheet_entries)} timesheet entries across {len(past_months_3)} months.")
+
+    # ── Project Allocations (past 3 months — one record per employee per project per month) ──
+    allocation_records = []
+    proj_name_map = {v: k for k, v in project_ids.items()}  # id -> name
+
+    for year, month in past_months_3:
+        period = f"{year:04d}-{month:02d}"
+        working_days_count = len(get_working_days(year, month))
+
+        for loc_id, emp_list in branch_employees.items():
+            for eid in emp_list:
+                level = emp_id_to_level.get(eid, "")
+                if level in CORPORATE_LEVELS:
+                    continue
+
+                proj_list = emp_projects.get(eid, [])
+                if not proj_list:
+                    continue
+
+                n = len(proj_list)
+                per_proj_days = round(working_days_count / n, 1)
+                alloc_pct = round(100.0 / n, 1)
+
+                for pid, role in proj_list:
+                    proj_name = proj_name_map.get(pid, "Unknown")
+                    client = CLIENT_MAP.get(proj_name)
+                    emp_name = emp_id_to_name.get(eid, "")
+                    allocation_records.append(ProjectAllocation(
+                        period=period,
+                        employee_id=eid,
+                        hrms_employee_id=0,
+                        employee_name=emp_name,
+                        project_id=pid,
+                        hrms_project_id=0,
+                        project_name=proj_name,
+                        client_name=client,
+                        allocated_days=per_proj_days,
+                        allocation_percentage=alloc_pct,
+                        total_working_days=working_days_count,
+                        total_allocated_days=float(working_days_count),
+                        available_days=0.0,
+                        sync_batch_id="seed-alloc-1",
+                        synced_at=now,
+                    ))
+
+    for i in range(0, len(allocation_records), BATCH_SIZE):
+        await ProjectAllocation.insert_many(allocation_records[i : i + BATCH_SIZE])
+    print(f"Created {len(allocation_records)} project allocation records.")
 
     # ── Finance Billable (past 2 months) ──
     random.seed(42)  # Reset seed for reproducibility

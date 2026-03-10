@@ -18,6 +18,7 @@ async def list_projects(
     search: Optional[str] = None,
     project_type: Optional[str] = None,
     status: Optional[str] = None,
+    client_name: Optional[str] = None,
     period: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
@@ -50,6 +51,10 @@ async def list_projects(
     if search:
         search_lower = search.lower()
         projects = [p for p in projects if search_lower in p.name.lower()]
+
+    if client_name:
+        client_lower = client_name.lower()
+        projects = [p for p in projects if p.client_name and client_lower in p.client_name.lower()]
 
     dept_ids = list({p.department_id for p in projects})
     depts = await Department.find(
@@ -120,6 +125,7 @@ async def list_projects(
             "id": pid,
             "name": p.name,
             "project_type": p.project_type,
+            "client_name": p.client_name,
             "description": p.description,
             "status": p.status,
             "department_name": dept_map.get(p.department_id, "Unknown"),
@@ -151,6 +157,7 @@ async def create_project(
     start_date: datetime,
     end_date: Optional[datetime],
     description: Optional[str],
+    client_name: Optional[str],
     user_id: str,
     branch_location_id: str,
 ):
@@ -159,6 +166,7 @@ async def create_project(
         name=name,
         status="ACTIVE",
         project_type=project_type,
+        client_name=client_name,
         description=description,
         department_id=department_id,
         start_date=start_date,
@@ -330,6 +338,7 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
         "id": str(project.id),
         "name": project.name,
         "project_type": project.project_type,
+        "client_name": project.client_name,
         "description": project.description,
         "status": project.status,
         "department_name": dept.name if dept else "Unknown",
@@ -340,4 +349,108 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
         "progress_percent": round(progress, 1),
         "member_count": len(members),
         "members": members,
+    }
+
+
+async def get_distinct_clients(branch_location_id: str) -> list[str]:
+    """Return sorted list of distinct non-null client names for projects in this branch."""
+    branch_emps = await Employee.find(
+        Employee.location_id == branch_location_id,
+        Employee.is_deleted != True,
+    ).to_list()
+    branch_emp_ids = [str(e.id) for e in branch_emps]
+
+    assignments = await EmployeeProject.find(
+        {"employee_id": {"$in": branch_emp_ids}},
+        EmployeeProject.is_deleted != True,
+    ).to_list()
+    proj_ids = list({a.project_id for a in assignments})
+
+    if not proj_ids:
+        return []
+
+    projects = await Project.find(
+        {"_id": {"$in": [ObjectId(pid) for pid in proj_ids if ObjectId.is_valid(pid)]}},
+        Project.is_deleted != True,
+    ).to_list()
+
+    clients = sorted({p.client_name for p in projects if p.client_name})
+    return clients
+
+
+async def get_employee_timeline(
+    employee_id: str,
+    from_period: str,
+    to_period: str,
+) -> dict:
+    """
+    Returns a month-by-month project timeline for an employee.
+    Uses ProjectAllocation for allocated months, UtilisationSnapshot for bench periods.
+    """
+    from app.models.project_allocation import ProjectAllocation
+    from app.models.utilisation_snapshot import UtilisationSnapshot
+    from collections import defaultdict
+
+    allocations = await ProjectAllocation.find(
+        ProjectAllocation.employee_id == employee_id,
+        ProjectAllocation.period >= from_period,
+        ProjectAllocation.period <= to_period,
+        ProjectAllocation.is_deleted != True,
+    ).sort("+period").to_list()
+
+    assignments = await EmployeeProject.find(
+        EmployeeProject.employee_id == employee_id,
+        EmployeeProject.is_deleted != True,
+    ).to_list()
+    role_map = {a.project_id: a.role_in_project for a in assignments}
+
+    by_period: dict[str, list] = defaultdict(list)
+    for a in allocations:
+        by_period[a.period].append(a)
+
+    timeline = []
+    y, m = int(from_period[:4]), int(from_period[5:7])
+    end_y, end_m = int(to_period[:4]), int(to_period[5:7])
+
+    while (y, m) <= (end_y, end_m):
+        period = f"{y:04d}-{m:02d}"
+        period_allocs = by_period.get(period, [])
+
+        if period_allocs:
+            timeline.append({
+                "period": period,
+                "status": "allocated",
+                "projects": [
+                    {
+                        "project_id": a.project_id,
+                        "project_name": a.project_name,
+                        "client_name": a.client_name,
+                        "allocated_days": a.allocated_days,
+                        "allocation_percentage": a.allocation_percentage,
+                        "role": role_map.get(a.project_id, "contributor"),
+                    }
+                    for a in period_allocs
+                ],
+            })
+        else:
+            snap = await UtilisationSnapshot.find_one(
+                UtilisationSnapshot.employee_id == employee_id,
+                UtilisationSnapshot.period == period,
+            )
+            timeline.append({
+                "period": period,
+                "status": snap.classification if snap else "bench",
+                "projects": [],
+            })
+
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+
+    return {
+        "employee_id": employee_id,
+        "from_period": from_period,
+        "to_period": to_period,
+        "timeline": timeline,
     }
