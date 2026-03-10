@@ -5,6 +5,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.middleware.auth_middleware import CurrentUser, get_current_user
+from app.services import hrms_mode_service
 from app.services.project_service import (
     assign_employees,
     create_project,
@@ -51,8 +52,13 @@ async def get_projects(
     page_size: int = Query(20, ge=1, le=100),
     user: CurrentUser = Depends(get_current_user),
 ):
+    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
+        user_id=user.user_id,
+        user_email=getattr(user, "email", None),
+    )
     return await list_projects(
         branch_location_id=user.branch_location_id,
+        sync_mode=sync_mode,
         search=search,
         project_type=project_type,
         status=status,
@@ -88,7 +94,11 @@ async def get_project(
     period: Optional[str] = Query(None, description="Period in YYYY-MM format", pattern=r"^\d{4}-\d{2}$"),
     user: CurrentUser = Depends(get_current_user),
 ):
-    detail = await get_project_detail(project_id, period=period)
+    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
+        user_id=user.user_id,
+        user_email=getattr(user, "email", None),
+    )
+    detail = await get_project_detail(project_id, period=period, sync_mode=sync_mode)
     if not detail:
         raise HTTPException(status_code=404, detail="Project not found")
     return detail
@@ -150,4 +160,8 @@ async def employee_timeline(
             m += 12
             y -= 1
         from_period = f"{y:04d}-{m:02d}"
-    return await get_employee_timeline(employee_id, from_period, to_period)
+    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
+        user_id=user.user_id,
+        user_email=getattr(user, "email", None),
+    )
+    return await get_employee_timeline(employee_id, from_period, to_period, sync_mode=sync_mode)

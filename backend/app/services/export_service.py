@@ -16,6 +16,7 @@ from app.models.project import Project
 from app.models.reporting_relationship import ReportingRelationship
 from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
+from app.services import hrms_mode_service
 
 
 async def export_team_report(location_id: str) -> bytes:
@@ -170,21 +171,24 @@ async def export_billable_list(location_id: str, period: str) -> bytes:
     return _build_csv(headers, rows)
 
 
-async def export_bench_list(location_id: str, period: str) -> bytes:
+async def export_bench_list(location_id: str, period: str, sync_mode: str = "live") -> bytes:
     """Export bench and partially billed employees for a branch and period as CSV bytes."""
     CORPORATE_LEVELS = {"c-suite", "vp"}
 
+    snapshot_visibility_filter = hrms_mode_service.get_snapshot_visibility_filter(sync_mode)
     # If no data for the requested period, fall back to the latest available period
     snapshots = await UtilisationSnapshot.find(
         UtilisationSnapshot.branch_location_id == location_id,
         UtilisationSnapshot.period == period,
         {"classification": {"$in": ["bench", "partially_billed"]}},
         {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
+        snapshot_visibility_filter,
     ).to_list()
 
     if not snapshots:
         latest = await UtilisationSnapshot.find(
             UtilisationSnapshot.branch_location_id == location_id,
+            snapshot_visibility_filter,
         ).sort(-UtilisationSnapshot.period).limit(1).to_list()
         if latest:
             period = latest[0].period
@@ -192,6 +196,7 @@ async def export_bench_list(location_id: str, period: str) -> bytes:
                 UtilisationSnapshot.branch_location_id == location_id,
                 UtilisationSnapshot.period == period,
                 {"classification": {"$in": ["bench", "partially_billed"]}},
+                snapshot_visibility_filter,
             ).to_list()
 
     # Get employee details for designation / department
@@ -234,7 +239,7 @@ async def export_bench_list(location_id: str, period: str) -> bytes:
     return _build_csv(headers, rows)
 
 
-async def export_project_utilisation(location_id: str, period: str) -> bytes:
+async def export_project_utilisation(location_id: str, period: str, sync_mode: str = "live") -> bytes:
     """Export project utilisation for a branch and period as CSV bytes."""
     CORPORATE_LEVELS = {"c-suite", "vp"}
 
@@ -250,6 +255,7 @@ async def export_project_utilisation(location_id: str, period: str) -> bytes:
         TimesheetEntry.branch_location_id == location_id,
         TimesheetEntry.period == period,
         {"employee_id": {"$in": branch_emp_ids}},
+        hrms_mode_service.get_timesheet_visibility_filter(sync_mode),
     ).to_list()
 
     # Aggregate by project
@@ -293,7 +299,7 @@ async def export_project_utilisation(location_id: str, period: str) -> bytes:
     return _build_csv(headers, rows)
 
 
-async def export_employee_allocation(location_id: str, period: str) -> bytes:
+async def export_employee_allocation(location_id: str, period: str, sync_mode: str = "live") -> bytes:
     """Export employee allocation for a branch and period as CSV bytes."""
     CORPORATE_LEVELS = {"c-suite", "vp"}
 
@@ -301,6 +307,7 @@ async def export_employee_allocation(location_id: str, period: str) -> bytes:
         UtilisationSnapshot.branch_location_id == location_id,
         UtilisationSnapshot.period == period,
         {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
+        hrms_mode_service.get_snapshot_visibility_filter(sync_mode),
     ).to_list()
 
     # Get employee details

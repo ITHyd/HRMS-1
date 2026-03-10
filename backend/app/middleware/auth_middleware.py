@@ -7,12 +7,21 @@ security = HTTPBearer()
 
 
 class CurrentUser:
-    def __init__(self, employee_id: str, branch_location_id: str, name: str, user_id: str, role: str = "branch_head"):
+    def __init__(
+        self,
+        employee_id: str,
+        branch_location_id: str,
+        name: str,
+        user_id: str,
+        role: str = "branch_head",
+        email: str = "",
+    ):
         self.employee_id = employee_id
         self.branch_location_id = branch_location_id
         self.name = name
         self.user_id = user_id
         self.role = role
+        self.email = email
 
 
 async def get_current_user(
@@ -31,4 +40,5 @@ async def get_current_user(
         name=payload.get("name", ""),
         user_id=payload.get("user_id", ""),
         role=payload.get("role", "branch_head"),
+        email=payload.get("email", ""),
     )

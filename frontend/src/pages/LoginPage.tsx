@@ -112,7 +112,8 @@ export function LoginPage() {
                 <p>michael.torres@company.com</p>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground text-center mt-2">Password: demo123</p>
+            <p className="text-xs text-muted-foreground text-center mt-2">Password (company.com): demo123</p>
+            <p className="text-xs text-muted-foreground text-center">Password (nxzen.com): password123</p>
           </div>
         </CardContent>
       </Card>

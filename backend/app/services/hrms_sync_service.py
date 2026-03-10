@@ -33,9 +33,11 @@ from app.models.reporting_relationship import ReportingRelationship
 from app.models.timesheet_entry import TimesheetEntry
 from app.models.user import User
 from app.services.hrms_client import HrmsClient
+from app.services import hrms_mode_service
 from app.services.utilisation_service import compute_utilisation
 
-SOURCE_SYSTEM = "nxzen_hrms"
+SOURCE_SYSTEM = hrms_mode_service.LIVE_SOURCE_SYSTEM
+DEMO_SOURCE_SYSTEM = hrms_mode_service.DEMO_SOURCE_SYSTEM
 
 
 def _hash_password(password: str) -> str:
@@ -171,33 +173,7 @@ async def get_hrms_integration_config(config_id: str | None = None) -> tuple[Int
 
 
 def is_live_sync_enabled_for_user(user_email: str | None, mode_config: dict | None = None) -> bool:
-    """
-    Decide whether a user should run real HRMS sync or stay on demo mode.
-
-    Precedence:
-    1) demo_users list
-    2) live_users list
-    3) live_domains list
-    4) fallback env flags/credentials
-    """
-    email = (user_email or "").strip().lower()
-
-    mode = mode_config if isinstance(mode_config, dict) else {}
-    demo_users = set(_normalize_str_list(mode.get("demo_users"))) or _csv_to_set(settings.HRMS_DEMO_USERS)
-    live_users = set(_normalize_str_list(mode.get("live_users"))) or _csv_to_set(settings.HRMS_LIVE_USERS)
-    live_domains = set(_normalize_str_list(mode.get("live_domains"))) or _csv_to_set(settings.HRMS_LIVE_DOMAINS)
-
-    if email and email in demo_users:
-        return False
-
-    if email and live_users:
-        return email in live_users
-
-    if email and live_domains and "@" in email:
-        domain = email.split("@", 1)[1]
-        return domain in live_domains
-
-    return bool(settings.HRMS_AUTH_USERNAME and settings.HRMS_AUTH_PASSWORD) or bool(settings.HRMS_TOKEN)
+    return hrms_mode_service.is_live_sync_enabled_for_user(user_email, mode_config)
 
 
 def _secret_ref_key(secret_ref: str) -> str:
@@ -1134,7 +1110,7 @@ async def trigger_live_sync(
         for p in periods:
             for branch_id in branch_ids:
                 try:
-                    await compute_utilisation(period=p, branch_location_id=branch_id)
+                    await compute_utilisation(period=p, branch_location_id=branch_id, sync_mode="live")
                 except Exception:
                     # Non-fatal: sync data is still available even if one compute fails.
                     continue
@@ -1906,7 +1882,7 @@ async def _trigger_live_sync_impl(
 
         async def _safe_compute(p: str, branch_id: str):
             try:
-                await compute_utilisation(period=p, branch_location_id=branch_id)
+                await compute_utilisation(period=p, branch_location_id=branch_id, sync_mode="live")
             except Exception as util_err:
                 _add_error(errors, entity="utilisation", key=f"{branch_id}:{p}", error=str(util_err))
 
@@ -1979,6 +1955,7 @@ async def trigger_sync(period: str, branch_location_id: str, user_id: str) -> di
     now = datetime.now(timezone.utc)
 
     sync_log = HrmsSyncLog(
+        mode="demo",
         batch_id=batch_id,
         branch_location_id=branch_location_id,
         period=period,
@@ -2031,11 +2008,22 @@ async def trigger_sync(period: str, branch_location_id: str, user_id: str) -> di
 
                 if is_bench:
                     total_records += 1
+                    source_id = f"timesheet:{emp_id}:{day.isoformat()}:bench"
                     existing = await TimesheetEntry.find_one(
-                        TimesheetEntry.employee_id == emp_id,
-                        TimesheetEntry.date == day,
-                        TimesheetEntry.project_id == "bench",
+                        TimesheetEntry.source_system == DEMO_SOURCE_SYSTEM,
+                        TimesheetEntry.source_id == source_id,
                     )
+                    if not existing:
+                        existing = await TimesheetEntry.find_one(
+                            TimesheetEntry.employee_id == emp_id,
+                            TimesheetEntry.date == day,
+                            TimesheetEntry.project_id == "bench",
+                            TimesheetEntry.source == "hrms_sync",
+                            {"$or": [
+                                {"source_system": {"$exists": False}},
+                                {"source_system": DEMO_SOURCE_SYSTEM},
+                            ]},
+                        )
                     if existing:
                         duplicate_count += 1
                         continue
@@ -2052,6 +2040,10 @@ async def trigger_sync(period: str, branch_location_id: str, user_id: str) -> di
                         approved_by="system",
                         approved_at=now,
                         source="hrms_sync",
+                        source_system=DEMO_SOURCE_SYSTEM,
+                        source_id=source_id,
+                        source_updated_at=now,
+                        last_synced_at=now,
                         sync_batch_id=batch_id,
                         period=period,
                         branch_location_id=branch_location_id,
@@ -2066,6 +2058,7 @@ async def trigger_sync(period: str, branch_location_id: str, user_id: str) -> di
 
                     for idx, proj in enumerate(projects):
                         proj_id = str(proj.id)
+                        source_id = f"timesheet:{emp_id}:{day.isoformat()}:{proj_id}"
                         total_records += 1
 
                         if idx == num_projects - 1:
@@ -2078,10 +2071,20 @@ async def trigger_sync(period: str, branch_location_id: str, user_id: str) -> di
                         is_billable = random.random() < 0.70
 
                         existing = await TimesheetEntry.find_one(
-                            TimesheetEntry.employee_id == emp_id,
-                            TimesheetEntry.date == day,
-                            TimesheetEntry.project_id == proj_id,
+                            TimesheetEntry.source_system == DEMO_SOURCE_SYSTEM,
+                            TimesheetEntry.source_id == source_id,
                         )
+                        if not existing:
+                            existing = await TimesheetEntry.find_one(
+                                TimesheetEntry.employee_id == emp_id,
+                                TimesheetEntry.date == day,
+                                TimesheetEntry.project_id == proj_id,
+                                TimesheetEntry.source == "hrms_sync",
+                                {"$or": [
+                                    {"source_system": {"$exists": False}},
+                                    {"source_system": DEMO_SOURCE_SYSTEM},
+                                ]},
+                            )
                         if existing:
                             duplicate_count += 1
                             continue
@@ -2098,6 +2101,10 @@ async def trigger_sync(period: str, branch_location_id: str, user_id: str) -> di
                             approved_by="system",
                             approved_at=now,
                             source="hrms_sync",
+                            source_system=DEMO_SOURCE_SYSTEM,
+                            source_id=source_id,
+                            source_updated_at=now,
+                            last_synced_at=now,
                             sync_batch_id=batch_id,
                             period=period,
                             branch_location_id=branch_location_id,
@@ -2106,6 +2113,12 @@ async def trigger_sync(period: str, branch_location_id: str, user_id: str) -> di
                         )
                         await entry.insert()
                         imported_count += 1
+
+        await compute_utilisation(
+            period=period,
+            branch_location_id=branch_location_id,
+            sync_mode="demo",
+        )
 
         sync_log.status = "completed"
         sync_log.total_records = total_records

@@ -48,9 +48,16 @@ ALL_MODELS = [
     ProjectAllocation, SkillCatalog, EmployeeSkill, IntegrationConfig,
 ]
 
+DEFAULT_DEMO_PASSWORD = "demo123"
+NXZEN_PASSWORD = "password123"
+
 
 def date(y, m, d):
     return datetime(y, m, d, tzinfo=timezone.utc)
+
+
+def _password_for_email(email: str) -> str:
+    return NXZEN_PASSWORD if (email or "").lower().endswith("@nxzen.com") else DEFAULT_DEMO_PASSWORD
 
 
 async def seed():
@@ -476,8 +483,6 @@ async def seed():
     print(f"Created {len(assignments)} project assignments.")
 
     # ── Users (Login Accounts) ──
-    password_hash = bcrypt.hashpw(b"demo123", bcrypt.gensalt()).decode("utf-8")
-
     users_data = [
         ("vikram.patel@company.com", vp_eng_india, HYD, "Vikram Patel"),
         ("kavitha.rao@company.com", dir_eng_blr, BLR, "Kavitha Rao"),
@@ -489,7 +494,7 @@ async def seed():
     for email, emp_id, loc_id, name in users_data:
         user = User(
             email=email,
-            password_hash=password_hash,
+            password_hash=bcrypt.hashpw(_password_for_email(email).encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
             employee_id=emp_id,
             branch_location_id=loc_id,
             name=name,
@@ -926,12 +931,13 @@ async def seed():
                 "mode": {
                     "demo_users": ["vikram.patel@company.com"],
                     "live_domains": ["nxzen.com"],
+                    "live_users": ["vamsi.krishna@nxzen.com"],
                 },
             }
         elif itype == "skills":
             config_data = {
                 "endpoint": "http://skills.nxzen.com",
-                "token": "",
+                "token": "configure-skills-token",
                 "sync_frequency": "daily",
             }
         
@@ -959,14 +965,14 @@ async def seed():
     print(f"   Employee skills: Assign after syncing skill catalog")
     print(f"   Integration configs: 4")
     print(f"   Login credentials:")
-    print(f"     HYD (demo): vikram.patel@company.com / demo123")
-    print(f"     HYD (live): vamsi.krishna@nxzen.com / demo123")
-    print(f"     BLR: kavitha.rao@company.com / demo123")
-    print(f"     LON: james.mitchell@company.com / demo123")
-    print(f"     SYD: michael.torres@company.com / demo123")
-    print(f"\n   ⚠️  To get real skills data:")
+    print(f"     HYD (demo): vikram.patel@company.com / {DEFAULT_DEMO_PASSWORD}")
+    print(f"     HYD (live): vamsi.krishna@nxzen.com / {NXZEN_PASSWORD}")
+    print(f"     BLR: kavitha.rao@company.com / {DEFAULT_DEMO_PASSWORD}")
+    print(f"     LON: james.mitchell@company.com / {DEFAULT_DEMO_PASSWORD}")
+    print(f"     SYD: michael.torres@company.com / {DEFAULT_DEMO_PASSWORD}")
+    print(f"\n   NOTE: To get real skills data:")
     print(f"     1. Login to http://localhost:5173")
-    print(f"     2. Go to Integration Hub → Skills tab")
+    print(f"     2. Go to Integration Hub -> Skills tab")
     print(f"     3. Click 'Sync Now' on Skills Portal Connector")
     print(f"     4. This will fetch 100+ skills from http://skills.nxzen.com/api/skills/")
 

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 
 from app.middleware.auth_middleware import CurrentUser, get_current_user
+from app.services import hrms_mode_service
 from app.services.dashboard_service import (
     get_allocation_dashboard,
     get_executive_dashboard,
@@ -17,7 +18,11 @@ async def executive_dashboard(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Executive-level utilisation dashboard with KPIs, trends, and breakdowns."""
-    return await get_executive_dashboard(period, user.branch_location_id)
+    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
+        user_id=user.user_id,
+        user_email=getattr(user, "email", None),
+    )
+    return await get_executive_dashboard(period, user.branch_location_id, sync_mode=sync_mode)
 
 
 @router.get("/resources")
@@ -30,9 +35,14 @@ async def resource_dashboard(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Per-employee resource utilisation dashboard with search and filters."""
+    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
+        user_id=user.user_id,
+        user_email=getattr(user, "email", None),
+    )
     return await get_resource_dashboard(
         period=period,
         branch_location_id=user.branch_location_id,
+        sync_mode=sync_mode,
         search=search,
         classification=classification,
         page=page,
@@ -49,9 +59,14 @@ async def project_dashboard(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Per-project utilisation dashboard with health status and member details."""
+    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
+        user_id=user.user_id,
+        user_email=getattr(user, "email", None),
+    )
     return await get_project_dashboard(
         period=period,
         branch_location_id=user.branch_location_id,
+        sync_mode=sync_mode,
         project_id=project_id,
         page=page,
         page_size=page_size,
@@ -67,8 +82,13 @@ async def allocation_dashboard(
     user: CurrentUser = Depends(get_current_user),
 ):
     """HRMS project allocation data for a given period."""
+    sync_mode = await hrms_mode_service.resolve_user_sync_mode(
+        user_id=user.user_id,
+        user_email=getattr(user, "email", None),
+    )
     return await get_allocation_dashboard(
         period=period,
+        sync_mode=sync_mode,
         search=search,
         page=page,
         page_size=page_size,
