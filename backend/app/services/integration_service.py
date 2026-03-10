@@ -188,12 +188,28 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
         mode_cfg = (cfg.config or {}).get("mode", {}) if isinstance(cfg.config, dict) else {}
 
         if hrms_sync_service.is_live_sync_enabled_for_user(user_email, mode_cfg):
-            hrms_result = await hrms_sync_service.trigger_live_sync(
+            # Step 1: Sync master data (employees, locations, projects, departments)
+            master_result = await hrms_sync_service.sync_master_data(
+                token=None,
+                user_id=user.user_id,
+                integration_config_id=str(cfg.id),
+            )
+            # Step 2: Sync live data (attendance, timesheets, allocations, holidays)
+            live_result = await hrms_sync_service.trigger_live_sync(
                 period=current_period,
                 user_id=user.user_id,
                 integration_config_id=str(cfg.id),
                 months_backfill_override=1,
             )
+            # Combine counts from both steps
+            master_status = master_result.get("status", "completed")
+            live_status = live_result.get("status", "completed")
+            hrms_result = {
+                "status": "failed" if "failed" in (master_status, live_status) else "completed",
+                "total_records": int(master_result.get("total_records", 0) or 0) + int(live_result.get("total_records", 0) or 0),
+                "imported_count": int(master_result.get("imported_count", 0) or 0) + int(live_result.get("imported_count", 0) or 0),
+                "error_count": int(master_result.get("error_count", 0) or 0) + int(live_result.get("error_count", 0) or 0),
+            }
         else:
             hrms_result = await hrms_sync_service.trigger_sync(
                 period=current_period,

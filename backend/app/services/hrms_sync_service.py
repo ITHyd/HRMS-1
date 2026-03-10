@@ -1455,6 +1455,33 @@ async def _sync_master_data_impl(
                     entity_counts["relationships"]["updated"] += 1
         entity_counts["relationships"]["deleted"] = await _soft_delete_missing(ReportingRelationship, seen_rel_ids, now)
 
+        # Keep User.branch_location_id (and employee_id) in sync after every master sync.
+        # Match by email (stable) so this works even after a full DB wipe + re-sync.
+        emp_email_map: dict[int, str] = {}  # hrms_employee_id -> email
+        for hemp in hrms_employees:
+            hid = _to_int(hemp.get("employeeId"), 0)
+            email = str(hemp.get("email") or "").strip().lower()
+            if hid and email:
+                emp_email_map[hid] = email
+
+        for hloc_id, hemp_id in BRANCH_HEAD_OVERRIDES.items():
+            new_loc_id = loc_id_map.get(hloc_id)
+            emp_mongo_id = emp_id_map.get(hemp_id)
+            emp_email = emp_email_map.get(hemp_id)
+            if not new_loc_id or not emp_email:
+                continue
+            user_doc = await User.find_one(User.email == emp_email)
+            if user_doc:
+                changed = False
+                if user_doc.branch_location_id != new_loc_id:
+                    user_doc.branch_location_id = new_loc_id
+                    changed = True
+                if emp_mongo_id and user_doc.employee_id != emp_mongo_id:
+                    user_doc.employee_id = emp_mongo_id
+                    changed = True
+                if changed:
+                    await user_doc.save()
+
         sync_log.status = "completed"
         sync_log.imported_count = imported
         sync_log.error_count = len(errors)

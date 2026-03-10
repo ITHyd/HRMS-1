@@ -25,10 +25,25 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
+
+    user_id = payload.get("user_id", "")
+
+    # Always resolve branch_location_id and employee_id from DB so that
+    # changes made by a sync (e.g. after HRMS re-sync updates location IDs)
+    # are reflected immediately without requiring a re-login.
+    branch_location_id = payload.get("branch_location_id", "")
+    employee_id = payload.get("employee_id", "")
+    if user_id:
+        from app.models.user import User
+        db_user = await User.get(user_id)
+        if db_user:
+            branch_location_id = db_user.branch_location_id
+            employee_id = db_user.employee_id
+
     return CurrentUser(
-        employee_id=payload.get("employee_id", ""),
-        branch_location_id=payload.get("branch_location_id", ""),
+        employee_id=employee_id,
+        branch_location_id=branch_location_id,
         name=payload.get("name", ""),
-        user_id=payload.get("user_id", ""),
+        user_id=user_id,
         role=payload.get("role", "branch_head"),
     )

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react"
-import { Link2 } from "lucide-react"
+import { Link2, AlertTriangle, RefreshCw } from "lucide-react"
 import { IntegrationConfigList } from "@/components/integration/IntegrationConfigList"
 import { SyncLogTimeline } from "@/components/integration/SyncLogTimeline"
 import { DynamicsExportPanel } from "@/components/integration/DynamicsExportPanel"
@@ -14,6 +14,7 @@ import {
   getDynamicsExports,
   downloadDynamicsExport,
 } from "@/api/integration"
+import { getHrmsStatus } from "@/api/employees"
 import type { IntegrationConfig, SyncLogEntry, DynamicsExport } from "@/types/integration"
 
 type TabKey = "hrms" | "finance" | "dynamics"
@@ -35,6 +36,7 @@ export function IntegrationPage() {
   const [exporting, setExporting] = useState(false)
   const [syncingConfigId, setSyncingConfigId] = useState<string | null>(null)
   const [retryingLogId, setRetryingLogId] = useState<string | null>(null)
+  const [hrmsDataSynced, setHrmsDataSynced] = useState<boolean | null>(null)
   const addToast = useToastStore((s) => s.addToast)
 
   // Fetch integration configs
@@ -82,10 +84,21 @@ export function IntegrationPage() {
     }
   }, [])
 
+  // Check if HRMS data has ever been synced
+  const checkHrmsStatus = useCallback(async () => {
+    try {
+      const status = await getHrmsStatus()
+      setHrmsDataSynced(status.synced)
+    } catch {
+      setHrmsDataSynced(false)
+    }
+  }, [])
+
   // Initial fetch
   useEffect(() => {
     fetchConfigs()
-  }, [fetchConfigs])
+    checkHrmsStatus()
+  }, [fetchConfigs, checkHrmsStatus])
 
   // Tab-specific data
   useEffect(() => {
@@ -104,6 +117,8 @@ export function IntegrationPage() {
       const result = await triggerSync(configId)
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
       await Promise.all([fetchConfigs(), fetchSyncLogs(activeTab)])
+
+      await checkHrmsStatus()
 
       if (result.status === "completed") {
         addToast({
@@ -275,6 +290,33 @@ export function IntegrationPage() {
           {/* HRMS Tab */}
           {activeTab === "hrms" && (
             <div className="space-y-8">
+              {/* Initial sync required banner */}
+              {hrmsDataSynced === false && (
+                <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                      No HRMS data synced yet
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                      Activate your HRMS integration and click <strong>Sync Now</strong> to import employees, projects, attendance, and timesheets from HRMS.
+                    </p>
+                  </div>
+                  {filteredConfigs.some((c) => c.status === "active") && (
+                    <button
+                      onClick={() => {
+                        const active = filteredConfigs.find((c) => c.status === "active")
+                        if (active) handleSync(active.id)
+                      }}
+                      disabled={!!syncingConfigId}
+                      className="flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-60 shrink-0"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${syncingConfigId ? "animate-spin" : ""}`} />
+                      {syncingConfigId ? "Syncing..." : "Sync Now"}
+                    </button>
+                  )}
+                </div>
+              )}
               <IntegrationConfigList
                 configs={filteredConfigs}
                 onSync={handleSync}

@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.middleware.auth_middleware import CurrentUser, get_current_user
+from app.models.employee import Employee
 from app.services.employee_service import (
     get_employee_departments,
     get_employee_detail,
@@ -32,6 +33,15 @@ async def get_employees(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/status")
+async def get_hrms_status(
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Return whether HRMS data has been synced (employee count > 0)."""
+    total = await Employee.find_all().count()
+    return {"total": total, "synced": total > 0}
 
 
 @router.get("/departments")

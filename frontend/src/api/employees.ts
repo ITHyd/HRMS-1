@@ -41,3 +41,8 @@ export async function getEmployeeDepartments(): Promise<
   const res = await client.get("/employees/departments")
   return res.data
 }
+
+export async function getHrmsStatus(): Promise<{ total: number; synced: boolean }> {
+  const res = await client.get<{ total: number; synced: boolean }>("/employees/status")
+  return res.data
+}
