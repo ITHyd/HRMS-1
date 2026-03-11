@@ -977,11 +977,11 @@ async def seed():
     print(f"   Employee skill tags: {skill_count}")
     print(f"   Integration configs: 3")
     print(f"   Login credentials:")
-    print(f"     HYD (demo): vikram.patel@company.com / {DEFAULT_DEMO_PASSWORD}")
-    print(f"     HYD (live): vamsi.krishna@nxzen.com / {NXZEN_PASSWORD}")
-    print(f"     BLR: kavitha.rao@company.com / {DEFAULT_DEMO_PASSWORD}")
-    print(f"     LON: james.mitchell@company.com / {DEFAULT_DEMO_PASSWORD}")
-    print(f"     SYD: michael.torres@company.com / {DEFAULT_DEMO_PASSWORD}")
+    print(f"     HYD (demo): vikram.patel@company.com / demo123")
+    print(f"     HYD (live): vamsi.krishna@nxzen.com / password123")
+    print(f"     BLR: kavitha.rao@company.com / demo123")
+    print(f"     LON: james.mitchell@company.com / demo123")
+    print(f"     SYD: michael.torres@company.com / demo123")
 
 
 if __name__ == "__main__":

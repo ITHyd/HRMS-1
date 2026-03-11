@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.middleware.auth_middleware import CurrentUser, get_current_user
 from app.schemas.utilisation import CapacityConfigUpdate, EmployeeCapacityOverrideCreate
 from app.services.utilisation_service import (
-    compute_utilisation,
     create_employee_override,
     get_cached_utilisation,
     get_or_create_capacity_config,
@@ -88,16 +87,6 @@ async def list_overrides(
         }
         for o in overrides
     ]
-
-
-@router.post("/compute")
-async def compute(
-    period: str = Query(..., description="Period in YYYY-MM format", pattern=r"^\d{4}-\d{2}$"),
-    user: CurrentUser = Depends(get_current_user),
-):
-    """Compute utilisation for all employees in the branch for the given period."""
-    summary = await compute_utilisation(period, user.branch_location_id)
-    return summary.model_dump()
 
 
 @router.get("/summary")

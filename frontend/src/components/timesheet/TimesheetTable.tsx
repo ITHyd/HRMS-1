@@ -1,4 +1,5 @@
 import { TimesheetStatusBadge } from "./TimesheetStatusBadge"
+import { useOrgChartStore } from "@/store/orgChartStore"
 import type { TimesheetEntry } from "@/types/timesheet"
 
 interface TimesheetTableProps {
@@ -16,6 +17,7 @@ export function TimesheetTable({
   onSelectAll,
   selectable = false,
 }: TimesheetTableProps) {
+  const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
   const allSelected =
     selectable && entries.length > 0 && entries.every((e) => selectedIds?.has(e.id))
 
@@ -76,7 +78,14 @@ export function TimesheetTable({
                 <td className="px-3 py-2.5 whitespace-nowrap">
                   {new Date(entry.date + "T00:00:00").toLocaleDateString()}
                 </td>
-                <td className="px-3 py-2.5">{entry.employee_name}</td>
+                <td className="px-3 py-2.5">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); selectEmployee(entry.employee_id) }}
+                    className="cursor-pointer font-medium text-primary hover:underline text-left"
+                  >
+                    {entry.employee_name}
+                  </button>
+                </td>
                 <td className="px-3 py-2.5">{entry.project_name}</td>
                 <td className="px-3 py-2.5 text-right font-mono">{entry.hours.toFixed(1)}</td>
                 <td className="px-3 py-2.5 text-muted-foreground max-w-[200px] truncate">

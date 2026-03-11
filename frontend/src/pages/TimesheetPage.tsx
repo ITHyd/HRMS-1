@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { PeriodSelector } from "@/components/shared/PeriodSelector"
 import { PeriodLockBanner } from "@/components/timesheet/PeriodLockBanner"
 import { TimesheetTable } from "@/components/timesheet/TimesheetTable"
 import { TimesheetApprovalPanel } from "@/components/timesheet/TimesheetApprovalPanel"
-import { HrmsSyncPanel } from "@/components/timesheet/HrmsSyncPanel"
 import { WorkloadHeatmap } from "@/components/timesheet/WorkloadHeatmap"
 import { useAuthStore } from "@/store/authStore"
 import { useToastStore } from "@/store/toastStore"
@@ -20,25 +20,24 @@ import type {
   TimesheetSummary,
   TimesheetFilterOptions,
 } from "@/types/timesheet"
+import { SelectDropdown } from "@/components/shared/SelectDropdown"
+import { Pagination } from "@/components/shared/Pagination"
 import {
   ClipboardList,
   LayoutGrid,
-  RefreshCw,
   Clock,
   DollarSign,
   Percent,
   UserCheck,
-  ChevronLeft,
-  ChevronRight,
   SlidersHorizontal,
+  X,
 } from "lucide-react"
 
-type Tab = "my" | "heatmap" | "sync"
+type Tab = "my" | "heatmap"
 
 const TAB_CONFIG: { key: Tab; label: string; icon: typeof ClipboardList }[] = [
   { key: "my", label: "Timesheets", icon: ClipboardList },
   { key: "heatmap", label: "Workload Heatmap", icon: LayoutGrid },
-  { key: "sync", label: "HRMS Sync", icon: RefreshCw },
 ]
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
@@ -146,7 +145,6 @@ export function TimesheetPage() {
 
 
   // Derived data
-  const totalPages = Math.ceil(total / pageSize)
   const activeFilterCount = [filterEmployee, filterProject, filterStatus].filter(Boolean).length
 
   // Submitted entries in current page (for inline approval)
@@ -189,6 +187,12 @@ export function TimesheetPage() {
     } catch {
       addToast({ type: "error", title: "Failed to process entries", message: "Please try again." })
     }
+  }
+
+  const resetFilters = () => {
+    setFilterEmployee("")
+    setFilterProject("")
+    setFilterStatus("")
   }
 
   const handleToggleLock = async () => {
@@ -235,7 +239,7 @@ export function TimesheetPage() {
     : []
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-6 space-y-6">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -244,26 +248,24 @@ export function TimesheetPage() {
             Manage timesheet entries, workload overview, and HRMS sync
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
           {activeTab === "my" && (
-            <button
+            <Button
+              variant={showFilters ? "default" : "outline"}
+              size="sm"
               onClick={() => setShowFilters((v) => !v)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                showFilters
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background hover:bg-accent border-input"
-              }`}
+              className="h-8 text-xs relative"
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
               Filters
               {activeFilterCount > 0 && (
-                <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+                <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
                   {activeFilterCount}
                 </span>
               )}
-            </button>
+            </Button>
           )}
-          <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
         </div>
       </div>
 
@@ -273,81 +275,6 @@ export function TimesheetPage() {
         onToggle={handleToggleLock}
         period={selectedPeriod}
       />
-
-      {/* Summary Cards */}
-      {summary && activeTab === "my" && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {summaryCards.map((card) => (
-            <Card key={card.title}>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`rounded-lg p-2 ${card.bgColor}`}>
-                    <card.icon className={`h-5 w-5 ${card.color}`} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">{card.title}</p>
-                    <p className="text-2xl font-semibold tabular-nums">{card.value}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Filters (only on Timesheets tab) */}
-      {activeTab === "my" && showFilters && filterOptions && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Employee</label>
-                <select
-                  value={filterEmployee}
-                  onChange={(e) => setFilterEmployee(e.target.value)}
-                  className="w-full h-8 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="">All Employees</option>
-                  {filterOptions.employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Project</label>
-                <select
-                  value={filterProject}
-                  onChange={(e) => setFilterProject(e.target.value)}
-                  className="w-full h-8 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="">All Projects</option>
-                  {filterOptions.projects.map((proj) => (
-                    <option key={proj.id} value={proj.id}>
-                      {proj.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Status</label>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="w-full h-8 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="">All Status</option>
-                  <option value="draft">Draft</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b">
@@ -370,6 +297,81 @@ export function TimesheetPage() {
       {/* Tab Content */}
       {activeTab === "my" && (
         <div className="space-y-4">
+          {/* Summary Cards */}
+          {summary && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {summaryCards.map((card) => (
+                <Card key={card.title}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`rounded-lg p-2 ${card.bgColor}`}>
+                        <card.icon className={`h-5 w-5 ${card.color}`} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">{card.title}</p>
+                        <p className="text-2xl font-semibold tabular-nums">{card.value}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Filters */}
+          {showFilters && filterOptions && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <SelectDropdown
+                    value={filterEmployee}
+                    onChange={setFilterEmployee}
+                    options={[
+                      { value: "", label: "All Employees" },
+                      ...filterOptions.employees.map((emp) => ({ value: emp.id, label: emp.name })),
+                    ]}
+                    placeholder="All Employees"
+                    maxVisible={5}
+                  />
+                  <SelectDropdown
+                    value={filterProject}
+                    onChange={setFilterProject}
+                    options={[
+                      { value: "", label: "All Projects" },
+                      ...filterOptions.projects.map((proj) => ({ value: proj.id, label: proj.name })),
+                    ]}
+                    placeholder="All Projects"
+                    maxVisible={5}
+                  />
+                  <SelectDropdown
+                    value={filterStatus}
+                    onChange={setFilterStatus}
+                    options={[
+                      { value: "", label: "All Status" },
+                      { value: "draft", label: "Draft" },
+                      { value: "submitted", label: "Submitted" },
+                      { value: "approved", label: "Approved" },
+                      { value: "rejected", label: "Rejected" },
+                    ]}
+                    placeholder="All Status"
+                    maxVisible={5}
+                  />
+                  {activeFilterCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="mr-1 h-3 w-3" />
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Inline Approval Bar (shown when filtering by "submitted") */}
           {showApprovalBar && (
             <TimesheetApprovalPanel
@@ -399,60 +401,20 @@ export function TimesheetPage() {
               />
 
               {/* Pagination */}
-              {total > 0 && (
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground tabular-nums">
-                    Showing {(page - 1) * pageSize + 1}&ndash;{Math.min(page * pageSize, total)} of{" "}
-                    {total}
-                  </p>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setPage(page - 1)}
-                      disabled={page <= 1}
-                      className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="px-2 text-xs font-medium tabular-nums">
-                      {page} / {totalPages}
-                    </span>
-                    <button
-                      onClick={() => setPage(page + 1)}
-                      disabled={page >= totalPages}
-                      className="rounded-md border p-1 hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Rows</span>
-                    <select
-                      value={pageSize}
-                      onChange={(e) => {
-                        setPageSize(Number(e.target.value))
-                        setPage(1)
-                      }}
-                      className="h-7 rounded-md border border-input bg-transparent px-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    >
-                      {PAGE_SIZE_OPTIONS.map((size) => (
-                        <option key={size} value={size}>
-                          {size}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
+              <Pagination
+                total={total}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+              />
             </>
           )}
         </div>
       )}
 
       {activeTab === "heatmap" && <WorkloadHeatmap period={selectedPeriod} />}
-
-      {activeTab === "sync" && <HrmsSyncPanel period={selectedPeriod} />}
     </div>
   )
 }

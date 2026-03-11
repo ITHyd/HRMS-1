@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts"
-import { Calculator, Loader2 } from "lucide-react"
+import { SlidersHorizontal, Search, X } from "lucide-react"
 import { PeriodSelector } from "@/components/shared/PeriodSelector"
 import { ExecutiveOverview } from "@/components/dashboard/ExecutiveOverview"
 import { ClassificationDonut } from "@/components/dashboard/ClassificationDonut"
@@ -16,8 +16,6 @@ import {
   getProjectDashboard,
   getAllocationDashboard,
 } from "@/api/dashboard"
-import { computeUtilisation } from "@/api/utilisation"
-import { useToastStore } from "@/store/toastStore"
 import type { ExecutiveDashboard, AllocationEntry } from "@/types/dashboard"
 import type { ResourceDashboardEntry, ProjectDashboardEntry } from "@/types/dashboard"
 
@@ -42,18 +40,32 @@ const AVAILABILITY_LABELS: Record<string, string> = {
   over_allocated: "Over Allocated",
 }
 
-function getPreviousPeriod(): string {
+function getCurrentPeriod(): string {
   const now = new Date()
-  now.setMonth(now.getMonth() - 1)
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 }
 
+
 export function DashboardPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState(getPreviousPeriod())
+  const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod())
   const [activeTab, setActiveTab] = useState<TabKey>("executive")
   const [loading, setLoading] = useState(true)
-  const addToast = useToastStore((s) => s.addToast)
-  const [computing, setComputing] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Filter state
+  const [searchInput, setSearchInput] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleSearchInput = (value: string) => {
+    setSearchInput(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setSearchQuery(value)
+      setResourcePage(1)
+      setAllocationPage(1)
+    }, 300)
+  }
 
   // Executive tab state
   const [executiveData, setExecutiveData] = useState<ExecutiveDashboard | null>(null)
@@ -61,9 +73,8 @@ export function DashboardPage() {
   // Resources tab state
   const [resourceEntries, setResourceEntries] = useState<ResourceDashboardEntry[]>([])
   const [resourceTotal, setResourceTotal] = useState(0)
-  const [resourceSearch, setResourceSearch] = useState("")
-  const [resourceClassification, setResourceClassification] = useState("")
   const [resourcePage, setResourcePage] = useState(1)
+  const [resourcePageSize, setResourcePageSize] = useState(20)
 
   // Projects tab state
   const [projectEntries, setProjectEntries] = useState<ProjectDashboardEntry[]>([])
@@ -71,8 +82,8 @@ export function DashboardPage() {
   // Allocations tab state
   const [allocationEntries, setAllocationEntries] = useState<AllocationEntry[]>([])
   const [allocationTotal, setAllocationTotal] = useState(0)
-  const [allocationSearch, setAllocationSearch] = useState("")
   const [allocationPage, setAllocationPage] = useState(1)
+  const [allocationPageSize, setAllocationPageSize] = useState(20)
 
   const fetchExecutiveData = useCallback(async (period: string) => {
     setLoading(true)
@@ -88,7 +99,7 @@ export function DashboardPage() {
   }, [])
 
   const fetchResourceData = useCallback(
-    async (period: string, search?: string, classification?: string, page?: number) => {
+    async (period: string, search?: string, classification?: string, page?: number, pageSize?: number) => {
       setLoading(true)
       try {
         const data = await getResourceDashboard({
@@ -96,7 +107,7 @@ export function DashboardPage() {
           search: search || undefined,
           classification: classification || undefined,
           page: page || 1,
-          page_size: 20,
+          page_size: pageSize || 20,
         })
         setResourceEntries(data.entries)
         setResourceTotal(data.total)
@@ -125,14 +136,14 @@ export function DashboardPage() {
   }, [])
 
   const fetchAllocationData = useCallback(
-    async (period: string, search?: string, page?: number) => {
+    async (period: string, search?: string, page?: number, pageSize?: number) => {
       setLoading(true)
       try {
         const data = await getAllocationDashboard({
           period,
           search: search || undefined,
           page: page || 1,
-          page_size: 20,
+          page_size: pageSize || 20,
         })
         setAllocationEntries(data.allocations)
         setAllocationTotal(data.total)
@@ -147,20 +158,19 @@ export function DashboardPage() {
     []
   )
 
-  // Fetch data based on active tab
   useEffect(() => {
     switch (activeTab) {
       case "executive":
         fetchExecutiveData(selectedPeriod)
         break
       case "resources":
-        fetchResourceData(selectedPeriod, resourceSearch, resourceClassification, resourcePage)
+        fetchResourceData(selectedPeriod, searchQuery, undefined, resourcePage, resourcePageSize)
         break
       case "projects":
         fetchProjectData(selectedPeriod)
         break
       case "allocations":
-        fetchAllocationData(selectedPeriod, allocationSearch, allocationPage)
+        fetchAllocationData(selectedPeriod, searchQuery, allocationPage, allocationPageSize)
         break
     }
   }, [
@@ -170,98 +180,44 @@ export function DashboardPage() {
     fetchResourceData,
     fetchProjectData,
     fetchAllocationData,
-    resourceSearch,
-    resourceClassification,
+    searchQuery,
     resourcePage,
-    allocationSearch,
+    resourcePageSize,
     allocationPage,
+    allocationPageSize,
   ])
+
+  const resetFilters = () => {
+    setSearchInput("")
+    setSearchQuery("")
+    setResourcePage(1)
+    setAllocationPage(1)
+  }
 
   const handlePeriodChange = (period: string) => {
     setSelectedPeriod(period)
-    setResourcePage(1)
-    setResourceSearch("")
-    setResourceClassification("")
-    setAllocationPage(1)
-    setAllocationSearch("")
-  }
-
-  const handleComputeUtilisation = async () => {
-    setComputing(true)
-    const startTime = Date.now()
-    try {
-      await computeUtilisation(selectedPeriod)
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-      addToast({
-        type: "success",
-        title: "Utilisation computed",
-        message: `Completed in ${elapsed}s for ${selectedPeriod}`,
-      })
-      // Refresh current tab after computation
-      switch (activeTab) {
-        case "executive":
-          await fetchExecutiveData(selectedPeriod)
-          break
-        case "resources":
-          await fetchResourceData(selectedPeriod, resourceSearch, resourceClassification, resourcePage)
-          break
-        case "projects":
-          await fetchProjectData(selectedPeriod)
-          break
-        case "allocations":
-          await fetchAllocationData(selectedPeriod, allocationSearch, allocationPage)
-          break
-      }
-    } catch (err) {
-      console.error("Failed to compute utilisation:", err)
-      addToast({
-        type: "error",
-        title: "Computation failed",
-        message: "Please try again.",
-        duration: 6000,
-      })
-    } finally {
-      setComputing(false)
-    }
-  }
-
-  const handleResourceSearch = (query: string) => {
-    setResourceSearch(query)
-    setResourcePage(1)
-  }
-
-  const handleResourceClassification = (value: string) => {
-    setResourceClassification(value)
-    setResourcePage(1)
-  }
-
-  const handleResourcePageChange = (page: number) => {
-    setResourcePage(page)
-  }
-
-  const handleAllocationSearch = (query: string) => {
-    setAllocationSearch(query)
-    setAllocationPage(1)
-  }
-
-  const handleAllocationPageChange = (page: number) => {
-    setAllocationPage(page)
+    resetFilters()
   }
 
   const handleTabChange = (tab: TabKey) => {
     setActiveTab(tab)
-    if (tab === "resources") {
-      setResourcePage(1)
-      setResourceSearch("")
-      setResourceClassification("")
-    }
-    if (tab === "allocations") {
-      setAllocationPage(1)
-      setAllocationSearch("")
-    }
+    resetFilters()
+    setShowFilters(false)
   }
 
-  // Resource availability chart data for executive tab
+  // Client-side filtered projects (search is client-side for this tab)
+  const filteredProjects = searchQuery
+    ? projectEntries.filter((p) => {
+        const q = searchQuery.toLowerCase()
+        return (
+          p.project_name.toLowerCase().includes(q) ||
+          (p.department || "").toLowerCase().includes(q) ||
+          (p.members || []).some((m) => m.employee_name.toLowerCase().includes(q))
+        )
+      })
+    : projectEntries
+
+  // Resource availability chart
   const availabilityData = executiveData
     ? [
         {
@@ -292,20 +248,21 @@ export function DashboardPage() {
             Utilisation and billing insights across the branch
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <PeriodSelector value={selectedPeriod} onChange={handlePeriodChange} />
-          <button
-            onClick={handleComputeUtilisation}
-            disabled={computing}
-            className="cursor-pointer inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {computing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Calculator className="h-4 w-4" />
-            )}
-            Compute Utilisation
-          </button>
+          {activeTab !== "executive" && (
+            <button
+              onClick={() => setShowFilters((v) => !v)}
+              className={`cursor-pointer inline-flex items-center gap-1.5 h-8 rounded-md border px-3 text-xs font-medium transition-colors ${
+                showFilters
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-input hover:bg-muted text-muted-foreground"
+              }`}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filters
+            </button>
+          )}
         </div>
       </div>
 
@@ -326,7 +283,44 @@ export function DashboardPage() {
         ))}
       </div>
 
-      {/* Loading state */}
+      {/* Filters Panel */}
+      {activeTab !== "executive" && showFilters && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Search — all non-executive tabs */}
+              <div className="relative w-56">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  placeholder={
+                    activeTab === "resources"
+                      ? "Search name, designation, dept..."
+                      : activeTab === "projects"
+                      ? "Search project, department, member..."
+                      : "Search employee, project, client..."
+                  }
+                  value={searchInput}
+                  onChange={(e) => handleSearchInput(e.target.value)}
+                  className="w-full h-8 rounded-md border border-input bg-transparent pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+
+              {/* Clear */}
+              {searchQuery && (
+                <button
+                  onClick={resetFilters}
+                  className="cursor-pointer inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                  Clear
+                </button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Content */}
       {loading ? (
         <div className="flex h-64 items-center justify-center">
           <div className="animate-spin h-8 w-8 rounded-full border-4 border-primary border-t-transparent" />
@@ -362,7 +356,7 @@ export function DashboardPage() {
                             ))}
                           </Pie>
                           <Tooltip
-                            formatter={(value: number, name: string) => [
+                            formatter={(value, name) => [
                               `${value} employees`,
                               name,
                             ]}
@@ -393,7 +387,7 @@ export function DashboardPage() {
 
           {activeTab === "executive" && !executiveData && (
             <div className="p-6 text-center text-muted-foreground">
-              No executive data available. Try computing utilisation for this period first.
+              No executive data available for this period. Run an HRMS sync first.
             </div>
           )}
 
@@ -401,32 +395,36 @@ export function DashboardPage() {
           {activeTab === "resources" && (
             <ResourceTable
               entries={resourceEntries}
-              onSearch={handleResourceSearch}
-              searchQuery={resourceSearch}
-              classification={resourceClassification}
-              onClassificationChange={handleResourceClassification}
+              onSearch={() => {}}
+              searchQuery=""
+              classification=""
+              onClassificationChange={() => {}}
               total={resourceTotal}
               page={resourcePage}
-              pageSize={20}
-              onPageChange={handleResourcePageChange}
+              pageSize={resourcePageSize}
+              onPageChange={setResourcePage}
+              onPageSizeChange={(size) => { setResourcePageSize(size); setResourcePage(1) }}
+              hideInlineFilters
             />
           )}
 
           {/* Projects Tab */}
           {activeTab === "projects" && (
-            <ProjectHealthTable projects={projectEntries} />
+            <ProjectHealthTable projects={filteredProjects} />
           )}
 
           {/* Allocations Tab */}
           {activeTab === "allocations" && (
             <AllocationsTable
               entries={allocationEntries}
-              onSearch={handleAllocationSearch}
-              searchQuery={allocationSearch}
+              onSearch={() => {}}
+              searchQuery=""
               total={allocationTotal}
               page={allocationPage}
-              pageSize={20}
-              onPageChange={handleAllocationPageChange}
+              pageSize={allocationPageSize}
+              onPageChange={setAllocationPage}
+              onPageSizeChange={(size) => { setAllocationPageSize(size); setAllocationPage(1) }}
+              hideInlineFilters
             />
           )}
         </>

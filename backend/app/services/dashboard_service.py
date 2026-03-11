@@ -197,24 +197,10 @@ async def get_resource_dashboard(
 
     snapshots = await UtilisationSnapshot.find(*filters).to_list()
 
-    # If search is provided, filter snapshots by employee name (case-insensitive)
-    if search:
-        search_lower = search.lower()
-        snapshots = [s for s in snapshots if search_lower in s.employee_name.lower()]
-
-    total = len(snapshots)
-
-    # Paginate
-    start = (page - 1) * page_size
-    page_snapshots = snapshots[start : start + page_size]
-
-    if not page_snapshots:
-        return {"period": period, "entries": [], "total": total}
-
-    # Resolve employee details
-    emp_ids = [s.employee_id for s in page_snapshots]
+    # Resolve employee details for all snapshots (needed for search across fields)
+    all_emp_ids = [s.employee_id for s in snapshots]
     employees = await Employee.find(
-        {"_id": {"$in": [ObjectId(eid) for eid in emp_ids if ObjectId.is_valid(eid)]}}
+        {"_id": {"$in": [ObjectId(eid) for eid in all_emp_ids if ObjectId.is_valid(eid)]}}
     ).to_list()
     emp_map = {str(e.id): e for e in employees}
 
@@ -228,6 +214,31 @@ async def get_resource_dashboard(
         else []
     )
     dept_map = {str(d.id): d.name for d in departments}
+
+    # Search across employee name, designation, and department
+    if search:
+        search_lower = search.lower()
+        filtered = []
+        for s in snapshots:
+            emp = emp_map.get(s.employee_id)
+            designation = (emp.designation if emp else "").lower()
+            department = (dept_map.get(emp.department_id, "") if emp else "").lower()
+            if (
+                search_lower in s.employee_name.lower()
+                or search_lower in designation
+                or search_lower in department
+            ):
+                filtered.append(s)
+        snapshots = filtered
+
+    total = len(snapshots)
+
+    # Paginate
+    start = (page - 1) * page_size
+    page_snapshots = snapshots[start : start + page_size]
+
+    if not page_snapshots:
+        return {"period": period, "entries": [], "total": total}
 
     # Get timesheet entries for these employees to derive project hours
     ts_entries = await TimesheetEntry.find(
@@ -500,7 +511,12 @@ async def get_allocation_dashboard(
 
     if search:
         search_lower = search.lower()
-        allocations = [a for a in allocations if search_lower in a.employee_name.lower()]
+        allocations = [
+            a for a in allocations
+            if search_lower in a.employee_name.lower()
+            or search_lower in a.project_name.lower()
+            or (a.client_name and search_lower in a.client_name.lower())
+        ]
 
     total = len(allocations)
     start = (page - 1) * page_size

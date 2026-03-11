@@ -3,7 +3,6 @@ from typing import Optional
 
 from app.models.integration_config import IntegrationConfig
 from app.models.sync_log import SyncLog
-from app.models.user import User
 from app.services import audit_service
 from app.services import hrms_sync_service
 from app.services import skills_sync_service
@@ -183,8 +182,7 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
     await sync_log.insert()
 
     if cfg.integration_type == "hrms":
-        db_user = await User.get(user.user_id)
-        user_email = db_user.email if db_user else None
+        user_email = user.email  # already resolved fresh from DB by auth middleware
         current_period = datetime.now(timezone.utc).strftime("%Y-%m")
         mode_cfg = (cfg.config or {}).get("mode", {}) if isinstance(cfg.config, dict) else {}
 
@@ -200,7 +198,6 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
                 period=current_period,
                 user_id=user.user_id,
                 integration_config_id=str(cfg.id),
-                months_backfill_override=1,
             )
             # Combine counts from both steps
             master_status = master_result.get("status", "completed")

@@ -11,6 +11,7 @@ from app.services.project_service import (
     get_distinct_clients,
     get_employee_timeline,
     get_project_detail,
+    get_project_timeline,
     list_projects,
 )
 
@@ -80,6 +81,12 @@ async def create_new_project(
         branch_location_id=user.branch_location_id,
     )
     return {"id": str(project.id), "name": project.name}
+
+
+@router.get("/timeline")
+async def project_timeline(user: CurrentUser = Depends(get_current_user)):
+    """Return Gantt timeline data: projects with end dates, freeing-up employees, client opportunities."""
+    return await get_project_timeline(user.branch_location_id)
 
 
 @router.get("/{project_id}")

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { StatusBadge } from "@/components/shared/StatusBadge"
+import { Pagination } from "@/components/shared/Pagination"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import type { ProjectDashboardEntry } from "@/types/dashboard"
 
@@ -14,8 +15,13 @@ interface ProjectHealthTableProps {
 
 export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
   const navigate = useNavigate()
+
+  const total = projects.length
+  const pagedProjects = projects.slice((page - 1) * pageSize, page * pageSize)
 
   const toggleRow = (projectId: string) => {
     setExpandedRows((prev) => {
@@ -56,24 +62,25 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
               </tr>
             </thead>
             <tbody>
-              {projects.length === 0 ? (
+              {pagedProjects.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-8 text-center text-muted-foreground">
                     No projects found
                   </td>
                 </tr>
               ) : (
-                projects.map((project) => {
+                pagedProjects.map((project) => {
                   const isExpanded = expandedRows.has(project.project_id)
                   const overdue = isOverdue(project.end_date)
                   return (
                     <Fragment key={project.project_id}>
                       <tr
-                        className="border-b hover:bg-muted/50 transition-colors"
+                        className="border-b hover:bg-muted/50 transition-colors cursor-pointer group"
+                        onClick={() => navigate(`/projects/${project.project_id}`)}
                       >
                         <td
                           className="py-2.5 pr-2 cursor-pointer"
-                          onClick={() => project.members.length > 0 && toggleRow(project.project_id)}
+                          onClick={(e) => { e.stopPropagation(); project.members.length > 0 && toggleRow(project.project_id) }}
                         >
                           {project.members.length > 0 && (
                             isExpanded ? (
@@ -84,12 +91,9 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                           )}
                         </td>
                         <td className="py-2.5 pr-4">
-                          <button
-                            onClick={() => navigate(`/projects/${project.project_id}`)}
-                            className="font-medium text-primary hover:underline text-left"
-                          >
+                          <span className="font-medium text-primary group-hover:underline">
                             {project.project_name}
-                          </button>
+                          </span>
                         </td>
                         <td className="py-2.5 pr-4">
                           <Badge
@@ -106,7 +110,7 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                           <div className="flex items-center gap-2">
                             <Progress value={project.progress_percent} className="flex-1 h-2" />
                             <span className="text-xs tabular-nums font-medium w-10 text-right">
-                              {project.progress_percent.toFixed(0)}%
+                              {(project.progress_percent ?? 0).toFixed(0)}%
                             </span>
                           </div>
                         </td>
@@ -124,7 +128,7 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                           {project.member_count}
                         </td>
                         <td className="py-2.5 pr-4 text-right tabular-nums">
-                          {project.total_hours_consumed.toFixed(1)}
+                          {(project.total_hours_consumed ?? 0).toFixed(1)}
                         </td>
                         <td className="py-2.5 text-right tabular-nums">
                           <span
@@ -136,7 +140,7 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                                 : "text-red-600 font-medium"
                             }
                           >
-                            {project.billable_percent.toFixed(1)}%
+                            {(project.billable_percent ?? 0).toFixed(1)}%
                           </span>
                         </td>
                       </tr>
@@ -166,27 +170,22 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                                     return (
                                       <tr
                                         key={member.employee_id}
-                                        className="border-t border-muted"
+                                        onClick={(e) => { e.stopPropagation(); selectEmployee(member.employee_id) }}
+                                        className="border-t border-muted cursor-pointer hover:bg-muted/50 transition-colors group/member"
                                       >
                                         <td className="py-1.5">
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              selectEmployee(member.employee_id)
-                                            }}
-                                            className="cursor-pointer text-primary hover:underline font-medium"
-                                          >
+                                          <span className="text-primary group-hover/member:underline font-medium">
                                             {member.employee_name}
-                                          </button>
+                                          </span>
                                         </td>
                                         <td className="py-1.5 text-muted-foreground">
                                           {member.role}
                                         </td>
                                         <td className="py-1.5 text-right tabular-nums">
-                                          {member.hours.toFixed(1)}
+                                          {(member.hours ?? 0).toFixed(1)}
                                         </td>
                                         <td className="py-1.5 text-right tabular-nums">
-                                          {member.billable_hours.toFixed(1)}
+                                          {(member.billable_hours ?? 0).toFixed(1)}
                                         </td>
                                         <td className="py-1.5 text-right">
                                           {isOverUtilised ? (
@@ -215,6 +214,14 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
             </tbody>
           </table>
         </div>
+
+        <Pagination
+          total={total}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
+        />
       </CardContent>
     </Card>
   )

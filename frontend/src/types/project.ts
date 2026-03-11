@@ -71,6 +71,53 @@ export interface ProjectDetail {
   }>
 }
 
+export interface TimelineProject {
+  project_id: string
+  name: string
+  status: string
+  project_type: string
+  client_name: string | null
+  department_name: string
+  start_date: string | null
+  end_date: string | null
+  days_until_end: number | null
+  urgency: "overdue" | "critical" | "warning" | "upcoming" | "future" | "no_date"
+  member_count: number
+  members: Array<{
+    employee_id: string
+    employee_name: string
+    designation: string
+    role_in_project: string
+  }>
+}
+
+export interface FreeingUpEmployee {
+  employee_id: string
+  employee_name: string
+  designation: string
+  role_in_project: string
+  projects_ending: string[]
+}
+
+export interface ClientOpportunity {
+  client_name: string
+  projects: Array<{
+    project_id: string
+    name: string
+    end_date: string | null
+    urgency: string
+    member_count: number
+  }>
+  earliest_end_date: string | null
+  total_freeing_employees: number
+}
+
+export interface ProjectTimelineResponse {
+  projects: TimelineProject[]
+  freeing_up_by_month: Record<string, FreeingUpEmployee[]>
+  client_opportunities: ClientOpportunity[]
+}
+
 export interface AssignToProjectRequest {
   employee_ids: string[]
   project_id?: string
