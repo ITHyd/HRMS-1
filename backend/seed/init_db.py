@@ -1,26 +1,28 @@
 """
-init_db.py — First-time setup for a fresh MongoDB instance.
+init_db.py — LIVE mode database setup.
 
-Creates:
-  1. Login user accounts (branch heads)
-  2. HRMS integration config
+Drops ALL collections and creates:
+  1. Login user accounts (branch heads) with pending_sync placeholders
+  2. Integration configs (HRMS, Finance, Dynamics, Skills)
 
-Run once on any new machine before starting the app:
+After this, log in and use Integration Hub > HRMS > Sync Now to pull all
+employees, projects, timesheets, and resolve branch head location/employee IDs.
+
+Usage:
     cd backend
     python -m seed.init_db
-
-After this, log in and use Integration Hub → HRMS → Sync Now to pull all data.
 """
 
 import asyncio
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import bcrypt
 
-from app.database import init_db
+from app.database import ALL_MODELS, init_db
 from app.models.integration_config import IntegrationConfig
 from app.models.user import User
 
@@ -104,17 +106,24 @@ def _hash(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
-async def _ensure_users() -> int:
-    created = 0
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+async def main():
+    print("Connecting to MongoDB...")
+    await init_db()
+
+    # ── Drop ALL collections for a clean slate ──
+    print("\nClearing database (switching to LIVE mode)...")
+    for model in ALL_MODELS:
+        await model.find_all().delete()
+    print("All collections cleared.")
+
+    # ── Users ──
+    now = datetime.now(timezone.utc)
+    print("\nUsers:")
     for u in USERS:
-        existing = await User.find_one(User.email == u["email"])
-        if existing:
-            existing.password_hash = _hash(u["password"])
-            existing.name = u["name"]
-            existing.role = u["role"]
-            await existing.save()
-            print(f"  [ok]   updated user: {u['email']}  (password reset to: {u['password']})")
-            continue
         doc = User(
             email=u["email"],
             password_hash=_hash(u["password"]),
@@ -124,22 +133,11 @@ async def _ensure_users() -> int:
             employee_id=u["employee_id"],
         )
         await doc.insert()
-        print(f"  [ok]   created user: {u['email']}  (password: {u['password']})")
-        created += 1
-    return created
+        print(f"  [ok] created user: {u['email']}  (password: {u['password']})")
 
-
-async def _ensure_integration_configs() -> int:
-    created = 0
+    # ── Integration configs ──
+    print("\nIntegration configs:")
     for cfg in INTEGRATION_CONFIGS:
-        existing = await IntegrationConfig.find_one(
-            IntegrationConfig.integration_type == cfg["integration_type"]
-        )
-        if existing:
-            print(f"  [skip] integration config already exists: {cfg['integration_type']}")
-            continue
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
         doc = IntegrationConfig(
             integration_type=cfg["integration_type"],
             name=cfg["name"],
@@ -149,29 +147,13 @@ async def _ensure_integration_configs() -> int:
             updated_at=now,
         )
         await doc.insert()
-        print(f"  [ok]   created integration config: {cfg['name']}")
-        created += 1
-    return created
+        print(f"  [ok] created: {cfg['name']}")
 
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-async def main():
-    print("Connecting to MongoDB...")
-    await init_db()
-
-    print("\nUsers:")
-    u = await _ensure_users()
-
-    print("\nIntegration configs:")
-    c = await _ensure_integration_configs()
-
-    print(f"\nDone. Created {u} user(s), {c} integration config(s).")
-    if u > 0:
-        print("\nNext step: Log in and go to Integration Hub > HRMS > Sync Now")
-        print("           This will import all employees, projects, and timesheets.")
+    print(f"\n{'='*55}")
+    print(f"  LIVE MODE — {len(USERS)} user(s), {len(INTEGRATION_CONFIGS)} config(s)")
+    print(f"{'='*55}")
+    print("\nNext step: Log in and go to Integration Hub > HRMS > Sync Now")
+    print("           This will import all employees, projects, and timesheets.")
 
 
 if __name__ == "__main__":

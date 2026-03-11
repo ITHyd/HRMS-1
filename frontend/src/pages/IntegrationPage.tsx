@@ -12,6 +12,7 @@ import {
   getSyncLogs,
 } from "@/api/integration"
 import { getMe } from "@/api/auth"
+import { getMode, switchMode } from "@/api/admin"
 import { getHrmsStatus } from "@/api/employees"
 import type { IntegrationConfig, SyncLogEntry } from "@/types/integration"
 
@@ -32,6 +33,8 @@ export function IntegrationPage() {
   const [syncingConfigId, setSyncingConfigId] = useState<string | null>(null)
   const [retryingLogId, setRetryingLogId] = useState<string | null>(null)
   const [hrmsDataSynced, setHrmsDataSynced] = useState<boolean | null>(null)
+  const [mode, setMode] = useState<string>("")
+  const [switchingMode, setSwitchingMode] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
 
   // Fetch integration configs
@@ -79,6 +82,7 @@ export function IntegrationPage() {
   useEffect(() => {
     fetchConfigs()
     checkHrmsStatus()
+    getMode().then((r) => setMode(r.mode)).catch(() => {})
   }, [fetchConfigs, checkHrmsStatus])
 
   // Tab-specific data
@@ -185,6 +189,21 @@ export function IntegrationPage() {
     }
   }
 
+  const handleSwitchMode = async (target: "demo" | "live") => {
+    if (target === mode || switchingMode) return
+    setSwitchingMode(true)
+    try {
+      const res = await switchMode(target)
+      setMode(res.mode)
+      // Logout since users change between modes
+      useAuthStore.getState().logout()
+      window.location.href = "/login"
+    } catch {
+      addToast({ type: "error", title: "Failed to switch mode" })
+      setSwitchingMode(false)
+    }
+  }
+
   // Filter for current tab
   const filteredConfigs = configs.filter((c) => c.integration_type === activeTab)
   const filteredLogs = syncLogs.filter((l) => l.integration_type === activeTab)
@@ -204,6 +223,40 @@ export function IntegrationPage() {
             Manage HRMS, Finance, and Skills integrations
           </p>
         </div>
+        {/* Mode Toggle */}
+        {mode && (
+          <div className="flex items-center gap-2">
+            {switchingMode && (
+              <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+            )}
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+              <button
+                type="button"
+                disabled={switchingMode}
+                onClick={() => handleSwitchMode("demo")}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                  mode === "demo"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground cursor-pointer"
+                } ${switchingMode ? "opacity-50" : ""}`}
+              >
+                Demo
+              </button>
+              <button
+                type="button"
+                disabled={switchingMode}
+                onClick={() => handleSwitchMode("live")}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                  mode === "live"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground cursor-pointer"
+                } ${switchingMode ? "opacity-50" : ""}`}
+              >
+                Live
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -234,14 +287,14 @@ export function IntegrationPage() {
           {activeTab === "hrms" && (
             <div className="space-y-8">
               {/* Initial sync required banner */}
-              {hrmsDataSynced === false && (
-                <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/30">
-                  <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              {hrmsDataSynced === false && mode === "live" && (
+                <div className="flex items-center gap-3 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                    <p className="text-sm font-semibold text-gray-900">
                       No HRMS data synced yet
                     </p>
-                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                    <p className="text-xs text-gray-600 mt-0.5">
                       Activate your HRMS integration and click <strong>Sync Now</strong> to import employees, projects, attendance, and timesheets from HRMS.
                     </p>
                   </div>
@@ -252,7 +305,7 @@ export function IntegrationPage() {
                         if (active) handleSync(active.id)
                       }}
                       disabled={!!syncingConfigId}
-                      className="flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-60 shrink-0"
+                      className="flex items-center gap-1.5 rounded-md bg-yellow-500 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-yellow-600 disabled:opacity-60 shrink-0"
                     >
                       <RefreshCw className={`h-3 w-3 ${syncingConfigId ? "animate-spin" : ""}`} />
                       {syncingConfigId ? "Syncing..." : "Sync Now"}
@@ -265,6 +318,7 @@ export function IntegrationPage() {
                 onSync={handleSync}
                 onToggle={handleToggle}
                 syncingConfigId={syncingConfigId}
+                mode={mode}
               />
               <SyncLogTimeline
                 logs={filteredLogs}
@@ -282,6 +336,7 @@ export function IntegrationPage() {
                 onSync={handleSync}
                 onToggle={handleToggle}
                 syncingConfigId={syncingConfigId}
+                mode={mode}
               />
               <SyncLogTimeline
                 logs={filteredLogs}
@@ -299,6 +354,7 @@ export function IntegrationPage() {
                 onSync={handleSync}
                 onToggle={handleToggle}
                 syncingConfigId={syncingConfigId}
+                mode={mode}
               />
               <SyncLogTimeline
                 logs={filteredLogs}
