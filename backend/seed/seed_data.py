@@ -1,5 +1,5 @@
 """
-Seed data generator for Branch Command Center.
+Seed data generator for Branch Command Center — DEMO mode.
 Creates ~80 employees across 4 locations with realistic org hierarchy.
 
 Usage: cd backend && python -m seed.seed_data
@@ -21,6 +21,7 @@ from dateutil.relativedelta import relativedelta
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import settings
+from app.database import ALL_MODELS
 from app.models.employee import Employee
 from app.models.reporting_relationship import ReportingRelationship
 from app.models.location import Location
@@ -40,29 +41,23 @@ from app.models.skill_catalog import SkillCatalog
 from app.models.employee_skill import EmployeeSkill
 from app.models.integration_config import IntegrationConfig
 
-ALL_MODELS = [
-    Employee, ReportingRelationship, Location, Department, Project, EmployeeProject,
-    AuditLog, User,
-    TimesheetEntry, TimesheetPeriodLock, CapacityConfig,
-    FinanceBillable, FinanceUploadLog, UtilisationSnapshot,
-    ProjectAllocation, SkillCatalog, EmployeeSkill, IntegrationConfig,
-]
-
 
 def date(y, m, d):
     return datetime(y, m, d, tzinfo=timezone.utc)
 
 
-async def seed():
-    client = AsyncMongoClient(settings.MONGODB_URL)
-    db = client[settings.DATABASE_NAME]
-    await init_beanie(database=db, document_models=ALL_MODELS)
+async def seed(skip_init: bool = False):
+    if not skip_init:
+        client = AsyncMongoClient(settings.MONGODB_URL)
+        db = client[settings.DATABASE_NAME]
+        await init_beanie(database=db, document_models=ALL_MODELS)
 
-    # Drop all collections
+    # Drop ALL collections for a clean slate
+    print("Clearing database (switching to DEMO mode)...")
     for model in ALL_MODELS:
         await model.find_all().delete()
 
-    print("Cleared all collections.")
+    print("All collections cleared.")
 
     # ── Locations ──
     loc_hyd = Location(city="Hyderabad", country="India", region="APAC", code="HYD")
@@ -968,33 +963,46 @@ async def seed():
     print(f"Created {skill_count} employee skill tags.")
 
     # ── Integration Configs ──
-    for itype, iname in [("hrms", "HRMS Connector"), ("finance", "Finance Data Feed"), ("dynamics", "Dynamics 365 Export")]:
-        cfg = {"endpoint": f"https://api.example.com/{itype}", "version": "1.0"}
-        if itype == "hrms":
-            cfg = {
-                "provider": "nxzen_hrms",
-                "base_url": "http://149.102.158.71:2342",
-                "auth_mode": "password_grant",
-                "secret_ref": "NXZEN_MANAGER",
-                "hr_id": 1,
-                "sync_scope": {"months_backfill": 6, "manual_only": True},
-                "mode": {
-                    "demo_users": ["vikram.patel@company.com"],
-                    "live_domains": ["nxzen.com"],
-                },
-            }
+    integration_defs = [
+        ("hrms", "HRMS Connector", "active", {
+            "provider": "nxzen_hrms",
+            "base_url": "http://149.102.158.71:2342",
+            "auth_mode": "password_grant",
+            "secret_ref": "NXZEN_MANAGER",
+            "hr_id": 1,
+            "sync_scope": {"months_backfill": 6, "manual_only": True},
+            "mode": {
+                "demo_users": ["vikram.patel@company.com"],
+                "live_domains": ["nxzen.com"],
+            },
+        }),
+        ("finance", "Finance Data Feed", "inactive", {
+            "endpoint": "https://api.example.com/finance", "version": "1.0",
+        }),
+        ("dynamics", "Dynamics 365 Export", "inactive", {
+            "endpoint": "https://api.example.com/dynamics", "version": "1.0",
+        }),
+        ("skills", "Skills Portal", "active", {
+            "provider": "nxzen_skills",
+            "base_url": "http://skills.nxzen.com/",
+            "auth_mode": "password_grant",
+        }),
+    ]
+    for itype, iname, istatus, cfg in integration_defs:
         await IntegrationConfig(
             integration_type=itype,
             name=iname,
-            status="active",
+            status=istatus,
             config=cfg,
             created_by=str(users[0].id),
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         ).insert()
-    print("Created 3 integration configs.")
+    print(f"Created {len(integration_defs)} integration configs.")
 
-    print("\nSeed data complete!")
+    print(f"\n{'='*55}")
+    print(f"  DEMO MODE — seed data complete!")
+    print(f"{'='*55}")
     print(f"   Total employees: {len(employees)}")
     print(f"   Locations: 4 (HYD, BLR, LON, SYD)")
     print(f"   Projects: {len(project_ids)} (incl. 4 new client projects for Client Opportunities)")
@@ -1005,7 +1013,7 @@ async def seed():
     print(f"   Period locks: {len(period_locks)}")
     print(f"   Skill catalog entries: {len(skill_catalog_data)}")
     print(f"   Employee skill tags: {skill_count}")
-    print(f"   Integration configs: 3")
+    print(f"   Integration configs: {len(integration_defs)}")
     print(f"   Login credentials:")
     print(f"     HYD (demo): vikram.patel@company.com / demo123")
     print(f"     BLR: kavitha.rao@company.com / demo123")

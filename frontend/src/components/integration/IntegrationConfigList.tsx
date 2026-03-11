@@ -5,11 +5,15 @@ import { StatusBadge } from "@/components/shared/StatusBadge"
 import { RefreshCw, Link2, Loader2 } from "lucide-react"
 import type { IntegrationConfig } from "@/types/integration"
 
+// Integration types that require a live external API and should not sync in demo mode
+const LIVE_ONLY_TYPES = new Set(["hrms", "skills"])
+
 interface IntegrationConfigListProps {
   configs: IntegrationConfig[]
   onSync: (configId: string) => void
   onToggle: (configId: string, status: string) => void
   syncingConfigId?: string | null
+  mode?: string
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -41,6 +45,7 @@ export function IntegrationConfigList({
   onSync,
   onToggle,
   syncingConfigId,
+  mode,
 }: IntegrationConfigListProps) {
   if (configs.length === 0) {
     return (
@@ -59,6 +64,7 @@ export function IntegrationConfigList({
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {configs.map((config) => {
           const isSyncing = syncingConfigId === config.id
+          const syncDisabledByMode = mode === "demo" && LIVE_ONLY_TYPES.has(config.integration_type)
           return (
             <Card key={config.id}>
               <CardHeader className="pb-3">
@@ -98,14 +104,15 @@ export function IntegrationConfigList({
                       variant="outline"
                       size="sm"
                       onClick={() => onSync(config.id)}
-                      disabled={config.status !== "active" || isSyncing}
+                      disabled={config.status !== "active" || isSyncing || syncDisabledByMode}
+                      title={syncDisabledByMode ? "Switch to Live mode to sync from external APIs" : undefined}
                     >
                       {isSyncing ? (
                         <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
                       ) : (
                         <RefreshCw className="mr-1.5 h-3 w-3" />
                       )}
-                      {isSyncing ? "Syncing..." : "Sync Now"}
+                      {syncDisabledByMode ? "Live Only" : isSyncing ? "Syncing..." : "Sync Now"}
                     </Button>
                     <Button
                       variant="ghost"

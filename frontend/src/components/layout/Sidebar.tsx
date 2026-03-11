@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { NavLink } from "react-router-dom"
 import {
   Network,
@@ -20,6 +20,8 @@ import {
 import { useAuthStore } from "@/store/authStore"
 import { cn } from "@/lib/utils"
 import { UserProfileModal } from "./UserProfileModal"
+import { getMode } from "@/api/admin"
+import { getMe } from "@/api/auth"
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -43,6 +45,22 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user, logout } = useAuthStore()
   const [showProfileModal, setShowProfileModal] = useState(false)
+  const [mode, setMode] = useState<string>("")
+
+  useEffect(() => {
+    getMode().then((r) => setMode(r.mode)).catch(() => {})
+    // Refresh user data from DB on mount — picks up branch_code/employee_id
+    // changes from HRMS sync without requiring re-login
+    getMe().then((fresh) => {
+      useAuthStore.getState().setAuth(fresh.access_token, {
+        employee_id: fresh.employee_id,
+        branch_location_id: fresh.branch_location_id,
+        branch_code: fresh.branch_code,
+        name: fresh.name,
+        role: fresh.role || "branch_head",
+      })
+    }).catch(() => {})
+  }, [])
 
   return (
     <aside
@@ -59,7 +77,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         )}>
           <Building2 className="h-6 w-6 shrink-0 text-sidebar-primary" />
           <div className="whitespace-nowrap">
-            <h1 className="text-sm font-bold text-sidebar-primary">Branch Command</h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-sm font-bold text-sidebar-primary">Branch Command</h1>
+              {mode && (
+                <span className={cn(
+                  "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase leading-none",
+                  mode === "live"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-blue-100 text-blue-700"
+                )}>
+                  {mode}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">Center</p>
           </div>
         </div>
