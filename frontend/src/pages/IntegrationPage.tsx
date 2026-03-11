@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from "react"
 import { Link2, AlertTriangle, RefreshCw } from "lucide-react"
 import { IntegrationConfigList } from "@/components/integration/IntegrationConfigList"
 import { SyncLogTimeline } from "@/components/integration/SyncLogTimeline"
-import { DynamicsExportPanel } from "@/components/integration/DynamicsExportPanel"
 import { useToastStore } from "@/store/toastStore"
 import {
   getIntegrationConfigs,
@@ -10,30 +9,24 @@ import {
   triggerSync,
   retrySync,
   getSyncLogs,
-  createDynamicsExport,
-  getDynamicsExports,
-  downloadDynamicsExport,
 } from "@/api/integration"
 import { getHrmsStatus } from "@/api/employees"
-import type { IntegrationConfig, SyncLogEntry, DynamicsExport } from "@/types/integration"
+import type { IntegrationConfig, SyncLogEntry } from "@/types/integration"
 
-type TabKey = "hrms" | "finance" | "dynamics"
+type TabKey = "hrms" | "finance" | "skills"
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "hrms", label: "HRMS" },
   { key: "finance", label: "Finance" },
-  { key: "dynamics", label: "Dynamics" },
+  { key: "skills", label: "Skills" },
 ]
 
 export function IntegrationPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("hrms")
   const [configs, setConfigs] = useState<IntegrationConfig[]>([])
   const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([])
-  const [dynamicsExports, setDynamicsExports] = useState<DynamicsExport[]>([])
   const [loadingConfigs, setLoadingConfigs] = useState(true)
   const [loadingLogs, setLoadingLogs] = useState(true)
-  const [loadingExports, setLoadingExports] = useState(false)
-  const [exporting, setExporting] = useState(false)
   const [syncingConfigId, setSyncingConfigId] = useState<string | null>(null)
   const [retryingLogId, setRetryingLogId] = useState<string | null>(null)
   const [hrmsDataSynced, setHrmsDataSynced] = useState<boolean | null>(null)
@@ -70,20 +63,6 @@ export function IntegrationPage() {
     }
   }, [])
 
-  // Fetch dynamics exports
-  const fetchDynamicsExports = useCallback(async () => {
-    setLoadingExports(true)
-    try {
-      const res = await getDynamicsExports({ page_size: 20 })
-      setDynamicsExports(res.exports)
-    } catch (err) {
-      console.error("Failed to load dynamics exports:", err)
-      setDynamicsExports([])
-    } finally {
-      setLoadingExports(false)
-    }
-  }, [])
-
   // Check if HRMS data has ever been synced
   const checkHrmsStatus = useCallback(async () => {
     try {
@@ -102,12 +81,8 @@ export function IntegrationPage() {
 
   // Tab-specific data
   useEffect(() => {
-    if (activeTab === "dynamics") {
-      fetchDynamicsExports()
-    } else {
-      fetchSyncLogs(activeTab)
-    }
-  }, [activeTab, fetchSyncLogs, fetchDynamicsExports])
+    fetchSyncLogs(activeTab)
+  }, [activeTab, fetchSyncLogs])
 
   // Handlers
   const handleSync = async (configId: string) => {
@@ -196,57 +171,11 @@ export function IntegrationPage() {
     }
   }
 
-  const handleExport = async (type: string) => {
-    setExporting(true)
-    const startTime = Date.now()
-    try {
-      await createDynamicsExport(type)
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-      await fetchDynamicsExports()
-      addToast({
-        type: "success",
-        title: `${type.charAt(0).toUpperCase() + type.slice(1)} export ready`,
-        message: `Generated in ${elapsed}s`,
-      })
-    } catch (err) {
-      console.error("Failed to create export:", err)
-      addToast({
-        type: "error",
-        title: "Export failed",
-        message: "Please try again.",
-      })
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  const handleDownload = async (exportId: string, format: "json" | "csv") => {
-    try {
-      const blob = await downloadDynamicsExport(exportId, format)
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `dynamics-export-${exportId}.${format}`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      addToast({ type: "success", title: "Download started" })
-    } catch (err) {
-      console.error("Failed to download export:", err)
-      addToast({
-        type: "error",
-        title: "Download failed",
-        message: "Please try again.",
-      })
-    }
-  }
-
   // Filter for current tab
   const filteredConfigs = configs.filter((c) => c.integration_type === activeTab)
   const filteredLogs = syncLogs.filter((l) => l.integration_type === activeTab)
 
-  const loading = loadingConfigs || loadingLogs || loadingExports
+  const loading = loadingConfigs || loadingLogs
 
   return (
     <div className="space-y-6 p-6">
@@ -258,7 +187,7 @@ export function IntegrationPage() {
             Integration Hub
           </h2>
           <p className="text-sm text-muted-foreground">
-            Manage HRMS, Finance, and Dynamics 365 integrations
+            Manage HRMS, Finance, and Skills integrations
           </p>
         </div>
       </div>
@@ -348,14 +277,21 @@ export function IntegrationPage() {
             </div>
           )}
 
-          {/* Dynamics Tab */}
-          {activeTab === "dynamics" && (
-            <DynamicsExportPanel
-              exports={dynamicsExports}
-              onExport={handleExport}
-              onDownload={handleDownload}
-              exporting={exporting}
-            />
+          {/* Skills Tab */}
+          {activeTab === "skills" && (
+            <div className="space-y-8">
+              <IntegrationConfigList
+                configs={filteredConfigs}
+                onSync={handleSync}
+                onToggle={handleToggle}
+                syncingConfigId={syncingConfigId}
+              />
+              <SyncLogTimeline
+                logs={filteredLogs}
+                onRetry={handleRetry}
+                retryingLogId={retryingLogId}
+              />
+            </div>
           )}
         </>
       )}

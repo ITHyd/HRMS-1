@@ -1,11 +1,9 @@
 import { useState } from "react"
-import { Settings2, Briefcase, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { SkillBadge } from "@/components/availability/SkillBadge"
 import { SkillTagManager } from "@/components/availability/SkillTagManager"
-import { AssignProjectModal } from "@/components/availability/AssignProjectModal"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import type { AvailableEmployee } from "@/types/availability"
 
@@ -48,8 +46,6 @@ export function BenchPoolTable({
   hasActiveFilters = false,
 }: BenchPoolTableProps) {
   const [managingEmployee, setManagingEmployee] = useState<AvailableEmployee | null>(null)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [showAssignModal, setShowAssignModal] = useState(false)
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
   const totalPages = Math.ceil(total / pageSize)
 
@@ -57,61 +53,17 @@ export function BenchPoolTable({
     onRefresh()
   }
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
-  }
-
-  const toggleAll = () => {
-    if (selectedIds.size === employees.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(employees.map((e) => e.employee_id)))
-    }
-  }
-
-  const selectedEmployees = employees
-    .filter((e) => selectedIds.has(e.employee_id))
-    .map((e) => ({ id: e.employee_id, name: e.employee_name }))
-
   return (
     <>
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Available Employees</CardTitle>
-            {selectedIds.size > 0 && (
-              <Button
-                size="sm"
-                onClick={() => setShowAssignModal(true)}
-                className="h-8 text-xs"
-              >
-                <Briefcase className="mr-1.5 h-3.5 w-3.5" />
-                Assign to Project ({selectedIds.size})
-              </Button>
-            )}
-          </div>
+          <CardTitle className="text-base">Available Employees</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
-                  <th className="pb-2 px-3 font-medium w-8">
-                    <input
-                      type="checkbox"
-                      checked={employees.length > 0 && selectedIds.size === employees.length}
-                      onChange={toggleAll}
-                      className="cursor-pointer rounded border-gray-300"
-                    />
-                  </th>
                   <th className="pb-2 px-3 font-medium border-l border-border">Name</th>
                   <th className="pb-2 px-3 font-medium border-l border-border">Designation</th>
                   <th className="pb-2 px-3 font-medium border-l border-border">Department</th>
@@ -120,13 +72,12 @@ export function BenchPoolTable({
                   <th className="pb-2 px-3 font-medium border-l border-border">Classification</th>
                   <th className="pb-2 px-3 font-medium border-l border-border">Available From</th>
                   <th className="pb-2 px-3 font-medium border-l border-border">Projects</th>
-                  <th className="pb-2 px-3 font-medium border-l border-border">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {employees.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
                       {hasActiveFilters
                         ? "No employees match the current filters"
                         : "No available employees found"}
@@ -136,16 +87,8 @@ export function BenchPoolTable({
                   employees.map((emp) => (
                     <tr
                       key={emp.employee_id}
-                      className={`border-b last:border-0 hover:bg-muted/50 transition-colors ${selectedIds.has(emp.employee_id) ? "bg-primary/5" : ""}`}
+                      className="border-b last:border-0 hover:bg-muted/50 transition-colors"
                     >
-                      <td className="py-2.5 px-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(emp.employee_id)}
-                          onChange={() => toggleSelect(emp.employee_id)}
-                          className="cursor-pointer rounded border-gray-300"
-                        />
-                      </td>
                       <td className="py-2.5 px-3 border-l border-border">
                         <button
                           onClick={() => selectEmployee(emp.employee_id)}
@@ -221,17 +164,6 @@ export function BenchPoolTable({
                             .map((p) => p.project_name)
                             .join(", ") || "-"}
                         </span>
-                      </td>
-                      <td className="py-2.5 px-3 border-l border-border">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setManagingEmployee(emp)}
-                          className="h-7 text-xs"
-                        >
-                          <Settings2 className="mr-1 h-3.5 w-3.5" />
-                          Manage Skills
-                        </Button>
                       </td>
                     </tr>
                   ))
@@ -336,18 +268,6 @@ export function BenchPoolTable({
           skills={managingEmployee.skills}
           onUpdate={handleSkillUpdate}
           onClose={() => setManagingEmployee(null)}
-        />
-      )}
-
-      {/* Assign Project Modal */}
-      {showAssignModal && (
-        <AssignProjectModal
-          selectedEmployees={selectedEmployees}
-          onClose={() => setShowAssignModal(false)}
-          onSuccess={() => {
-            setSelectedIds(new Set())
-            onRefresh()
-          }}
         />
       )}
     </>

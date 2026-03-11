@@ -26,12 +26,27 @@ async def get_branch_analytics(location_id: str):
     total_headcount = len(employees)
     emp_ids = {str(e.id) for e in employees}
 
-    # Department breakdown
+    # Department breakdown (from both employees and projects)
     dept_counts = defaultdict(int)
+    
+    # Count employees by department
     for emp in employees:
         dept = dept_map.get(emp.department_id)
         dept_name = dept.name if dept else "Unknown"
         dept_counts[dept_name] += 1
+    
+    # Get all projects to include their departments in the breakdown
+    all_projects = await Project.find_all().to_list()
+    
+    # Add all project departments to the breakdown (with 0 employees if not already counted)
+    for proj in all_projects:
+        dept = dept_map.get(proj.department_id)
+        if dept:
+            dept_name = dept.name
+            # Only add if not already counted (this ensures we don't overwrite employee counts)
+            if dept_name not in dept_counts:
+                dept_counts[dept_name] = 0
+    
     department_breakdown = [
         {"department": k, "count": v} for k, v in sorted(dept_counts.items())
     ]
@@ -160,14 +175,13 @@ async def get_branch_analytics(location_id: str):
                     "relationship_type": "PRIMARY",
                 })
 
-    # Projects
+    # Projects - show all projects, not just those with employees from this branch
     emp_projs = await EmployeeProject.find(
         {"employee_id": {"$in": list(emp_ids)}}
     ).to_list()
-
-    project_ids = {ep.project_id for ep in emp_projs}
-    projects_list = await Project.find({"_id": {"$in": [ObjectId(pid) for pid in project_ids if ObjectId.is_valid(pid)]}}).to_list() if project_ids else []
-    proj_map = {str(p.id): p for p in projects_list}
+    
+    all_projects = await Project.find_all().to_list()
+    proj_map = {str(p.id): p for p in all_projects}
 
     proj_member_count = defaultdict(int)
     for ep in emp_projs:
@@ -184,15 +198,11 @@ async def get_branch_analytics(location_id: str):
             "department": dept.name if dept else "Unknown",
         })
 
-    # Orphaned projects (in branch departments but no employees assigned)
-    branch_dept_ids = {emp.department_id for emp in employees}
-    all_branch_projects = await Project.find(
-        {"department_id": {"$in": list(branch_dept_ids)}}
-    ).to_list()
-
-    assigned_project_ids = {ep.project_id for ep in emp_projs}
+    # Orphaned projects (projects with no employees assigned from any branch)
+    all_emp_projs = await EmployeeProject.find_all().to_list()
+    assigned_project_ids = {ep.project_id for ep in all_emp_projs}
     orphaned = []
-    for proj in all_branch_projects:
+    for proj in all_projects:
         if str(proj.id) not in assigned_project_ids:
             dept = dept_map.get(proj.department_id)
             orphaned.append({

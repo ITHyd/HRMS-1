@@ -30,4 +30,10 @@ class Settings(BaseSettings):
     HRMS_LIVE_DOMAINS: str = "nxzen.com"
     HRMS_DEMO_USERS: str = "vikram.patel@company.com"
 
+    # Skills integration
+    SKILLS_BASE_URL: str = "http://skills.nxzen.com"
+    SKILLS_TOKEN: str = ""
+    SKILLS_USERNAME: str = ""
+    SKILLS_PASSWORD: str = ""
+
 settings = Settings()

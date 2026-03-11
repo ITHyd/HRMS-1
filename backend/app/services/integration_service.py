@@ -6,6 +6,7 @@ from app.models.sync_log import SyncLog
 from app.models.user import User
 from app.services import audit_service
 from app.services import hrms_sync_service
+from app.services import skills_sync_service
 
 
 async def list_integration_configs() -> list[dict]:
@@ -225,6 +226,19 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
         if sync_log.records_failed:
             sync_log.error_details.append(
                 {"record": "hrms_sync", "error": f"{sync_log.records_failed} errors during sync"}
+            )
+    elif cfg.integration_type == "skills":
+        # Skills Portal sync
+        skills_result = await skills_sync_service.sync_skills_from_portal()
+        
+        sync_log.status = "completed" if skills_result.get("success") else "failed"
+        sync_log.records_processed = skills_result.get("total_count", 0)
+        sync_log.records_succeeded = skills_result.get("synced_count", 0)
+        sync_log.records_failed = sync_log.records_processed - sync_log.records_succeeded
+        sync_log.error_details = []
+        if not skills_result.get("success"):
+            sync_log.error_details.append(
+                {"record": "skills_sync", "error": skills_result.get("message", "Unknown error")}
             )
     else:
         # Simulate sync completion with fake counts
