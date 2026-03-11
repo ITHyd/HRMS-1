@@ -221,10 +221,30 @@ async def get_audit_log(
     if date_to:
         filters.append(AuditLog.timestamp <= datetime.fromisoformat(date_to + "T23:59:59"))
 
+    # If search is provided, we need to resolve names first then filter,
+    # so we query a larger set, enrich, filter, then paginate.
+    if search:
+        return await _search_audit_log(filters, search, page, page_size)
+
     skip = (page - 1) * page_size
 
     total = await AuditLog.find(*filters).count()
     entries = await AuditLog.find(*filters).sort(-AuditLog.timestamp).skip(skip).limit(page_size).to_list()
+
+    result = await _enrich_entries(entries)
+
+    return {
+        "entries": result,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+async def _enrich_entries(entries: list[AuditLog]) -> list[dict]:
+    """Resolve names and humanize audit entries."""
+    if not entries:
+        return []
 
     # Resolve user names
     user_ids = {e.changed_by for e in entries}
@@ -239,7 +259,6 @@ async def get_audit_log(
         desc = _build_description(entry, emp_map, proj_map)
         entity_label = ENTITY_LABELS.get(entry.entity_type, entry.entity_type)
 
-        # Humanize old/new values
         old_val = _humanize_value(entry.old_value, emp_map, proj_map) if entry.old_value else None
         new_val = _humanize_value(entry.new_value, emp_map, proj_map) if entry.new_value else None
 
@@ -260,19 +279,31 @@ async def get_audit_log(
             item["metadata"] = entry.metadata
         result.append(item)
 
-    # Filter by search term
-    if search:
-        search_lower = search.lower()
-        result = [
-            r for r in result
-            if search_lower in r["description"].lower()
-            or search_lower in r.get("changed_by_name", "").lower()
-            or search_lower in r.get("entity_label", "").lower()
-        ]
-        total = len(result)
+    return result
+
+
+async def _search_audit_log(
+    filters: list, search: str, page: int, page_size: int
+) -> dict:
+    """Fetch all matching entries, enrich, then filter by search and paginate."""
+    # Cap at 5000 to avoid memory issues
+    all_entries = await AuditLog.find(*filters).sort(-AuditLog.timestamp).limit(5000).to_list()
+    enriched = await _enrich_entries(all_entries)
+
+    search_lower = search.lower()
+    filtered = [
+        r for r in enriched
+        if search_lower in r["description"].lower()
+        or search_lower in r.get("changed_by_name", "").lower()
+        or search_lower in r.get("entity_label", "").lower()
+    ]
+
+    total = len(filtered)
+    skip = (page - 1) * page_size
+    page_entries = filtered[skip : skip + page_size]
 
     return {
-        "entries": result,
+        "entries": page_entries,
         "total": total,
         "page": page,
         "page_size": page_size,

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getAuditStats, type AuditStatsResponse } from "@/api/audit"
-import { Activity, TrendingUp } from "lucide-react"
+import { Activity, TrendingUp, Layers } from "lucide-react"
 
 interface AuditStatsProps {
   locationId: string
@@ -38,8 +38,8 @@ export function AuditStats({ locationId }: AuditStatsProps) {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {[1, 2].map((i) => (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[1, 2, 3].map((i) => (
           <Card key={i} className="animate-pulse">
             <CardContent className="p-6">
               <div className="h-16 bg-muted rounded" />
@@ -56,8 +56,12 @@ export function AuditStats({ locationId }: AuditStatsProps) {
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5)
 
+  const sortedEntities = Object.entries(stats.by_entity || {})
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center gap-3">
@@ -66,7 +70,7 @@ export function AuditStats({ locationId }: AuditStatsProps) {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">
-                Total Events ({stats.period})
+                Total Events (last 7 days)
               </p>
               <p className="text-2xl font-bold">{stats.total_events}</p>
             </div>
@@ -92,6 +96,33 @@ export function AuditStats({ locationId }: AuditStatsProps) {
               </Badge>
             ))}
             {sortedActions.length === 0 && (
+              <span className="text-sm text-muted-foreground">
+                No activity this week
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Layers className="h-5 w-5 text-primary" />
+            </div>
+            <p className="text-sm text-muted-foreground">By Entity</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {sortedEntities.map(([entity, count]) => (
+              <Badge
+                key={entity}
+                variant="outline"
+                className="text-xs"
+              >
+                {entity}: {count}
+              </Badge>
+            ))}
+            {sortedEntities.length === 0 && (
               <span className="text-sm text-muted-foreground">
                 No activity this week
               </span>

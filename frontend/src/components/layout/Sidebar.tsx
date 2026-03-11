@@ -3,7 +3,6 @@ import { NavLink } from "react-router-dom"
 import {
   Network,
   BarChart3,
-  Upload,
   ClipboardList,
   LogOut,
   Building2,
@@ -33,7 +32,6 @@ const navItems = [
   { to: "/finance", icon: PoundSterling, label: "Finance" },
   { to: "/availability", icon: Users, label: "Bench Pool" },
   { to: "/integrations", icon: Link2, label: "Integrations" },
-  { to: "/import", icon: Upload, label: "Import" },
   { to: "/audit", icon: ClipboardList, label: "Audit Log" },
 ]
 

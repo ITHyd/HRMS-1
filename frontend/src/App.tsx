@@ -4,7 +4,6 @@ import { AppLayout } from "@/components/layout/AppLayout"
 import { LoginPage } from "@/pages/LoginPage"
 import { OrgChartPage } from "@/pages/OrgChartPage"
 import { AnalyticsPage } from "@/pages/AnalyticsPage"
-import { ImportPage } from "@/pages/ImportPage"
 import { AuditPage } from "@/pages/AuditPage"
 import { TimesheetPage } from "@/pages/TimesheetPage"
 import { FinancePage } from "@/pages/FinancePage"
@@ -37,7 +36,6 @@ function App() {
           <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
           <Route path="/search" element={<SearchResultsPage />} />
           <Route path="/integrations" element={<IntegrationPage />} />
-          <Route path="/import" element={<ImportPage />} />
           <Route path="/audit" element={<AuditPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

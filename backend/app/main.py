@@ -7,7 +7,7 @@ from app.config import settings
 from app.database import init_db
 from app.routers import (
     analytics, audit, auth, availability, dashboard, employees, export_data,
-    finance, hrms_sync, import_data, integration, org, projects, search, timesheets, utilisation,
+    finance, hrms_sync, integration, org, projects, search, timesheets, utilisation,
 )
 
 
@@ -36,7 +36,6 @@ app.include_router(auth.router)
 app.include_router(org.router)
 app.include_router(employees.router)
 app.include_router(analytics.router)
-app.include_router(import_data.router)
 app.include_router(export_data.router)
 app.include_router(audit.router)
 app.include_router(timesheets.router)

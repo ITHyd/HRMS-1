@@ -46,6 +46,7 @@ async def export_audit_log(
     entity_type: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
     user: CurrentUser = Depends(get_current_user),
 ):
     import csv
@@ -57,6 +58,7 @@ async def export_audit_log(
         entity_type=entity_type,
         date_from=date_from,
         date_to=date_to,
+        search=search,
     )
 
     output = io.StringIO()

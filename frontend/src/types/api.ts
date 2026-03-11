@@ -18,23 +18,6 @@ export interface SearchResult {
   total: number
 }
 
-export interface ValidationRow {
-  row_number: number
-  data: Record<string, string>
-  status: "valid" | "error" | "warning"
-  errors: string[]
-  warnings: string[]
-}
-
-export interface ImportValidationResponse {
-  total_rows: number
-  valid_count: number
-  error_count: number
-  warning_count: number
-  rows: ValidationRow[]
-  import_token: string
-}
-
 export interface AuditEntry {
   id: string
   action: string

@@ -13,6 +13,7 @@ export interface AuditStatsResponse {
   total_events: number
   period: string
   by_action: Record<string, number>
+  by_entity: Record<string, number>
 }
 
 export async function getAuditLog(
