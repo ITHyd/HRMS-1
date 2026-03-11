@@ -3,6 +3,7 @@ import { Link2, AlertTriangle, RefreshCw } from "lucide-react"
 import { IntegrationConfigList } from "@/components/integration/IntegrationConfigList"
 import { SyncLogTimeline } from "@/components/integration/SyncLogTimeline"
 import { useToastStore } from "@/store/toastStore"
+import { useAuthStore } from "@/store/authStore" // used via .getState() after sync
 import {
   getIntegrationConfigs,
   updateIntegrationConfig,
@@ -10,6 +11,7 @@ import {
   retrySync,
   getSyncLogs,
 } from "@/api/integration"
+import { getMe } from "@/api/auth"
 import { getHrmsStatus } from "@/api/employees"
 import type { IntegrationConfig, SyncLogEntry } from "@/types/integration"
 
@@ -94,6 +96,18 @@ export function IntegrationPage() {
       await Promise.all([fetchConfigs(), fetchSyncLogs(activeTab)])
 
       await checkHrmsStatus()
+
+      // Refresh user profile (branch_code, employee_id) after sync updates the User doc
+      try {
+        const fresh = await getMe()
+        useAuthStore.getState().setAuth(fresh.access_token, {
+          employee_id: fresh.employee_id,
+          branch_location_id: fresh.branch_location_id,
+          branch_code: fresh.branch_code,
+          name: fresh.name,
+          role: fresh.role || "branch_head",
+        })
+      } catch { /* non-critical */ }
 
       if (result.status === "completed") {
         addToast({

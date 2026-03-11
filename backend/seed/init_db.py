@@ -83,6 +83,16 @@ INTEGRATION_CONFIGS = [
         "status": "inactive",
         "config": {"endpoint": "https://api.example.com/dynamics", "version": "1.0"},
     },
+    {
+        "integration_type": "skills",
+        "name": "Skills Portal",
+        "status": "active",
+        "config": {
+            "provider": "nxzen_skills",
+            "base_url": "http://skills.nxzen.com/",
+            "auth_mode": "password_grant",
+        },
+    },
 ]
 
 
@@ -99,7 +109,11 @@ async def _ensure_users() -> int:
     for u in USERS:
         existing = await User.find_one(User.email == u["email"])
         if existing:
-            print(f"  [skip] user already exists: {u['email']}")
+            existing.password_hash = _hash(u["password"])
+            existing.name = u["name"]
+            existing.role = u["role"]
+            await existing.save()
+            print(f"  [ok]   updated user: {u['email']}  (password reset to: {u['password']})")
             continue
         doc = User(
             email=u["email"],

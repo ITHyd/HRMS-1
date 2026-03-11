@@ -10,6 +10,7 @@ export interface LoginResponse {
   branch_location_id: string
   branch_code: string
   name: string
+  role: string
 }
 
 export interface SearchResult {

@@ -6,14 +6,17 @@ import {
 } from "lucide-react"
 import { listProjects, getProjectDetail } from "@/api/projects"
 import { getEmployeeSkills, getSkillCatalog } from "@/api/availability"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import type { ProjectBrief, ProjectDetail } from "@/types/project"
 import type { SkillTag, SkillCatalogEntry } from "@/types/availability"
+import { useOrgChartStore } from "@/store/orgChartStore"
 
 // ─── constants ─────────────────────────────────────────────────────────────
 const COL_W = 44
 const LEFT_W = 300
-const ROW_H = 48
-const HEADER_H = 60
+const ROW_H = 52
+const HEADER_H = 64
 const NUM_WEEKS = 30
 
 type WindowFilter = "<30d" | "30-90d" | "90d+" | "all"
@@ -26,9 +29,9 @@ const WINDOW_OPTIONS: { value: WindowFilter; label: string }[] = [
 
 type RiskKey = "red" | "orange" | "purple"
 const RISK_BANDS: { key: RiskKey; label: string; bg: string; border: string; text: string; chip: string }[] = [
-  { key: "red",    label: "< 30 days",  bg: "#fef7f6", border: "#f97316", text: "#c2410c", chip: "<30d"   },
-  { key: "orange", label: "30–90 days", bg: "#f0fdf9", border: "#0f766e", text: "#065f46", chip: "30–90d" },
-  { key: "purple", label: "> 90 days",  bg: "#eff6ff", border: "#1e40af", text: "#1d4ed8", chip: ">90d"   },
+  { key: "red",    label: "< 30 days",  bg: "#ffffff", border: "#f97316", text: "#c2410c", chip: "<30d"   },
+  { key: "orange", label: "30–90 days", bg: "#ffffff", border: "#0f766e", text: "#065f46", chip: "30–90d" },
+  { key: "purple", label: "> 90 days",  bg: "#ffffff", border: "#1e40af", text: "#1d4ed8", chip: ">90d"   },
 ]
 
 // ─── date helpers ──────────────────────────────────────────────────────────
@@ -102,6 +105,14 @@ const URGENCY_LABEL: Record<Urgency, string> = {
 }
 
 // ─── week/month grid ───────────────────────────────────────────────────────
+const TIMELINE_BAR_TONE: Record<Urgency, { fill: string; border: string }> = {
+  overdue:  { fill: "linear-gradient(90deg, #dc2626 0%, #ef4444 100%)", border: "rgba(254, 202, 202, 0.9)" },
+  critical: { fill: "linear-gradient(90deg, #ea580c 0%, #f97316 100%)", border: "rgba(254, 215, 170, 0.9)" },
+  upcoming: { fill: "linear-gradient(90deg, #2563eb 0%, #3b82f6 100%)", border: "rgba(191, 219, 254, 0.9)" },
+  future:   { fill: "linear-gradient(90deg, #475569 0%, #64748b 100%)", border: "rgba(203, 213, 225, 0.9)" },
+  no_date:  { fill: "linear-gradient(90deg, #64748b 0%, #94a3b8 100%)", border: "rgba(226, 232, 240, 0.9)" },
+}
+
 interface WeekCell  { date: Date; label: string; isCurrent: boolean }
 interface MonthSpan { label: string; weekCount: number }
 
@@ -120,15 +131,8 @@ function buildGrid(ganttStart: Date): { weeks: WeekCell[]; months: MonthSpan[] }
 }
 
 // ─── Avatar helpers ─────────────────────────────────────────────────────────
-const AVATAR_COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#f97316",
-  "#10b981", "#3b82f6", "#f59e0b", "#14b8a6",
-  "#a855f7", "#ef4444", "#0ea5e9", "#84cc16",
-]
-function avatarColor(name: string): string {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + hash * 31
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
+function avatarColor(_name: string): string {
+  return "#6366f1"
 }
 function initials(name: string): string {
   return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
@@ -147,10 +151,9 @@ interface DrawerEmployee {
 
 // ─── Freeing Card ────────────────────────────────────────────────────────────
 function FreeingCard({
-  emp, skills, risk, selected, onSelect, onViewProfile, onMatchProjects,
+  emp, risk, selected, onSelect, onViewProfile, onMatchProjects,
 }: {
   emp: DrawerEmployee
-  skills: SkillTag[]
   risk: typeof RISK_BANDS[number]
   selected: boolean
   onSelect: () => void
@@ -158,25 +161,25 @@ function FreeingCard({
   onMatchProjects: () => void
 }) {
   const color = avatarColor(emp.employee_name)
-  const skillList = skills.slice(0, 3).map((s) => s.skill_name).join(", ")
-  const hasMoreSkills = skills.length > 3
 
   return (
     <div
       onClick={onSelect}
-      className="relative rounded-xl cursor-pointer overflow-hidden transition-all duration-200 hover:shadow-md hover:scale-[1.02]"
+      className={cn(
+        "relative cursor-pointer overflow-hidden border transition-all duration-200",
+        selected
+          ? "border-primary shadow-md ring-2 ring-primary/20"
+          : "border-border shadow-sm bc-hover-surface hover:border-primary/40"
+      )}
       style={{
-        minHeight: 140,
+        minHeight: 100,
+        borderRadius: 10,
         backgroundColor: risk.bg,
-        border: selected
-          ? "2px solid #3b82f6"
-          : `1px solid ${risk.border}`,
-        boxShadow: selected ? "0 0 0 3px #bfdbfe" : undefined,
         borderLeft: `4px solid ${risk.border}`,
       }}
     >
       {/* Risk pill — top-right */}
-      <div className="absolute top-2.5 right-3 z-10">
+      <div className="absolute top-2 right-2.5 z-10">
         <span
           className="rounded-full px-2 py-0.5 text-[10px] font-bold"
           style={{ backgroundColor: risk.border + "22", color: risk.text, border: `1px solid ${risk.border}` }}
@@ -185,61 +188,48 @@ function FreeingCard({
         </span>
       </div>
 
-      <div className="p-4 space-y-2">
+      <div className="p-3 space-y-1.5">
         {/* Name + designation */}
-        <div className="flex items-center gap-2.5 pr-14">
+        <div className="flex items-center gap-2 pr-12">
           <div
-            className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm"
+            className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-sm"
             style={{ backgroundColor: color }}
           >
             {initials(emp.employee_name)}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold truncate leading-tight" style={{ color: risk.text }}>
+            <p className="text-xs font-semibold truncate leading-tight" style={{ color: risk.text }}>
               {emp.employee_name}
             </p>
-            <p className="text-xs truncate" style={{ color: risk.text + "99" }}>
+            <p className="text-[11px] truncate" style={{ color: risk.text + "99" }}>
               {emp.designation || "Team member"}
             </p>
           </div>
         </div>
 
-        {/* [Skills] · Project */}
-        <p className="text-xs leading-snug" style={{ color: risk.text }}>
-          {skillList ? (
-            <>
-              <span className="font-semibold">[{skillList}{hasMoreSkills ? "…" : ""}]</span>
-              <span style={{ color: risk.text + "bb" }}> · {emp.project_name}</span>
-            </>
-          ) : (
-            <span style={{ color: risk.text + "bb" }}>{emp.project_name}</span>
-          )}
+        {/* Project */}
+        <p className="text-[11px] leading-snug truncate" style={{ color: risk.text + "bb" }}>
+          {emp.project_name}
         </p>
 
         {/* Client · Ends */}
-        <p className="text-xs" style={{ color: risk.text + "bb" }}>
+        <p className="text-[11px]" style={{ color: risk.text + "bb" }}>
           Client: <span className="font-medium" style={{ color: risk.text }}>{emp.client_name ?? "—"}</span>
           {" · Ends: "}
           <span className="font-medium" style={{ color: risk.text }}>{fmt(emp.end_date)}</span>
         </p>
 
         {/* Footer buttons */}
-        <div className="flex gap-2 justify-end pt-1">
+        <div className="flex gap-1.5 justify-end pt-0.5">
           <button
             onClick={(e) => { e.stopPropagation(); onViewProfile() }}
-            className="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
-            style={{ border: `1px solid ${risk.border}`, color: risk.text, backgroundColor: "transparent" }}
-            onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = risk.border + "18" }}
-            onMouseOut={(e)  => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent" }}
+            className="rounded border border-slate-400/70 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-100"
           >
             View Profile
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onMatchProjects() }}
-            className="rounded-md px-2.5 py-1 text-xs font-medium transition-colors text-white"
-            style={{ backgroundColor: risk.border }}
-            onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.85" }}
-            onMouseOut={(e)  => { (e.currentTarget as HTMLButtonElement).style.opacity = "1" }}
+            className="rounded bg-blue-600 px-2 py-0.5 text-[11px] font-medium text-white transition-colors hover:bg-blue-700"
           >
             Match Projects
           </button>
@@ -255,10 +245,10 @@ function ProjectSuggestionRow({ project, highlight }: { project: ProjectBrief; h
   return (
     <Link
       to={`/projects/${project.id}`}
-      className={`flex items-center justify-between rounded-md px-3 py-2 text-xs gap-2 hover:bg-muted/80 transition-colors group ${
+      className={`group flex items-center justify-between gap-2 rounded-md px-3 py-2 text-xs transition-all duration-200 hover:bg-muted/80 ${
         highlight
           ? "bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800"
-          : "bg-muted/40"
+          : "bg-muted/40 hover:shadow-sm"
       }`}
     >
       <div className="flex items-center gap-2 min-w-0">
@@ -346,7 +336,8 @@ function SuggestProjectsModal({
 }
 
 // ─── Employee Drawer ─────────────────────────────────────────────────────────
-function EmployeeDrawer({ emp, onClose }: { emp: DrawerEmployee; onClose: () => void }) {
+function EmployeeDrawer({ emp, skills, onClose }: { emp: DrawerEmployee; skills: SkillTag[]; onClose: () => void }) {
+  const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
   const urgency = getUrgency(emp.end_date)
   const availableMonth = emp.end_date
     ? new Date(emp.end_date).toLocaleString("default", { month: "long", year: "numeric" })
@@ -374,28 +365,48 @@ function EmployeeDrawer({ emp, onClose }: { emp: DrawerEmployee; onClose: () => 
           </div>
           <div className="rounded-lg border p-3 space-y-1">
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Completing</p>
-            <p className="text-sm font-medium">{emp.project_name}</p>
+            <Link
+              to={`/projects/${emp.project_id}`}
+              onClick={onClose}
+              className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+            >
+              {emp.project_name}
+              <ExternalLink className="h-3 w-3 shrink-0" />
+            </Link>
             {emp.client_name && <p className="text-xs text-muted-foreground">Client: {emp.client_name}</p>}
             <p className="text-xs text-muted-foreground">End date: {fmtFull(emp.end_date)}</p>
           </div>
-          <span className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${URGENCY_BADGE[urgency]}`}>
-            {URGENCY_LABEL[urgency]}
-          </span>
+          {skills.length > 0 && (
+            <div className="rounded-lg border p-3 space-y-2" style={{ background: "#f9fafb", borderColor: "#e5e7eb" }}>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Skills</p>
+              <div className="flex flex-wrap gap-1.5">
+                {skills.map((s) => (
+                  <span key={s.skill_name} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ background: "#ede9fe", color: "#5b21b6" }}>
+                    {s.skill_name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           {availableMonth && (
-            <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 p-3">
-              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Available for new project</p>
-              <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5">From {availableMonth}</p>
+            <div className="rounded-lg border p-3 flex items-center gap-3" style={{ background: "#f9fafb", borderColor: "#e5e7eb" }}>
+              <div className="rounded-md p-1.5 shrink-0" style={{ background: "#d1fae5" }}>
+                <Users className="h-4 w-4" style={{ color: "#059669" }} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold" style={{ color: "#111827" }}>Available for new project</p>
+                <p className="text-xs text-muted-foreground mt-0.5">From {availableMonth}</p>
+              </div>
             </div>
           )}
         </div>
         <div className="px-4 pb-4 border-t pt-3">
-          <Link
-            to="/employees"
+          <button
             className="block w-full text-center rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted transition-colors"
-            onClick={onClose}
+            onClick={() => { onClose(); selectEmployee(emp.employee_id) }}
           >
-            View in Employees
-          </Link>
+            View More Details
+          </button>
         </div>
       </div>
     </div>
@@ -416,6 +427,7 @@ function GanttChart({
   onLoadDetail: (id: string) => void
 }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [hoveredBarId, setHoveredBarId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -441,43 +453,59 @@ function GanttChart({
     if (!effEnd || effStart >= ganttEnd) return null
     const sw = Math.max(0, weekDiff(ganttStart, getMonday(effStart)))
     const ew = Math.min(NUM_WEEKS, Math.max(sw + 1, weekDiff(ganttStart, getMonday(effEnd)) + 1))
-    return { left: sw * COL_W + 2, width: Math.max(COL_W - 4, (ew - sw) * COL_W - 4), color: URGENCY_COLOR[getUrgency(p.end_date)] }
+    const urgency = getUrgency(p.end_date)
+    const tone = TIMELINE_BAR_TONE[urgency]
+    return {
+      left: sw * COL_W + 3,
+      width: Math.max(COL_W - 6, (ew - sw) * COL_W - 6),
+      fill: tone.fill,
+      border: tone.border,
+    }
   }
 
   const todayWeek = weekDiff(ganttStart, getMonday(new Date()))
   const todayOffset = todayWeek >= 0 && todayWeek < NUM_WEEKS ? todayWeek * COL_W + COL_W / 2 : null
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
       <div className="flex">
-        <div className="shrink-0 border-r bg-background z-20" style={{ width: LEFT_W }}>
-          <div className="border-b bg-muted/40 flex items-end px-3 pb-2" style={{ height: HEADER_H }}>
-            <span className="text-xs font-medium text-muted-foreground">Project</span>
+        <div className="z-20 shrink-0 border-r border-border/80 bg-card" style={{ width: LEFT_W }}>
+          <div className="flex items-center border-b border-border/80 bg-muted/40 px-3.5" style={{ height: HEADER_H }}>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Project</p>
+              <p className="text-xs text-muted-foreground">Client and timeline</p>
+            </div>
           </div>
-          {projects.map((p) => {
+          {projects.map((p, rowIndex) => {
             const exp = expandedIds.has(p.id)
             const detail = details[p.id]
+            const urgency = getUrgency(p.end_date)
             return (
               <div key={p.id}>
                 <button
                   onClick={() => toggle(p.id)}
-                  className="w-full flex items-center gap-2 px-3 hover:bg-muted/30 transition-colors border-b text-left"
-                  style={{ height: ROW_H }}
+                  className={`w-full border-b border-border/70 px-3.5 text-left transition-colors ${
+                    rowIndex % 2 === 0 ? "bg-background" : "bg-muted/20"
+                  } hover:bg-primary/5`}
                 >
-                  {exp
-                    ? <ChevronDown  className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate leading-tight">{p.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{p.client_name ?? p.department_name}</p>
+                  <div className="flex items-center gap-2.5" style={{ height: ROW_H }}>
+                    {exp
+                      ? <ChevronDown  className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium leading-tight">{p.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {(p.client_name ?? p.department_name ?? "Internal")} | Ends {fmt(p.end_date)}
+                      </p>
+                    </div>
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: URGENCY_COLOR[urgency] }} />
+                    {loadingDetailId === p.id && (
+                      <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
+                    )}
                   </div>
-                  {loadingDetailId === p.id
-                    ? <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
-                    : <span className="shrink-0 h-2 w-2 rounded-full" style={{ background: URGENCY_COLOR[getUrgency(p.end_date)] }} />
-                  }
                 </button>
                 {exp && (
-                  <div className="border-b bg-muted/10 px-3 py-2 space-y-1 min-h-[40px]">
+                  <div className="space-y-1.5 border-b border-border/70 bg-muted/20 px-3.5 py-2.5 min-h-[44px]">
                     {loadingDetailId === p.id ? (
                       <p className="text-xs text-muted-foreground">Loading…</p>
                     ) : detail ? (
@@ -485,7 +513,7 @@ function GanttChart({
                         ? detail.members.map((m) => (
                             <div key={m.employee_id} className="flex items-center gap-1.5">
                               <div
-                                className="h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+                                className="h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 ring-1 ring-white/70"
                                 style={{ backgroundColor: avatarColor(m.employee_name) }}
                               >
                                 {initials(m.employee_name)}
@@ -503,47 +531,99 @@ function GanttChart({
           })}
         </div>
 
-        <div ref={scrollRef} className="flex-1 overflow-x-auto relative">
+        <div ref={scrollRef} className="relative flex-1 overflow-x-auto scrollbar-thin">
           <div style={{ width: NUM_WEEKS * COL_W, position: "relative" }}>
             {todayOffset !== null && (
-              <div className="absolute top-0 bottom-0 w-px bg-red-400/70 z-10 pointer-events-none" style={{ left: todayOffset }} />
+              <>
+                <div
+                  className="pointer-events-none absolute top-0 bottom-0 z-30 w-px bg-red-500/70"
+                  style={{ left: todayOffset }}
+                />
+                <div
+                  className="pointer-events-none absolute top-1 z-30 -translate-x-1/2 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm"
+                  style={{ left: todayOffset }}
+                >
+                  Today
+                </div>
+              </>
             )}
-            <div className="flex border-b bg-muted/40 sticky top-0 z-10" style={{ height: 32 }}>
+            <div className="sticky top-0 z-20 flex border-b border-border/80 bg-muted/60 backdrop-blur" style={{ height: 32 }}>
               {months.map((m, i) => (
-                <div key={i} className="border-r flex items-center px-2 text-xs font-medium text-muted-foreground whitespace-nowrap overflow-hidden shrink-0"
-                  style={{ width: m.weekCount * COL_W }}>
+                <div
+                  key={i}
+                  className="shrink-0 border-r border-border/70 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center whitespace-nowrap overflow-hidden"
+                  style={{ width: m.weekCount * COL_W }}
+                >
                   {m.label}
                 </div>
               ))}
             </div>
-            <div className="flex border-b bg-muted/20 sticky top-8 z-10" style={{ height: HEADER_H - 32 }}>
+            <div
+              className="sticky z-20 flex border-b border-border/80 bg-card backdrop-blur"
+              style={{ top: 32, height: HEADER_H - 32 }}
+            >
               {weeks.map((w, i) => (
-                <div key={i}
-                  className={`border-r flex items-center justify-center text-[10px] shrink-0 ${w.isCurrent ? "bg-red-50 dark:bg-red-950/20 text-red-500 font-bold" : "text-muted-foreground"}`}
-                  style={{ width: COL_W }}>
+                <div
+                  key={i}
+                  className={`shrink-0 border-r border-border/60 flex items-center justify-center text-[10px] ${
+                    w.isCurrent ? "bg-red-50 text-red-600 font-semibold" : "text-muted-foreground"
+                  }`}
+                  style={{ width: COL_W }}
+                >
                   {w.label}
                 </div>
               ))}
             </div>
-            {projects.map((p) => {
+            {projects.map((p, rowIndex) => {
               const bar = barStyle(p)
               const exp = expandedIds.has(p.id)
               const detail = details[p.id]
               const expandedH = exp ? Math.max(40, (detail?.members.length ?? 0) * 24 + 16) : 0
+              const barHeight = ROW_H - 18
+              const tooltipLeft = bar ? Math.min(NUM_WEEKS * COL_W - 12, Math.max(12, bar.left + bar.width / 2)) : 0
               return (
                 <div key={p.id}>
-                  <div className="relative border-b cursor-pointer" style={{ height: ROW_H }} onClick={() => toggle(p.id)}>
+                  <div
+                    className={`relative cursor-pointer border-b border-border/70 transition-colors ${
+                      rowIndex % 2 === 0 ? "bg-background" : "bg-muted/20"
+                    } hover:bg-primary/5`}
+                    style={{ height: ROW_H }}
+                    onClick={() => toggle(p.id)}
+                  >
                     {weeks.map((_, i) => (
-                      <div key={i} className="absolute top-0 bottom-0 border-r border-muted/20" style={{ left: i * COL_W, width: COL_W }} />
+                      <div
+                        key={i}
+                        className={`absolute top-0 bottom-0 border-r ${i % 4 === 0 ? "border-border/60" : "border-border/30"}`}
+                        style={{ left: i * COL_W, width: COL_W }}
+                      />
                     ))}
                     {bar && (
-                      <div className="absolute top-3 rounded-md opacity-90 hover:opacity-100 flex items-center px-2 overflow-hidden"
-                        style={{ left: bar.left, width: bar.width, height: ROW_H - 24, backgroundColor: bar.color }}>
-                        <span className="text-white text-[10px] font-medium truncate">{p.name}</span>
+                      <div
+                        className="absolute flex items-center overflow-hidden rounded-full border px-2.5 text-[10px] font-semibold text-white shadow-[0_3px_10px_rgba(15,23,42,0.16)] transition-transform duration-200 hover:-translate-y-0.5"
+                        style={{
+                          left: bar.left,
+                          width: bar.width,
+                          height: barHeight,
+                          top: (ROW_H - barHeight) / 2,
+                          background: bar.fill,
+                          borderColor: bar.border,
+                        }}
+                        onMouseEnter={() => setHoveredBarId(p.id)}
+                        onMouseLeave={() => setHoveredBarId((curr) => (curr === p.id ? null : curr))}
+                      >
+                        <span className="truncate">{p.name}</span>
+                      </div>
+                    )}
+                    {bar && hoveredBarId === p.id && (
+                      <div
+                        className="bc-tooltip absolute z-40 -translate-x-1/2 -translate-y-full whitespace-nowrap"
+                        style={{ left: tooltipLeft, top: (ROW_H - barHeight) / 2 - 6 }}
+                      >
+                        {p.name}: {fmt(p.start_date)} - {fmt(p.end_date)}
                       </div>
                     )}
                   </div>
-                  {exp && <div className="border-b bg-muted/10" style={{ height: expandedH || 40 }} />}
+                  {exp && <div className="border-b border-border/70 bg-muted/20" style={{ height: expandedH || 40 }} />}
                 </div>
               )
             })}
@@ -749,7 +829,7 @@ export function ProjectTimelinePage() {
 
   return (
     <div className="space-y-5 p-6">
-      {drawerEmp && <EmployeeDrawer emp={drawerEmp} onClose={() => setDrawerEmp(null)} />}
+      {drawerEmp && <EmployeeDrawer emp={drawerEmp} skills={empSkills[drawerEmp.employee_id] ?? []} onClose={() => setDrawerEmp(null)} />}
       {suggestEmp && (
         <SuggestProjectsModal
           emp={suggestEmp}
@@ -760,38 +840,93 @@ export function ProjectTimelinePage() {
       )}
 
       <div>
-        <h1 className="text-2xl font-bold">Project Timeline</h1>
+        <h2 className="text-xl font-semibold tracking-tight">Project Timeline</h2>
         <p className="text-sm text-muted-foreground mt-0.5">
           Track project end dates, see who's freeing up, and plan client renewals
         </p>
       </div>
 
       {/* ── Stat cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="rounded-lg bg-slate-700 p-3">
-          <p className="text-xs text-slate-300">Active Projects</p>
-          <p className="text-2xl font-bold text-white">{projects.length}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        {/* Active Projects */}
+        <div
+          className="rounded-xl border p-4 shadow-sm transition-all duration-200 bc-hover-surface hover:border-primary/30"
+          style={{ background: "#f9fafb" }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg p-2 bg-slate-100">
+              <Calendar className="h-5 w-5 text-slate-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Active Projects</p>
+              <p className="text-2xl font-semibold tabular-nums" style={{ color: "#111827" }}>{projects.length}</p>
+            </div>
+          </div>
         </div>
-        <div className="rounded-lg bg-red-600 p-3">
-          <p className="text-xs text-red-100">Overdue</p>
-          <p className="text-2xl font-bold text-white">{overdue}</p>
+        {/* Overdue */}
+        <div
+          className="rounded-xl border p-4 shadow-sm transition-all duration-200 bc-hover-surface hover:border-primary/30"
+          style={{ background: "#f9fafb" }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg p-2 bg-red-50">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Overdue</p>
+              <p className="text-2xl font-semibold tabular-nums" style={{ color: "#111827" }}>{overdue}</p>
+            </div>
+          </div>
         </div>
-        <div className="rounded-lg bg-orange-500 p-3">
-          <p className="text-xs text-orange-100">Ending &lt; 30 days</p>
-          <p className="text-2xl font-bold text-white">{critical}</p>
+        {/* Ending <30d */}
+        <div
+          className="rounded-xl border p-4 shadow-sm transition-all duration-200 bc-hover-surface hover:border-primary/30"
+          style={{ background: "#f9fafb" }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg p-2 bg-orange-50">
+              <TrendingUp className="h-5 w-5 text-orange-500" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Ending &lt; 30 days</p>
+              <p className="text-2xl font-semibold tabular-nums" style={{ color: "#111827" }}>{critical}</p>
+            </div>
+          </div>
         </div>
-        <div className="rounded-lg bg-blue-600 p-3">
-          <p className="text-xs text-blue-100">Freeing Up (90d)</p>
-          <p className="text-2xl font-bold text-white">{freeing90}</p>
-          {(freeing_lt30 + freeing_30_90 + freeing_gt90) > 0 && (
-            <p className="text-[10px] text-blue-200 mt-1 whitespace-nowrap">
-              &lt;30d: {freeing_lt30} · 30–90d: {freeing_30_90} · &gt;90d: {freeing_gt90}
-            </p>
-          )}
+        {/* Freeing Up */}
+        <div
+          className="rounded-xl border p-4 shadow-sm transition-all duration-200 bc-hover-surface hover:border-primary/30"
+          style={{ background: "#f9fafb" }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg p-2 bg-blue-50">
+              <Users className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Freeing Up (90d)</p>
+              <p className="text-2xl font-semibold tabular-nums" style={{ color: "#111827" }}>{freeing90}</p>
+              {(freeing_lt30 + freeing_30_90 + freeing_gt90) > 0 && (
+                <p className="text-[10px] text-muted-foreground mt-0.5 whitespace-nowrap tabular-nums">
+                  &lt;30d: {freeing_lt30} · 30–90d: {freeing_30_90} · &gt;90d: {freeing_gt90}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="rounded-lg bg-emerald-600 p-3">
-          <p className="text-xs text-emerald-100">Client Opportunities</p>
-          <p className="text-2xl font-bold text-white">{clientOpps.length}</p>
+        {/* Client Opportunities */}
+        <div
+          className="rounded-xl border p-4 shadow-sm transition-all duration-200 bc-hover-surface hover:border-primary/30"
+          style={{ background: "#f9fafb" }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg p-2 bg-emerald-50">
+              <Building2 className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Client Opportunities</p>
+              <p className="text-2xl font-semibold tabular-nums" style={{ color: "#111827" }}>{clientOpps.length}</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -804,7 +939,7 @@ export function ProjectTimelinePage() {
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === t.key
                 ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border/70"
             }`}
           >
             {t.label}
@@ -815,19 +950,25 @@ export function ProjectTimelinePage() {
       {/* ── TAB 1: Timeline ── */}
       {activeTab === "timeline" && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-3 flex-wrap text-xs">
-              {(["overdue", "critical", "upcoming", "future"] as Urgency[]).map((u) => (
-                <span key={u} className="flex items-center gap-1.5">
-                  <span className="inline-block h-2.5 w-5 rounded" style={{ background: URGENCY_COLOR[u] }} />
-                  {URGENCY_LABEL[u]}
-                </span>
-              ))}
-            </div>
-            <div className="flex items-center gap-1 text-xs">
-              <button onClick={() => setWeekOffset((n) => n - 4)} className="rounded px-2 py-1 hover:bg-muted border">← 4 wks</button>
-              <button onClick={() => setWeekOffset(0)} className="rounded px-2 py-1 hover:bg-muted border">Today</button>
-              <button onClick={() => setWeekOffset((n) => n + 4)} className="rounded px-2 py-1 hover:bg-muted border">4 wks →</button>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-xs text-muted-foreground">
+              Window starts {weeks[0]?.date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+            </p>
+            <div className="flex items-center gap-1 rounded-lg border bg-card p-1 shadow-sm">
+              <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setWeekOffset((n) => n - 4)}>
+                {"< 4 wks"}
+              </Button>
+              <Button
+                variant={weekOffset === 0 ? "default" : "outline"}
+                size="sm"
+                className="h-7 px-2.5 text-xs"
+                onClick={() => setWeekOffset(0)}
+              >
+                Today
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setWeekOffset((n) => n + 4)}>
+                {"4 wks >"}
+              </Button>
             </div>
           </div>
           {projects.length === 0 ? (
@@ -841,7 +982,9 @@ export function ProjectTimelinePage() {
               details={details} loadingDetailId={loadingDetailId} onLoadDetail={loadDetailForId}
             />
           )}
-          <p className="text-xs text-muted-foreground">Click a row to expand team members · Red line = today</p>
+          <p className="text-xs text-muted-foreground">
+            Click a row to expand team members. Timeline bars are color-coded by urgency.
+          </p>
         </div>
       )}
 
@@ -862,11 +1005,11 @@ export function ProjectTimelinePage() {
                   <p className="text-base font-bold text-foreground leading-tight">
                     Freeing Up: {allFreeingEmps.length}
                     {" · "}
-                    <span style={{ color: "#c2410c" }}>&lt;30d: {allFreeingEmps.filter(e => urgencyToRisk(getUrgency(e.end_date)) === "red").length}</span>
+                    <span>&lt;30d: {allFreeingEmps.filter(e => urgencyToRisk(getUrgency(e.end_date)) === "red").length}</span>
                     {" | "}
-                    <span style={{ color: "#065f46" }}>30–90d: {allFreeingEmps.filter(e => urgencyToRisk(getUrgency(e.end_date)) === "orange").length}</span>
+                    <span>30–90d: {allFreeingEmps.filter(e => urgencyToRisk(getUrgency(e.end_date)) === "orange").length}</span>
                     {" | "}
-                    <span style={{ color: "#1d4ed8" }}>&gt;90d: {allFreeingEmps.filter(e => urgencyToRisk(getUrgency(e.end_date)) === "purple").length}</span>
+                    <span>&gt;90d: {allFreeingEmps.filter(e => urgencyToRisk(getUrgency(e.end_date)) === "purple").length}</span>
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {freeingTotal === allFreeingEmps.length ? "All windows" : `${freeingTotal} shown`}
@@ -997,12 +1140,11 @@ export function ProjectTimelinePage() {
                 </div>
 
                 {/* 2-column card grid, min 300px per card */}
-                <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
+                <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
                   {emps.map((emp) => (
                     <FreeingCard
                       key={`${emp.employee_id}-${emp.project_id}`}
                       emp={emp}
-                      skills={empSkills[emp.employee_id] ?? []}
                       risk={band}
                       selected={selectedEmpId === `${emp.employee_id}-${emp.project_id}`}
                       onSelect={() => setSelectedEmpId(
@@ -1039,7 +1181,10 @@ export function ProjectTimelinePage() {
                   return order.indexOf(pu) < order.indexOf(acc) ? pu : acc
                 }, "no_date")
                 return (
-                  <div key={opp.client_name} className="rounded-lg border bg-card p-4 space-y-3">
+                  <div
+                    key={opp.client_name}
+                    className="bc-hover-surface rounded-xl border border-border bg-card p-4 space-y-3 shadow-sm hover:border-primary/40"
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <div className="rounded-md bg-muted p-1.5 shrink-0">
@@ -1060,8 +1205,8 @@ export function ProjectTimelinePage() {
                       {opp.projects.map((p) => {
                         const pu = getUrgency(p.end_date)
                         return (
-                          <div key={p.id} className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-xs gap-2">
-                            <Link to={`/projects/${p.id}`} className="font-medium hover:text-primary flex items-center gap-1 truncate">
+                          <div key={p.id} className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-xs gap-2 transition-colors hover:bg-muted/70">
+                            <Link to={`/projects/${p.id}`} className="font-medium hover:text-primary transition-colors flex items-center gap-1 truncate">
                               {p.name} <ExternalLink className="h-3 w-3 shrink-0" />
                             </Link>
                             <div className="flex items-center gap-2 shrink-0">
@@ -1073,12 +1218,13 @@ export function ProjectTimelinePage() {
                         )
                       })}
                     </div>
-                    <div className="flex items-start gap-2 rounded-md border border-dashed border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2">
-                      <AlertTriangle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                      <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                        <strong>Renewal opportunity:</strong> Reach out to {opp.client_name} before{" "}
-                        {fmtFull(opp.earliestEnd)} to discuss the next engagement and retain{" "}
-                        {opp.totalMembers} freed resource{opp.totalMembers !== 1 ? "s" : ""}.
+                    <div className="flex items-start gap-2 rounded-md px-3 py-2.5" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: "#16a34a" }} />
+                      <p className="text-xs leading-relaxed" style={{ color: "#15803d" }}>
+                        <span className="font-semibold">Renewal opportunity: </span>
+                        Reach out to <span className="font-medium">{opp.client_name}</span> before{" "}
+                        <span className="font-medium">{fmtFull(opp.earliestEnd)}</span> to discuss the next engagement and retain{" "}
+                        <span className="font-medium">{opp.totalMembers} freed resource{opp.totalMembers !== 1 ? "s" : ""}</span>.
                       </p>
                     </div>
                   </div>

@@ -240,6 +240,9 @@ async def get_resource_dashboard(
     if not page_snapshots:
         return {"period": period, "entries": [], "total": total}
 
+    # Build list of employee IDs for the current page
+    emp_ids = [s.employee_id for s in page_snapshots]
+
     # Get timesheet entries for these employees to derive project hours
     ts_entries = await TimesheetEntry.find(
         TimesheetEntry.branch_location_id == branch_location_id,

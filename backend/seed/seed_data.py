@@ -217,7 +217,6 @@ async def seed():
 
     # ── HR Staff ──
     hr1_hyd = await emp("Sunitha Reddy", "sunitha.reddy@company.com", "HR Executive", ("HR", HYD), "mid", HYD, date(2023, 2, 1))
-    hr2_hyd = await emp("Vamsi Krishna", "vamsi.krishna@nxzen.com", "HR Coordinator", ("HR", HYD), "junior", HYD, date(2024, 4, 10))
     hr1_lon = await emp("Rachel Green", "rachel.green@company.com", "HR Executive", ("HR", LON), "mid", LON, date(2023, 8, 15))
 
     # ── Sales Staff ──
@@ -287,7 +286,7 @@ async def seed():
         (ops1_lon, mgr_ops_lon), (ops2_lon, mgr_ops_lon),
         (ops1_syd, mgr_ops_syd),
         # HR Staff
-        (hr1_hyd, mgr_hr_hyd), (hr2_hyd, mgr_hr_hyd),
+        (hr1_hyd, mgr_hr_hyd),
         (hr1_lon, mgr_hr_lon),
     ]
 
@@ -367,6 +366,11 @@ async def seed():
         "Design System v3": None,       # internal
         "Data Analytics Pipeline": None,  # internal / on hold
         "Employee Wellness Program": None,  # internal
+        # New client projects for Client Opportunities
+        "Retail Banking Portal": "Barclays",
+        "Smart City Platform": "Siemens",
+        "E-Commerce Replatform": "Marks & Spencer",
+        "Workforce Analytics": "Deloitte",
     }
 
     # (name, status, type, dept_key, start_offset_months, end_offset_months)
@@ -391,6 +395,15 @@ async def seed():
         ("Data Analytics Pipeline","ON_HOLD",    "internal", ("Engineering", HYD),  -7, +5),
         # Active internal — ends next month
         ("Employee Wellness Program","ACTIVE",   "internal", ("HR", LON),           -6, +1),
+        # New client projects — all ending within 90 days (Client Opportunities)
+        # Critical: ends this month (~20 days away)
+        ("Retail Banking Portal",  "ACTIVE",     "client",   ("Engineering", HYD),  -8,  0),
+        # Upcoming: ends in ~2 months
+        ("Smart City Platform",    "ACTIVE",     "client",   ("Engineering", BLR),  -6, +2),
+        # Upcoming: ends in ~3 months
+        ("E-Commerce Replatform",  "ACTIVE",     "client",   ("Engineering", LON),  -5, +2),
+        # Critical: ends next month (~40 days away)
+        ("Workforce Analytics",    "ACTIVE",     "client",   ("Engineering", HYD),  -4, +1),
     ]
 
     project_ids = {}
@@ -458,6 +471,24 @@ async def seed():
         # Employee Wellness Program (active, ending next month)
         (mgr_hr_lon, "Employee Wellness Program", "HR Lead"),
         (hr1_lon,    "Employee Wellness Program", "Coordinator"),
+        # Retail Banking Portal (Barclays, critical — ends this month)
+        (me2_hyd,  "Retail Banking Portal", "Lead Developer"),
+        (je2_hyd,  "Retail Banking Portal", "Frontend Developer"),
+        (int1_hyd, "Retail Banking Portal", "Intern"),
+        (me3_hyd,  "Retail Banking Portal", "Mobile Developer"),
+        # Smart City Platform (Siemens, upcoming — ends in ~2 months)
+        (mgr_eng_blr, "Smart City Platform", "Delivery Manager"),
+        (me2_blr,     "Smart City Platform", "Software Engineer"),
+        (je1_blr,     "Smart City Platform", "Junior Engineer"),
+        (d1_blr,      "Smart City Platform", "UX Designer"),
+        # E-Commerce Replatform (Marks & Spencer, upcoming — ends in ~2 months)
+        (mgr_eng_lon, "E-Commerce Replatform", "Engineering Lead"),
+        (me2_lon,     "E-Commerce Replatform", "Developer"),
+        (pa1_lon,     "E-Commerce Replatform", "Business Analyst"),
+        # Workforce Analytics (Deloitte, upcoming — ends next month)
+        (pa1_hyd, "Workforce Analytics", "Lead Analyst"),
+        (pa2_hyd, "Workforce Analytics", "Analyst"),
+        (ops1_hyd,"Workforce Analytics", "Operations Lead"),
     ]
 
     for emp_id, proj_name, role in assignments:
@@ -476,20 +507,19 @@ async def seed():
     print(f"Created {len(assignments)} project assignments.")
 
     # ── Users (Login Accounts) ──
-    password_hash = bcrypt.hashpw(b"demo123", bcrypt.gensalt()).decode("utf-8")
+    demo_hash = bcrypt.hashpw(b"demo123", bcrypt.gensalt()).decode("utf-8")
 
     users_data = [
-        ("vikram.patel@company.com", vp_eng_india, HYD, "Vikram Patel"),
-        ("kavitha.rao@company.com", dir_eng_blr, BLR, "Kavitha Rao"),
-        ("james.mitchell@company.com", coo, LON, "James Mitchell"),
-        ("michael.torres@company.com", vp_eng_apac, SYD, "Michael Torres"),
-        ("vamsi.krishna@nxzen.com", hr2_hyd, HYD, "Vamsi Krishna"),
+        ("vikram.patel@company.com", vp_eng_india, HYD, "Vikram Patel", demo_hash),
+        ("kavitha.rao@company.com", dir_eng_blr, BLR, "Kavitha Rao", demo_hash),
+        ("james.mitchell@company.com", coo, LON, "James Mitchell", demo_hash),
+        ("michael.torres@company.com", vp_eng_apac, SYD, "Michael Torres", demo_hash),
     ]
 
-    for email, emp_id, loc_id, name in users_data:
+    for email, emp_id, loc_id, name, pw_hash in users_data:
         user = User(
             email=email,
-            password_hash=password_hash,
+            password_hash=pw_hash,
             employee_id=emp_id,
             branch_location_id=loc_id,
             name=name,
@@ -967,7 +997,7 @@ async def seed():
     print("\nSeed data complete!")
     print(f"   Total employees: {len(employees)}")
     print(f"   Locations: 4 (HYD, BLR, LON, SYD)")
-    print(f"   Projects: {len(project_ids)}")
+    print(f"   Projects: {len(project_ids)} (incl. 4 new client projects for Client Opportunities)")
     print(f"   Capacity configs: {len(capacity_configs)}")
     print(f"   Timesheet entries: {len(timesheet_entries)}")
     print(f"   Finance billable records: {len(finance_records)}")
@@ -978,7 +1008,6 @@ async def seed():
     print(f"   Integration configs: 3")
     print(f"   Login credentials:")
     print(f"     HYD (demo): vikram.patel@company.com / demo123")
-    print(f"     HYD (live): vamsi.krishna@nxzen.com / password123")
     print(f"     BLR: kavitha.rao@company.com / demo123")
     print(f"     LON: james.mitchell@company.com / demo123")
     print(f"     SYD: michael.torres@company.com / demo123")
