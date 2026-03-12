@@ -3,8 +3,7 @@ export interface ProjectBrief {
   name: string
   status: string
   project_type: string
-  client_name: string | null
-  department_name: string
+  client_name: string
   description?: string
   member_count: number
   start_date: string | null
@@ -47,9 +46,8 @@ export interface ProjectDetail {
   name: string
   status: string
   project_type: string
-  client_name: string | null
+  client_name: string
   description?: string
-  department_name: string
   start_date: string | null
   end_date: string | null
   planned_days: number
@@ -76,8 +74,7 @@ export interface TimelineProject {
   name: string
   status: string
   project_type: string
-  client_name: string | null
-  department_name: string
+  client_name: string
   start_date: string | null
   end_date: string | null
   days_until_end: number | null

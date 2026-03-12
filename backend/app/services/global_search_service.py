@@ -142,12 +142,6 @@ async def _search_projects(query: str, branch_location_id: str, limit: int) -> d
     for a in assignments:
         member_counts[a.project_id] = member_counts.get(a.project_id, 0) + 1
 
-    dept_ids = list({p.department_id for p in matched if p.department_id})
-    depts = await Department.find(
-        {"_id": {"$in": [ObjectId(d) for d in dept_ids if ObjectId.is_valid(d)]}}
-    ).to_list() if dept_ids else []
-    dept_map = {str(d.id): d.name for d in depts}
-
     items = []
     for p in matched:
         items.append({
@@ -155,7 +149,7 @@ async def _search_projects(query: str, branch_location_id: str, limit: int) -> d
             "name": p.name,
             "status": p.status,
             "project_type": p.project_type,
-            "department_name": dept_map.get(p.department_id, "Unknown"),
+            "client_name": p.client_name or "General",
             "member_count": member_counts.get(str(p.id), 0),
         })
 

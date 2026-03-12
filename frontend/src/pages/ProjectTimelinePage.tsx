@@ -495,7 +495,7 @@ function GanttChart({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium leading-tight">{p.name}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {(p.client_name ?? p.department_name ?? "Internal")} | Ends {fmt(p.end_date)}
+                        {p.client_name} | Ends {fmt(p.end_date)}
                       </p>
                     </div>
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: URGENCY_COLOR[urgency] }} />

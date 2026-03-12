@@ -66,9 +66,10 @@ async def search(
 @router.get("/{employee_id}")
 async def get_employee(
     employee_id: str,
+    period: str = Query(None, description="Period in YYYY-MM format for utilisation data", pattern=r"^\d{4}-\d{2}$"),
     user: CurrentUser = Depends(get_current_user),
 ):
-    result = await get_employee_detail(employee_id, user.branch_location_id)
+    result = await get_employee_detail(employee_id, user.branch_location_id, period=period)
     if not result:
         raise HTTPException(status_code=404, detail="Employee not found")
     return result

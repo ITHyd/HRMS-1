@@ -3,7 +3,7 @@ import { useAuthStore } from "@/store/authStore"
 import { getBranchAnalytics } from "@/api/analytics"
 import type { BranchAnalytics } from "@/types/analytics"
 import { WorkforceOverview } from "@/components/analytics/WorkforceOverview"
-import { DeptBreakdownChart } from "@/components/analytics/DeptBreakdownChart"
+import { ClientBreakdownChart } from "@/components/analytics/DeptBreakdownChart"
 import { LevelPyramid } from "@/components/analytics/LevelPyramid"
 import { TrendLineChart } from "@/components/analytics/TrendLineChart"
 import { SpanOfControl } from "@/components/analytics/SpanOfControl"
@@ -52,7 +52,7 @@ export function AnalyticsPage() {
       <WorkforceOverview data={data} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DeptBreakdownChart data={data.department_breakdown} />
+        <ClientBreakdownChart data={data.client_breakdown} />
         <LevelPyramid data={data.level_breakdown} />
       </div>
 

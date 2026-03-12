@@ -7,6 +7,7 @@ import { TimesheetTable } from "@/components/timesheet/TimesheetTable"
 import { TimesheetApprovalPanel } from "@/components/timesheet/TimesheetApprovalPanel"
 import { WorkloadHeatmap } from "@/components/timesheet/WorkloadHeatmap"
 import { useAuthStore } from "@/store/authStore"
+import { useOrgChartStore } from "@/store/orgChartStore"
 import { useToastStore } from "@/store/toastStore"
 import {
   getTimesheets,
@@ -49,6 +50,7 @@ function getCurrentPeriod(): string {
 
 export function TimesheetPage() {
   const user = useAuthStore((s) => s.user)
+  const setDrawerPeriod = useOrgChartStore((s) => s.setDrawerPeriod)
 
   // State
   const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod)
@@ -60,6 +62,12 @@ export function TimesheetPage() {
   const [summary, setSummary] = useState<TimesheetSummary | null>(null)
   const [filterOptions, setFilterOptions] = useState<TimesheetFilterOptions | null>(null)
   const [initialized, setInitialized] = useState(false)
+
+  // Sync drawer period
+  useEffect(() => {
+    setDrawerPeriod(selectedPeriod)
+    return () => setDrawerPeriod(null)
+  }, [selectedPeriod, setDrawerPeriod])
 
   // Filters
   const [showFilters, setShowFilters] = useState(false)

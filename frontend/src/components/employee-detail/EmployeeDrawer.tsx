@@ -44,6 +44,7 @@ export function EmployeeDrawer() {
   const selectedId = useOrgChartStore((s) => s.selectedEmployeeId)
   const closeDrawer = useOrgChartStore((s) => s.closeDrawer)
   const focusEmployee = useOrgChartStore((s) => s.focusEmployee)
+  const drawerPeriod = useOrgChartStore((s) => s.drawerPeriod)
   const loggedInUser = useAuthStore((s) => s.user)
   const [employee, setEmployee] = useState<EmployeeDetail | null>(null)
   const [chain, setChain] = useState<Record<string, unknown>[]>([])
@@ -61,7 +62,7 @@ export function EmployeeDrawer() {
 
     const loadEmployee = async () => {
       try {
-        const emp = await getEmployee(selectedId)
+        const emp = await getEmployee(selectedId, drawerPeriod ?? undefined)
         setEmployee(emp)
       } catch (err) {
         console.error("Failed to load employee:", err)
@@ -86,7 +87,7 @@ export function EmployeeDrawer() {
     }
 
     loadEmployee()
-  }, [selectedId, isOpen])
+  }, [selectedId, isOpen, drawerPeriod])
 
   if (!isOpen) return null
 

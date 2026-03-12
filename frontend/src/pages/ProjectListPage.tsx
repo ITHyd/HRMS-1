@@ -260,7 +260,6 @@ export function ProjectListPage() {
                     <th className="py-2.5 px-3 font-medium border-l border-border">Client</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border">Type</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border">Status</th>
-                    <th className="py-2.5 px-3 font-medium border-l border-border">Department</th>
                     <th className="py-2.5 px-3 font-medium text-right border-l border-border">Planned Days</th>
                     <th className="py-2.5 px-3 font-medium text-right border-l border-border">Worked Days</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border min-w-50">Progress</th>
@@ -270,7 +269,7 @@ export function ProjectListPage() {
                 <tbody>
                   {projects.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={7} className="py-8 text-center text-muted-foreground">
                         {activeFilterCount > 0
                           ? "No projects match the current filters"
                           : "No projects found"}
@@ -289,11 +288,7 @@ export function ProjectListPage() {
                           </span>
                         </td>
                         <td className="py-2.5 px-3 border-l border-border text-sm">
-                          {proj.client_name ? (
-                            <span className="font-medium">{proj.client_name}</span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
+                          <span className="font-medium">{proj.client_name}</span>
                         </td>
                         <td className="py-2.5 px-3 border-l border-border">
                           <Badge
@@ -309,9 +304,6 @@ export function ProjectListPage() {
                         </td>
                         <td className="py-2.5 px-3 border-l border-border">
                           <StatusBadge status={proj.status} />
-                        </td>
-                        <td className="py-2.5 px-3 text-muted-foreground border-l border-border">
-                          {proj.department_name}
                         </td>
                         <td className="py-2.5 px-3 text-right tabular-nums border-l border-border">
                           {proj.planned_days > 0 ? proj.planned_days : <span className="text-muted-foreground">-</span>}

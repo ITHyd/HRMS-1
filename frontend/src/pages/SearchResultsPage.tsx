@@ -317,7 +317,7 @@ export function SearchResultsPage() {
                     <button key={proj.id} onClick={() => navigate(`/projects/${proj.id}`)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50 transition-colors">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-primary">{proj.name}</p>
-                        <p className="text-xs text-muted-foreground">{proj.department_name} · {proj.member_count} members</p>
+                        <p className="text-xs text-muted-foreground">{proj.client_name} · {proj.member_count} members</p>
                       </div>
                       <Badge variant="outline" className={`text-[10px] ${proj.project_type === "client" ? "border-blue-300 text-blue-700 bg-blue-50" : "border-gray-300 text-gray-600 bg-gray-50"}`}>
                         {proj.project_type}
@@ -449,7 +449,7 @@ export function SearchResultsPage() {
                     <th className="py-2.5 px-3 font-medium">Project Name</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border">Type</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border">Status</th>
-                    <th className="py-2.5 px-3 font-medium border-l border-border">Department</th>
+                    <th className="py-2.5 px-3 font-medium border-l border-border">Client</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border min-w-[150px]">Progress</th>
                     <th className="py-2.5 px-3 font-medium text-right border-l border-border">Members</th>
                   </tr>
@@ -466,7 +466,7 @@ export function SearchResultsPage() {
                         <Badge variant="outline" className={`text-[10px] ${proj.project_type === "client" ? "border-blue-300 text-blue-700 bg-blue-50" : "border-gray-300 text-gray-600 bg-gray-50"}`}>{proj.project_type}</Badge>
                       </td>
                       <td className="py-2.5 px-3 border-l border-border"><StatusBadge status={proj.status} /></td>
-                      <td className="py-2.5 px-3 text-muted-foreground border-l border-border">{proj.department_name}</td>
+                      <td className="py-2.5 px-3 text-muted-foreground border-l border-border">{proj.client_name}</td>
                       <td className="py-2.5 px-3 border-l border-border">
                         <div className="flex items-center gap-2">
                           <Progress value={proj.progress_percent} className="h-2 flex-1" />

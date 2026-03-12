@@ -1,8 +1,8 @@
 from pydantic import BaseModel
 
 
-class DepartmentCount(BaseModel):
-    department: str
+class ClientCount(BaseModel):
+    client: str
     count: int
 
 
@@ -40,13 +40,13 @@ class ProjectSummary(BaseModel):
     name: str
     status: str
     member_count: int
-    department: str
+    client_name: str
 
 
 class BranchAnalytics(BaseModel):
     total_headcount: int
     active_count: int
-    department_breakdown: list[DepartmentCount]
+    client_breakdown: list[ClientCount]
     level_breakdown: list[LevelCount]
     monthly_trend: list[MonthlyTrend]
     span_of_control: list[SpanOfControl]

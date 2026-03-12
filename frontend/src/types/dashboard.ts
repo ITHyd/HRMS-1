@@ -59,7 +59,7 @@ export interface ProjectDashboardEntry {
   project_name: string
   status: string
   project_type: string
-  department: string
+  client_name: string
   start_date?: string
   end_date?: string
   progress_percent: number
@@ -101,5 +101,23 @@ export interface AllocationEntry {
 export interface AllocationDashboardResponse {
   period: string
   allocations: AllocationEntry[]
+  total: number
+}
+
+export interface ResourceAllocationEntry {
+  employee_id: string
+  employee_name: string
+  project_name: string | null
+  client_name: string | null
+  allocation_percentage: number
+  billable_hours: number
+  non_billable_hours: number
+  classification: string
+  available_days: number
+}
+
+export interface ResourceAllocationResponse {
+  period: string
+  entries: ResourceAllocationEntry[]
   total: number
 }

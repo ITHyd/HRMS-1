@@ -14,6 +14,7 @@ export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
+  const setDrawerPeriod = useOrgChartStore((s) => s.setDrawerPeriod)
   const [project, setProject] = useState<ProjectDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -21,6 +22,11 @@ export function ProjectDetailPage() {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   })
+
+  useEffect(() => {
+    setDrawerPeriod(selectedPeriod)
+    return () => setDrawerPeriod(null)
+  }, [selectedPeriod, setDrawerPeriod])
 
   const fetchProject = useCallback(() => {
     if (!projectId) return
@@ -88,7 +94,7 @@ export function ProjectDetailPage() {
             <div>
               <h2 className="text-xl font-semibold">{project.name}</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {project.department_name}
+                Client: {project.client_name}
               </p>
             </div>
             <div className="flex items-center gap-2">

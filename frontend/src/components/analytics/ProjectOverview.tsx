@@ -43,7 +43,7 @@ export function ProjectOverview({
                 <p className="text-sm font-medium truncate text-primary group-hover:underline">
                   {proj.name}
                 </p>
-                <p className="text-xs text-muted-foreground">{proj.department}</p>
+                <p className="text-xs text-muted-foreground">{proj.client_name}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className="text-xs text-muted-foreground">
@@ -72,7 +72,7 @@ export function ProjectOverview({
                     <p className="text-sm font-medium text-primary group-hover:underline">
                       {proj.name}
                     </p>
-                    <p className="text-xs text-muted-foreground">{proj.department}</p>
+                    <p className="text-xs text-muted-foreground">{proj.client_name}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <StatusBadge status={proj.status} />

@@ -56,12 +56,6 @@ async def list_projects(
         client_lower = client_name.lower()
         projects = [p for p in projects if p.client_name and client_lower in p.client_name.lower()]
 
-    dept_ids = list({p.department_id for p in projects})
-    depts = await Department.find(
-        {"_id": {"$in": [ObjectId(d) for d in dept_ids if ObjectId.is_valid(d)]}}
-    ).to_list()
-    dept_map = {str(d.id): d.name for d in depts}
-
     # Count members per project
     member_counts = {}
     for a in assignments:
@@ -125,10 +119,9 @@ async def list_projects(
             "id": pid,
             "name": p.name,
             "project_type": p.project_type,
-            "client_name": p.client_name,
+            "client_name": p.client_name or "General",
             "description": p.description,
             "status": p.status,
-            "department_name": dept_map.get(p.department_id, "Unknown"),
             "start_date": p.start_date.isoformat() if p.start_date else None,
             "end_date": p.end_date.isoformat() if p.end_date else None,
             "member_count": member_counts.get(pid, 0),
@@ -177,12 +170,6 @@ async def get_project_timeline(branch_location_id: str) -> dict:
             "is_deleted": {"$ne": True},
         }
     ).to_list()
-
-    dept_ids = list({p.department_id for p in projects if p.department_id})
-    depts = await Department.find(
-        {"_id": {"$in": [ObjectId(d) for d in dept_ids if ObjectId.is_valid(d)]}}
-    ).to_list()
-    dept_map = {str(d.id): d.name for d in depts}
 
     proj_assignments: dict[str, list] = {}
     for a in assignments:
@@ -236,8 +223,7 @@ async def get_project_timeline(branch_location_id: str) -> dict:
             "name": proj.name,
             "status": proj.status,
             "project_type": proj.project_type,
-            "client_name": proj.client_name,
-            "department_name": dept_map.get(proj.department_id or "", ""),
+            "client_name": proj.client_name or "General",
             "start_date": proj.start_date.isoformat() if proj.start_date else None,
             "end_date": proj.end_date.isoformat() if proj.end_date else None,
             "days_until_end": days_until_end,
@@ -383,7 +369,6 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
     if not project or project.is_deleted:
         return None
 
-    dept = await Department.get(project.department_id)
     assignments = await EmployeeProject.find(
         EmployeeProject.project_id == project_id,
         EmployeeProject.is_deleted != True,
@@ -472,10 +457,9 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
         "id": str(project.id),
         "name": project.name,
         "project_type": project.project_type,
-        "client_name": project.client_name,
+        "client_name": project.client_name or "General",
         "description": project.description,
         "status": project.status,
-        "department_name": dept.name if dept else "Unknown",
         "start_date": project.start_date.isoformat() if project.start_date else None,
         "end_date": project.end_date.isoformat() if project.end_date else None,
         "planned_days": round(total_planned, 1),

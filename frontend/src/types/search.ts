@@ -15,7 +15,7 @@ export interface GlobalSearchProjectResult {
   name: string
   status: string
   project_type: string
-  department_name: string
+  client_name: string
   member_count: number
 }
 

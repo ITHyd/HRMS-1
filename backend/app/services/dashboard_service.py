@@ -368,17 +368,6 @@ async def get_project_dashboard(
     ).to_list()
     proj_map = {str(p.id): p for p in projects}
 
-    # Resolve departments for projects
-    proj_dept_ids = {p.department_id for p in projects}
-    departments = (
-        await Department.find(
-            {"_id": {"$in": [ObjectId(did) for did in proj_dept_ids if ObjectId.is_valid(did)]}}
-        ).to_list()
-        if proj_dept_ids
-        else []
-    )
-    dept_map = {str(d.id): d.name for d in departments}
-
     # Resolve all member employee ids across page projects
     all_member_ids: set[str] = set()
     for pid in page_project_ids:
@@ -423,7 +412,7 @@ async def get_project_dashboard(
         proj = proj_map.get(pid)
         proj_name = proj.name if proj else "Unknown"
         proj_status = proj.status if proj else "UNKNOWN"
-        proj_dept = dept_map.get(proj.department_id, "Unknown") if proj else "Unknown"
+        proj_dept = (proj.client_name or "General") if proj else "Unknown"
 
         pd = project_data[pid]
         total_hours = pd["total_hours"]
@@ -542,3 +531,141 @@ async def get_allocation_dashboard(
     ]
 
     return {"period": period, "allocations": entries, "total": total}
+
+
+async def get_resource_allocation_dashboard(
+    period: str,
+    branch_location_id: str,
+    search: str | None = None,
+    classification: str | None = None,
+    client_name: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    """
+    Combined resource + allocation view.
+
+    One row per employee-project allocation.  Bench employees (no allocations)
+    get a single row with project/client = None.
+
+    Columns: Name, Project, Client, Allocation %, Billable Hrs,
+             Non-Billable Hrs, Classification, Availability (days).
+    """
+    # 1. Utilisation snapshots → classification + hours per employee
+    snap_filters: list = [
+        UtilisationSnapshot.branch_location_id == branch_location_id,
+        UtilisationSnapshot.period == period,
+        {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
+    ]
+    if classification:
+        snap_filters.append(UtilisationSnapshot.classification == classification)
+
+    snapshots = await UtilisationSnapshot.find(*snap_filters).to_list()
+    snap_map = {s.employee_id: s for s in snapshots}
+    branch_emp_ids = [s.employee_id for s in snapshots]
+
+    if not branch_emp_ids:
+        return {"period": period, "entries": [], "total": 0}
+
+    # 2. Allocations for those employees
+    allocations = await ProjectAllocation.find(
+        ProjectAllocation.period == period,
+        {"employee_id": {"$in": branch_emp_ids}},
+        ProjectAllocation.is_deleted != True,
+    ).to_list()
+
+    # 3. Timesheet hours per employee-project → billable vs non-billable
+    ts_entries = await TimesheetEntry.find(
+        TimesheetEntry.period == period,
+        TimesheetEntry.status != "rejected",
+        {"employee_id": {"$in": branch_emp_ids}},
+    ).to_list()
+
+    # employee_id → project_id → {billable, non_billable}
+    emp_proj_hours: dict[str, dict[str, dict[str, float]]] = defaultdict(
+        lambda: defaultdict(lambda: {"billable": 0.0, "non_billable": 0.0})
+    )
+    for t in ts_entries:
+        bucket = "billable" if t.is_billable else "non_billable"
+        emp_proj_hours[t.employee_id][t.project_id][bucket] += t.hours
+
+    # Also build employee-level totals for bench rows
+    emp_total_hours: dict[str, dict[str, float]] = defaultdict(
+        lambda: {"billable": 0.0, "non_billable": 0.0}
+    )
+    for t in ts_entries:
+        bucket = "billable" if t.is_billable else "non_billable"
+        emp_total_hours[t.employee_id][bucket] += t.hours
+
+    # 4. Resolve project client_name for allocations that don't have it
+    proj_ids = {a.project_id for a in allocations}
+    projects = (
+        await Project.find(
+            {"_id": {"$in": [ObjectId(pid) for pid in proj_ids if ObjectId.is_valid(pid)]}}
+        ).to_list()
+        if proj_ids
+        else []
+    )
+    proj_client_map = {str(p.id): p.client_name or "General" for p in projects}
+
+    # 5. Build rows
+    rows: list[dict] = []
+    employees_with_alloc: set[str] = set()
+
+    for a in allocations:
+        snap = snap_map.get(a.employee_id)
+        if not snap:
+            continue  # not in branch or filtered out by classification
+        employees_with_alloc.add(a.employee_id)
+
+        hours = emp_proj_hours.get(a.employee_id, {}).get(a.project_id, {"billable": 0.0, "non_billable": 0.0})
+        client = a.client_name or proj_client_map.get(a.project_id, "General")
+
+        rows.append({
+            "employee_id": a.employee_id,
+            "employee_name": a.employee_name or snap.employee_name,
+            "project_name": a.project_name,
+            "client_name": client,
+            "allocation_percentage": a.allocation_percentage,
+            "billable_hours": round(hours["billable"], 1),
+            "non_billable_hours": round(hours["non_billable"], 1),
+            "classification": snap.classification,
+            "available_days": a.available_days,
+        })
+
+    # Bench / unallocated employees
+    for snap in snapshots:
+        if snap.employee_id in employees_with_alloc:
+            continue
+        totals = emp_total_hours.get(snap.employee_id, {"billable": 0.0, "non_billable": 0.0})
+        # available_days = total working days (default 22) since no allocation
+        rows.append({
+            "employee_id": snap.employee_id,
+            "employee_name": snap.employee_name,
+            "project_name": None,
+            "client_name": None,
+            "allocation_percentage": 0.0,
+            "billable_hours": round(totals["billable"], 1),
+            "non_billable_hours": round(totals["non_billable"], 1),
+            "classification": snap.classification,
+            "available_days": 22.0,
+        })
+
+    # 6. Filters
+    if search:
+        sl = search.lower()
+        rows = [
+            r for r in rows
+            if sl in r["employee_name"].lower()
+            or (r["project_name"] and sl in r["project_name"].lower())
+            or (r["client_name"] and sl in r["client_name"].lower())
+        ]
+    if client_name:
+        cl = client_name.lower()
+        rows = [r for r in rows if r["client_name"] and cl in r["client_name"].lower()]
+
+    total = len(rows)
+    start = (page - 1) * page_size
+    page_rows = rows[start : start + page_size]
+
+    return {"period": period, "entries": page_rows, "total": total}

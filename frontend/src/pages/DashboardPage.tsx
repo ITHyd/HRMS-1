@@ -7,25 +7,30 @@ import { ExecutiveOverview } from "@/components/dashboard/ExecutiveOverview"
 import { ClassificationDonut } from "@/components/dashboard/ClassificationDonut"
 import { UtilisationTrendChart } from "@/components/dashboard/UtilisationTrendChart"
 import { TopProjectsChart } from "@/components/dashboard/TopProjectsChart"
-import { ResourceTable } from "@/components/dashboard/ResourceTable"
 import { ProjectHealthTable } from "@/components/dashboard/ProjectHealthTable"
-import { AllocationsTable } from "@/components/dashboard/AllocationsTable"
+import { ResourceAllocationTable } from "@/components/dashboard/ResourceAllocationTable"
+import { SelectDropdown } from "@/components/shared/SelectDropdown"
 import {
   getExecutiveDashboard,
-  getResourceDashboard,
   getProjectDashboard,
-  getAllocationDashboard,
+  getResourceAllocationDashboard,
 } from "@/api/dashboard"
-import type { ExecutiveDashboard, AllocationEntry } from "@/types/dashboard"
-import type { ResourceDashboardEntry, ProjectDashboardEntry } from "@/types/dashboard"
+import { useOrgChartStore } from "@/store/orgChartStore"
+import type { ExecutiveDashboard, ResourceAllocationEntry, ProjectDashboardEntry } from "@/types/dashboard"
 
-type TabKey = "executive" | "resources" | "projects" | "allocations"
+type TabKey = "executive" | "resources" | "projects"
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "executive", label: "Executive" },
   { key: "resources", label: "Resources" },
   { key: "projects", label: "Projects" },
-  { key: "allocations", label: "Allocations" },
+]
+
+const CLASSIFICATION_OPTIONS = [
+  { value: "", label: "All Classifications" },
+  { value: "fully_billed", label: "Fully Billed" },
+  { value: "partially_billed", label: "Partially Billed" },
+  { value: "bench", label: "Bench" },
 ]
 
 const AVAILABILITY_COLORS: Record<string, string> = {
@@ -47,14 +52,26 @@ function getCurrentPeriod(): string {
 
 
 export function DashboardPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod())
+  const setDrawerPeriod = useOrgChartStore((s) => s.setDrawerPeriod)
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    const p = getCurrentPeriod()
+    return p
+  })
   const [activeTab, setActiveTab] = useState<TabKey>("executive")
   const [loading, setLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
 
+  // Keep drawer period in sync with dashboard period
+  useEffect(() => {
+    setDrawerPeriod(selectedPeriod)
+    return () => setDrawerPeriod(null)
+  }, [selectedPeriod, setDrawerPeriod])
+
   // Filter state
   const [searchInput, setSearchInput] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [classificationFilter, setClassificationFilter] = useState("")
+  const [clientFilter, setClientFilter] = useState("")
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleSearchInput = (value: string) => {
@@ -63,27 +80,21 @@ export function DashboardPage() {
     debounceRef.current = setTimeout(() => {
       setSearchQuery(value)
       setResourcePage(1)
-      setAllocationPage(1)
     }, 300)
   }
 
   // Executive tab state
   const [executiveData, setExecutiveData] = useState<ExecutiveDashboard | null>(null)
 
-  // Resources tab state
-  const [resourceEntries, setResourceEntries] = useState<ResourceDashboardEntry[]>([])
+  // Resources tab state (combined resource + allocation)
+  const [resourceEntries, setResourceEntries] = useState<ResourceAllocationEntry[]>([])
   const [resourceTotal, setResourceTotal] = useState(0)
   const [resourcePage, setResourcePage] = useState(1)
   const [resourcePageSize, setResourcePageSize] = useState(20)
+  const [clientOptions, setClientOptions] = useState<string[]>([])
 
   // Projects tab state
   const [projectEntries, setProjectEntries] = useState<ProjectDashboardEntry[]>([])
-
-  // Allocations tab state
-  const [allocationEntries, setAllocationEntries] = useState<AllocationEntry[]>([])
-  const [allocationTotal, setAllocationTotal] = useState(0)
-  const [allocationPage, setAllocationPage] = useState(1)
-  const [allocationPageSize, setAllocationPageSize] = useState(20)
 
   const fetchExecutiveData = useCallback(async (period: string) => {
     setLoading(true)
@@ -99,20 +110,29 @@ export function DashboardPage() {
   }, [])
 
   const fetchResourceData = useCallback(
-    async (period: string, search?: string, classification?: string, page?: number, pageSize?: number) => {
+    async (period: string, search?: string, classification?: string, client?: string, page?: number, pageSize?: number) => {
       setLoading(true)
       try {
-        const data = await getResourceDashboard({
+        const data = await getResourceAllocationDashboard({
           period,
           search: search || undefined,
           classification: classification || undefined,
+          client_name: client || undefined,
           page: page || 1,
           page_size: pageSize || 20,
         })
         setResourceEntries(data.entries)
         setResourceTotal(data.total)
+        // Extract unique client names for the filter dropdown
+        const uniqueClients = Array.from(
+          new Set(data.entries.map((e) => e.client_name).filter(Boolean) as string[])
+        ).sort()
+        setClientOptions((prev) => {
+          const merged = Array.from(new Set([...prev, ...uniqueClients])).sort()
+          return merged
+        })
       } catch (err) {
-        console.error("Failed to load resource dashboard:", err)
+        console.error("Failed to load resource allocation dashboard:", err)
         setResourceEntries([])
         setResourceTotal(0)
       } finally {
@@ -135,42 +155,16 @@ export function DashboardPage() {
     }
   }, [])
 
-  const fetchAllocationData = useCallback(
-    async (period: string, search?: string, page?: number, pageSize?: number) => {
-      setLoading(true)
-      try {
-        const data = await getAllocationDashboard({
-          period,
-          search: search || undefined,
-          page: page || 1,
-          page_size: pageSize || 20,
-        })
-        setAllocationEntries(data.allocations)
-        setAllocationTotal(data.total)
-      } catch (err) {
-        console.error("Failed to load allocation dashboard:", err)
-        setAllocationEntries([])
-        setAllocationTotal(0)
-      } finally {
-        setLoading(false)
-      }
-    },
-    []
-  )
-
   useEffect(() => {
     switch (activeTab) {
       case "executive":
         fetchExecutiveData(selectedPeriod)
         break
       case "resources":
-        fetchResourceData(selectedPeriod, searchQuery, undefined, resourcePage, resourcePageSize)
+        fetchResourceData(selectedPeriod, searchQuery, classificationFilter, clientFilter, resourcePage, resourcePageSize)
         break
       case "projects":
         fetchProjectData(selectedPeriod)
-        break
-      case "allocations":
-        fetchAllocationData(selectedPeriod, searchQuery, allocationPage, allocationPageSize)
         break
     }
   }, [
@@ -179,19 +173,19 @@ export function DashboardPage() {
     fetchExecutiveData,
     fetchResourceData,
     fetchProjectData,
-    fetchAllocationData,
     searchQuery,
+    classificationFilter,
+    clientFilter,
     resourcePage,
     resourcePageSize,
-    allocationPage,
-    allocationPageSize,
   ])
 
   const resetFilters = () => {
     setSearchInput("")
     setSearchQuery("")
+    setClassificationFilter("")
+    setClientFilter("")
     setResourcePage(1)
-    setAllocationPage(1)
   }
 
   const handlePeriodChange = (period: string) => {
@@ -211,7 +205,7 @@ export function DashboardPage() {
         const q = searchQuery.toLowerCase()
         return (
           p.project_name.toLowerCase().includes(q) ||
-          (p.department || "").toLowerCase().includes(q) ||
+          (p.client_name || "").toLowerCase().includes(q) ||
           (p.members || []).some((m) => m.employee_name.toLowerCase().includes(q))
         )
       })
@@ -288,16 +282,14 @@ export function DashboardPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-4 flex-wrap">
-              {/* Search — all non-executive tabs */}
+              {/* Search */}
               <div className="relative w-56">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
                   placeholder={
                     activeTab === "resources"
-                      ? "Search name, designation, dept..."
-                      : activeTab === "projects"
-                      ? "Search project, department, member..."
-                      : "Search employee, project, client..."
+                      ? "Search name, project, client..."
+                      : "Search project, client, member..."
                   }
                   value={searchInput}
                   onChange={(e) => handleSearchInput(e.target.value)}
@@ -305,8 +297,33 @@ export function DashboardPage() {
                 />
               </div>
 
+              {/* Classification filter — resources tab only */}
+              {activeTab === "resources" && (
+                <SelectDropdown
+                  value={classificationFilter}
+                  onChange={(v) => { setClassificationFilter(v); setResourcePage(1) }}
+                  options={CLASSIFICATION_OPTIONS}
+                  placeholder="All Classifications"
+                  maxVisible={5}
+                />
+              )}
+
+              {/* Client filter — resources tab only */}
+              {activeTab === "resources" && clientOptions.length > 0 && (
+                <SelectDropdown
+                  value={clientFilter}
+                  onChange={(v) => { setClientFilter(v); setResourcePage(1) }}
+                  options={[
+                    { value: "", label: "All Clients" },
+                    ...clientOptions.map((c) => ({ value: c, label: c })),
+                  ]}
+                  placeholder="All Clients"
+                  maxVisible={5}
+                />
+              )}
+
               {/* Clear */}
-              {searchQuery && (
+              {(searchQuery || classificationFilter || clientFilter) && (
                 <button
                   onClick={resetFilters}
                   className="cursor-pointer inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -391,41 +408,21 @@ export function DashboardPage() {
             </div>
           )}
 
-          {/* Resources Tab */}
+          {/* Resources Tab (combined resource + allocation) */}
           {activeTab === "resources" && (
-            <ResourceTable
+            <ResourceAllocationTable
               entries={resourceEntries}
-              onSearch={() => {}}
-              searchQuery=""
-              classification=""
-              onClassificationChange={() => {}}
               total={resourceTotal}
               page={resourcePage}
               pageSize={resourcePageSize}
               onPageChange={setResourcePage}
               onPageSizeChange={(size) => { setResourcePageSize(size); setResourcePage(1) }}
-              hideInlineFilters
             />
           )}
 
           {/* Projects Tab */}
           {activeTab === "projects" && (
             <ProjectHealthTable projects={filteredProjects} />
-          )}
-
-          {/* Allocations Tab */}
-          {activeTab === "allocations" && (
-            <AllocationsTable
-              entries={allocationEntries}
-              onSearch={() => {}}
-              searchQuery=""
-              total={allocationTotal}
-              page={allocationPage}
-              pageSize={allocationPageSize}
-              onPageChange={setAllocationPage}
-              onPageSizeChange={(size) => { setAllocationPageSize(size); setAllocationPage(1) }}
-              hideInlineFilters
-            />
           )}
         </>
       )}

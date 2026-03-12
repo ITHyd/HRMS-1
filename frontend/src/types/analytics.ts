@@ -1,5 +1,5 @@
-export interface DepartmentCount {
-  department: string
+export interface ClientCount {
+  client: string
   count: number
 }
 
@@ -37,13 +37,13 @@ export interface ProjectSummary {
   name: string
   status: string
   member_count: number
-  department: string
+  client_name: string
 }
 
 export interface BranchAnalytics {
   total_headcount: number
   active_count: number
-  department_breakdown: DepartmentCount[]
+  client_breakdown: ClientCount[]
   level_breakdown: LevelCount[]
   monthly_trend: MonthlyTrend[]
   span_of_control: SpanOfControl[]

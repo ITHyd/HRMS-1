@@ -11,7 +11,7 @@ from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
 
 
-async def get_employee_detail(employee_id: str, requester_branch_location_id: str):
+async def get_employee_detail(employee_id: str, requester_branch_location_id: str, period: str | None = None):
     emp = await Employee.get(employee_id)
     if not emp:
         return None
@@ -134,14 +134,20 @@ async def get_employee_detail(employee_id: str, requester_branch_location_id: st
             for s in skills
         ]
 
-    # Utilisation — latest snapshot (own branch only)
+    # Utilisation — snapshot for requested period, or latest (own branch only)
     if is_own_branch:
-        latest_util = await UtilisationSnapshot.find(
-            UtilisationSnapshot.employee_id == employee_id,
-        ).sort([("period", -1)]).limit(1).to_list()
+        if period:
+            util_list = await UtilisationSnapshot.find(
+                UtilisationSnapshot.employee_id == employee_id,
+                UtilisationSnapshot.period == period,
+            ).limit(1).to_list()
+        else:
+            util_list = await UtilisationSnapshot.find(
+                UtilisationSnapshot.employee_id == employee_id,
+            ).sort([("period", -1)]).limit(1).to_list()
 
-        if latest_util:
-            u = latest_util[0]
+        if util_list:
+            u = util_list[0]
             result["utilisation"] = {
                 "period": u.period,
                 "utilisation_percent": u.utilisation_percent,
@@ -153,13 +159,15 @@ async def get_employee_detail(employee_id: str, requester_branch_location_id: st
                 "classification": u.classification,
             }
 
-    # Timesheet summary — current period (own branch only)
+    # Timesheet summary — requested period or current period (own branch only)
     if is_own_branch:
-        now = datetime.now(timezone.utc)
-        current_period = f"{now.year:04d}-{now.month:02d}"
+        ts_period = period
+        if not ts_period:
+            now = datetime.now(timezone.utc)
+            ts_period = f"{now.year:04d}-{now.month:02d}"
         ts_entries = await TimesheetEntry.find(
             TimesheetEntry.employee_id == employee_id,
-            TimesheetEntry.period == current_period,
+            TimesheetEntry.period == ts_period,
             TimesheetEntry.status != "rejected",
         ).to_list()
 
@@ -167,7 +175,7 @@ async def get_employee_detail(employee_id: str, requester_branch_location_id: st
             total_hours = sum(e.hours for e in ts_entries)
             billable_hours = sum(e.hours for e in ts_entries if e.is_billable)
             result["timesheet_summary"] = {
-                "period": current_period,
+                "period": ts_period,
                 "total_hours": round(total_hours, 2),
                 "billable_hours": round(billable_hours, 2),
                 "entry_count": len(ts_entries),

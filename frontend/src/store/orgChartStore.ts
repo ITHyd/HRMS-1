@@ -34,6 +34,8 @@ interface OrgChartState {
   focusEmployeeId: string | null
   focusEmployee: (id: string) => void
   clearFocusEmployee: () => void
+  drawerPeriod: string | null
+  setDrawerPeriod: (period: string | null) => void
 }
 
 export const useOrgChartStore = create<OrgChartState>((set, get) => ({
@@ -48,6 +50,7 @@ export const useOrgChartStore = create<OrgChartState>((set, get) => ({
   isLoading: false,
   showSecondaryEdges: true,
   focusEmployeeId: null,
+  drawerPeriod: null,
 
   setTreeData: (data) => set({ treeData: data }),
 
@@ -130,4 +133,6 @@ export const useOrgChartStore = create<OrgChartState>((set, get) => ({
   },
 
   clearFocusEmployee: () => set({ focusEmployeeId: null }),
+
+  setDrawerPeriod: (period) => set({ drawerPeriod: period }),
 }))

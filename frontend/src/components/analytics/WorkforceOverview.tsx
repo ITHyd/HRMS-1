@@ -5,7 +5,7 @@ import type { BranchAnalytics } from "@/types/analytics"
 export function WorkforceOverview({ data }: { data: BranchAnalytics }) {
   const stats = [
     { label: "Total Headcount", value: data.total_headcount, icon: Users, color: "text-blue-600" },
-    { label: "Departments", value: data.department_breakdown.length, icon: Building2, color: "text-green-600" },
+    { label: "Clients", value: data.client_breakdown.length, icon: Building2, color: "text-green-600" },
     { label: "Hierarchy Depth", value: data.hierarchy_depth, icon: Layers, color: "text-amber-600" },
     { label: "Cross Reports", value: data.cross_reports.length, icon: GitBranch, color: "text-purple-600" },
   ]

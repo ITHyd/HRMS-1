@@ -26,30 +26,23 @@ async def get_branch_analytics(location_id: str):
     total_headcount = len(employees)
     emp_ids = {str(e.id) for e in employees}
 
-    # Department breakdown (from both employees and projects)
-    dept_counts = defaultdict(int)
-    
-    # Count employees by department
-    for emp in employees:
-        dept = dept_map.get(emp.department_id)
-        dept_name = dept.name if dept else "Unknown"
-        dept_counts[dept_name] += 1
-    
-    # Get all projects to include their departments in the breakdown
-    all_projects = await Project.find_all().to_list()
-    
-    # Add all project departments to the breakdown (with 0 employees if not already counted)
-    for proj in all_projects:
-        dept = dept_map.get(proj.department_id)
-        if dept:
-            dept_name = dept.name
-            # Only add if not already counted (this ensures we don't overwrite employee counts)
-            if dept_name not in dept_counts:
-                dept_counts[dept_name] = 0
-    
-    department_breakdown = [
-        {"department": k, "count": v} for k, v in sorted(dept_counts.items())
-    ]
+    # Client breakdown — count employees per client (via project assignments)
+    emp_projs_for_clients = await EmployeeProject.find(
+        {"employee_id": {"$in": list(emp_ids)}}
+    ).to_list()
+    all_projects_list = await Project.find_all().to_list()
+    proj_client_map = {str(p.id): p.client_name or "General" for p in all_projects_list}
+
+    client_counts: dict[str, set[str]] = defaultdict(set)
+    for ep in emp_projs_for_clients:
+        client = proj_client_map.get(ep.project_id, "General")
+        client_counts[client].add(ep.employee_id)
+
+    client_breakdown = sorted(
+        [{"client": k, "count": len(v)} for k, v in client_counts.items()],
+        key=lambda x: x["count"],
+        reverse=True,
+    )
 
     # Level breakdown
     level_order = ["intern", "junior", "mid", "senior", "lead", "manager", "head", "director", "vp", "c-suite"]
@@ -175,13 +168,9 @@ async def get_branch_analytics(location_id: str):
                     "relationship_type": "PRIMARY",
                 })
 
-    # Projects - show all projects, not just those with employees from this branch
-    emp_projs = await EmployeeProject.find(
-        {"employee_id": {"$in": list(emp_ids)}}
-    ).to_list()
-    
-    all_projects = await Project.find_all().to_list()
-    proj_map = {str(p.id): p for p in all_projects}
+    # Projects - reuse earlier queries
+    emp_projs = emp_projs_for_clients
+    proj_map = {str(p.id): p for p in all_projects_list}
 
     proj_member_count = defaultdict(int)
     for ep in emp_projs:
@@ -189,13 +178,12 @@ async def get_branch_analytics(location_id: str):
 
     project_summaries = []
     for pid, proj in proj_map.items():
-        dept = dept_map.get(proj.department_id)
         project_summaries.append({
             "id": pid,
             "name": proj.name,
             "status": proj.status,
             "member_count": proj_member_count.get(pid, 0),
-            "department": dept.name if dept else "Unknown",
+            "client_name": proj.client_name or "General",
         })
 
     # Orphaned projects (projects with no employees assigned from any branch)
@@ -204,19 +192,18 @@ async def get_branch_analytics(location_id: str):
     orphaned = []
     for proj in all_projects:
         if str(proj.id) not in assigned_project_ids:
-            dept = dept_map.get(proj.department_id)
             orphaned.append({
                 "id": str(proj.id),
                 "name": proj.name,
                 "status": proj.status,
                 "member_count": 0,
-                "department": dept.name if dept else "Unknown",
+                "client_name": proj.client_name or "General",
             })
 
     return {
         "total_headcount": total_headcount,
         "active_count": total_headcount,
-        "department_breakdown": department_breakdown,
+        "client_breakdown": client_breakdown,
         "level_breakdown": level_breakdown,
         "monthly_trend": monthly_trend,
         "span_of_control": span_data,

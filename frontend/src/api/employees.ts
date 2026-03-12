@@ -2,8 +2,10 @@ import client from "./client"
 import type { EmployeeDetail, EmployeeMasterEntry } from "@/types/employee"
 import type { SearchResult } from "@/types/api"
 
-export async function getEmployee(id: string): Promise<EmployeeDetail> {
-  const res = await client.get<EmployeeDetail>(`/employees/${id}`)
+export async function getEmployee(id: string, period?: string): Promise<EmployeeDetail> {
+  const res = await client.get<EmployeeDetail>(`/employees/${id}`, {
+    params: period ? { period } : undefined,
+  })
   return res.data
 }
 

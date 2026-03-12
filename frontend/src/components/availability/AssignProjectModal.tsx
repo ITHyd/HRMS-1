@@ -189,7 +189,7 @@ export function AssignProjectModal({
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{proj.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {proj.department_name} · {proj.member_count} members
+                          {proj.client_name} · {proj.member_count} members
                         </p>
                       </div>
                       <Badge

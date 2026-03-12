@@ -201,7 +201,7 @@ async def _export_projects(branch_location_id: str) -> dict:
             "project_id": str(proj.id),
             "name": proj.name,
             "status": proj.status,
-            "department": dept_map.get(proj.department_id, "Unknown"),
+            "client_name": proj.client_name or "General",
             "start_date": proj.start_date.isoformat() if proj.start_date else None,
             "end_date": proj.end_date.isoformat() if proj.end_date else None,
         })
