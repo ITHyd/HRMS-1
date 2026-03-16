@@ -23,7 +23,7 @@ export function CrossReportingView({ data }: { data: CrossReport[] }) {
                 onClick={() => selectEmployee(cr.employee_id)}
                 className="cursor-pointer flex-1 min-w-0 text-left group"
               >
-                <p className="text-sm font-medium truncate text-primary group-hover:underline">
+                <p className="text-sm font-medium truncate text-foreground group-hover:underline">
                   {cr.employee_name}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
@@ -37,7 +37,7 @@ export function CrossReportingView({ data }: { data: CrossReport[] }) {
                 onClick={() => selectEmployee(cr.external_manager_id)}
                 className="cursor-pointer flex-1 min-w-0 text-right group"
               >
-                <p className="text-sm font-medium truncate text-primary group-hover:underline">
+                <p className="text-sm font-medium truncate text-foreground group-hover:underline">
                   {cr.external_manager_name}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">

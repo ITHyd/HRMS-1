@@ -85,7 +85,7 @@ export function AllocationsTable({
                     className="border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer group"
                   >
                     <td className="py-2.5 pr-4">
-                      <span className="font-medium text-primary group-hover:underline">{entry.employee_name}</span>
+                      <span className="font-medium text-foreground group-hover:underline">{entry.employee_name}</span>
                     </td>
                     <td className="py-2.5 pr-4 text-muted-foreground">{entry.project_name}</td>
                     <td className="py-2.5 pr-4 text-muted-foreground">{entry.client_name || "-"}</td>

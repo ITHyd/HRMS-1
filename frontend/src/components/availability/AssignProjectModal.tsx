@@ -137,7 +137,7 @@ export function AssignProjectModal({
             onClick={() => setTab("existing")}
             className={`cursor-pointer px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === "existing"
-                ? "border-primary text-primary"
+                ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -148,7 +148,7 @@ export function AssignProjectModal({
             onClick={() => setTab("new")}
             className={`cursor-pointer px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === "new"
-                ? "border-primary text-primary"
+                ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -277,7 +277,7 @@ export function AssignProjectModal({
                   onClick={() => setRole(r)}
                   className={`cursor-pointer rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
                     role === r
-                      ? "border-primary bg-primary/10 text-primary"
+                      ? "border-primary bg-primary/10 text-foreground"
                       : "hover:bg-muted"
                   }`}
                 >

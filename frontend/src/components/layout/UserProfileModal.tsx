@@ -58,7 +58,7 @@ export function UserProfileModal({ employeeId, isOpen, onClose }: UserProfileMod
               <div className="flex items-start gap-6">
                 {/* Profile Avatar */}
                 <div className="flex-shrink-0">
-                  <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center text-primary text-3xl font-bold border-4 border-white shadow-lg">
+                  <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center text-foreground text-3xl font-bold border-4 border-white shadow-lg">
                     {employee.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
                   </div>
                 </div>
@@ -200,7 +200,7 @@ export function UserProfileModal({ employeeId, isOpen, onClose }: UserProfileMod
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="p-3 bg-gray-50 rounded-lg text-center">
-                      <p className="text-2xl font-bold text-primary">
+                      <p className="text-2xl font-bold text-foreground">
                         {employee.utilisation.utilisation_percent}%
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Utilisation</p>

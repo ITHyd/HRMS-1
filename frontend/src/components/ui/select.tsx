@@ -175,7 +175,7 @@ function Select({
                   >
                     <span className="w-4 shrink-0 flex items-center justify-center">
                       {isSelected && (
-                        <Check className="h-3.5 w-3.5 text-primary" />
+                        <Check className="h-3.5 w-3.5 text-foreground" />
                       )}
                     </span>
 

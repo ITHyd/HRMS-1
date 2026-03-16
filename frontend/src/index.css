@@ -1,40 +1,59 @@
 @import "tailwindcss";
 
 @theme {
+  /* ── NxZen Brand Palette ─────────────────────────────── */
+  /* Deep Space Black: #030304 | Lumen Green: #8DE971      */
+  /* Iridescent Pearl: #F6F2F4 | Neon Violet: #AD96DC      */
+
   --color-background: #ffffff;
-  --color-foreground: #0a0a0a;
+  --color-foreground: #030304;
   --color-card: #ffffff;
-  --color-card-foreground: #0a0a0a;
+  --color-card-foreground: #030304;
   --color-popover: #ffffff;
-  --color-popover-foreground: #0a0a0a;
-  --color-primary: #171717;
-  --color-primary-foreground: #fafafa;
-  --color-secondary: #f5f5f5;
-  --color-secondary-foreground: #171717;
-  --color-muted: #f5f5f5;
-  --color-muted-foreground: #737373;
-  --color-accent: #f5f5f5;
-  --color-accent-foreground: #171717;
+  --color-popover-foreground: #030304;
+
+  /* Primary = Lumen Green */
+  --color-primary: #8DE971;
+  --color-primary-foreground: #030304;
+
+  /* Secondary = Iridescent Pearl */
+  --color-secondary: #F6F2F4;
+  --color-secondary-foreground: #030304;
+
+  /* Muted */
+  --color-muted: #F6F2F4;
+  --color-muted-foreground: #6b7280;
+
+  /* Accent = Neon Violet */
+  --color-accent: #AD96DC;
+  --color-accent-foreground: #030304;
+
+  /* Destructive */
   --color-destructive: #ef4444;
-  --color-destructive-foreground: #fafafa;
-  --color-border: #e5e5e5;
-  --color-input: #e5e5e5;
-  --color-ring: #0a0a0a;
+  --color-destructive-foreground: #ffffff;
+
+  /* Borders & inputs */
+  --color-border: #e8e4e6;
+  --color-input: #e8e4e6;
+  --color-ring: #8DE971;
+
   --radius: 0.5rem;
 
-  --color-sidebar-background: #fafafa;
-  --color-sidebar-foreground: #3f3f46;
-  --color-sidebar-primary: #171717;
-  --color-sidebar-primary-foreground: #fafafa;
-  --color-sidebar-accent: #f4f4f5;
-  --color-sidebar-accent-foreground: #171717;
-  --color-sidebar-border: #e4e4e7;
+  /* ── Sidebar — Deep Space Black ───────────────────────── */
+  --color-sidebar-background: #030304;
+  --color-sidebar-foreground: #F6F2F4;
+  --color-sidebar-primary: #8DE971;
+  --color-sidebar-primary-foreground: #030304;
+  --color-sidebar-accent: #1a1a1c;
+  --color-sidebar-accent-foreground: #F6F2F4;
+  --color-sidebar-border: #1f1f21;
 
-  --color-chart-1: #6366f1;
-  --color-chart-2: #22c55e;
+  /* ── Chart colors — brand-aligned ────────────────────── */
+  --color-chart-1: #8DE971;
+  --color-chart-2: #AD96DC;
   --color-chart-3: #f59e0b;
   --color-chart-4: #ef4444;
-  --color-chart-5: #8b5cf6;
+  --color-chart-5: #6366f1;
 }
 
 @utility scrollbar-hide {
@@ -101,7 +120,11 @@
   body {
     @apply bg-background text-foreground;
     margin: 0;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cormorant Garamond', 'Georgia', serif;
+    font-weight: 600;
   }
   #root {
     min-height: 100vh;

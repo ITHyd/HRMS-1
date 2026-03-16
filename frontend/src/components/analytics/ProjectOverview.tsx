@@ -25,7 +25,7 @@ export function ProjectOverview({
           <CardTitle className="text-base">Projects</CardTitle>
           <button
             onClick={() => navigate("/projects")}
-            className="cursor-pointer text-xs text-primary hover:underline"
+            className="cursor-pointer text-xs text-foreground hover:underline"
           >
             View all
           </button>
@@ -40,7 +40,7 @@ export function ProjectOverview({
               className="cursor-pointer w-full text-left flex items-center justify-between rounded-lg border px-3 py-2 hover:bg-muted/50 transition-colors group"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate text-primary group-hover:underline">
+                <p className="text-sm font-medium truncate text-foreground group-hover:underline">
                   {proj.name}
                 </p>
                 <p className="text-xs text-muted-foreground">{proj.client_name}</p>
@@ -69,7 +69,7 @@ export function ProjectOverview({
                   className="cursor-pointer w-full text-left flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 hover:bg-amber-100 transition-colors group"
                 >
                   <div>
-                    <p className="text-sm font-medium text-primary group-hover:underline">
+                    <p className="text-sm font-medium text-foreground group-hover:underline">
                       {proj.name}
                     </p>
                     <p className="text-xs text-muted-foreground">{proj.client_name}</p>

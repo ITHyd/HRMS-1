@@ -253,7 +253,7 @@ function ProjectSuggestionRow({ project, highlight }: { project: ProjectBrief; h
     >
       <div className="flex items-center gap-2 min-w-0">
         <span className="h-2 w-2 rounded-full shrink-0" style={{ background: URGENCY_COLOR[urgency] }} />
-        <span className="font-medium truncate group-hover:text-primary">{project.name}</span>
+        <span className="font-medium truncate group-hover:text-foreground">{project.name}</span>
       </div>
       <div className="flex items-center gap-2 shrink-0 text-muted-foreground">
         <span>{project.member_count} ppl</span>
@@ -367,7 +367,7 @@ function EmployeeDrawer({ emp, skills, onClose }: { emp: DrawerEmployee; skills:
             <Link
               to={`/projects/${emp.project_id}`}
               onClick={onClose}
-              className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+              className="text-sm font-medium text-foreground hover:underline flex items-center gap-1"
             >
               {emp.project_name}
               <ExternalLink className="h-3 w-3 shrink-0" />
@@ -961,7 +961,7 @@ export function ProjectTimelinePage() {
             onClick={() => setActiveTab(t.key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === t.key
-                ? "border-primary text-primary"
+                ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-border/70"
             }`}
           >
@@ -1132,7 +1132,7 @@ export function ProjectTimelinePage() {
               {windowFilter !== "all" && (
                 <button
                   onClick={() => setWindowFilter("all")}
-                  className="mt-1 text-xs text-primary hover:underline"
+                  className="mt-1 text-xs text-foreground hover:underline"
                 >
                   Show all time ranges
                 </button>
@@ -1229,7 +1229,7 @@ export function ProjectTimelinePage() {
                         const pu = getUrgency(p.end_date)
                         return (
                           <div key={p.id} className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-xs gap-2 transition-colors hover:bg-muted/70">
-                            <Link to={`/projects/${p.id}`} className="font-medium hover:text-primary transition-colors flex items-center gap-1 truncate">
+                            <Link to={`/projects/${p.id}`} className="font-medium hover:text-foreground transition-colors flex items-center gap-1 truncate">
                               {p.name} <ExternalLink className="h-3 w-3 shrink-0" />
                             </Link>
                             <div className="flex items-center gap-2 shrink-0">

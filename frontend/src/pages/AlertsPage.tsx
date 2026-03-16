@@ -93,7 +93,7 @@ export function AlertsPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <BellRing className="h-5 w-5 text-primary" />
+            <BellRing className="h-5 w-5 text-foreground" />
             Automated Alerts
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -179,7 +179,7 @@ export function AlertsPage() {
 
       {/* Email toggle info */}
       {emailEnabled && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-primary">
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-foreground">
           Daily email digest enabled — alerts will be sent each morning to the branch head on record.
         </div>
       )}

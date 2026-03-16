@@ -267,7 +267,7 @@ export function IntegrationPage() {
             onClick={() => setActiveTab(tab.key)}
             className={`cursor-pointer px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.key
-                ? "border-primary text-primary"
+                ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
             }`}
           >

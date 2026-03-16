@@ -81,7 +81,7 @@ export function TimesheetTable({
                 <td className="px-3 py-2.5">
                   <button
                     onClick={(e) => { e.stopPropagation(); selectEmployee(entry.employee_id) }}
-                    className="cursor-pointer font-medium text-primary hover:underline text-left"
+                    className="cursor-pointer font-medium text-foreground hover:underline text-left"
                   >
                     {entry.employee_name}
                   </button>

@@ -133,7 +133,7 @@ export function TimesheetEntryForm({
           type="checkbox"
           checked={billable}
           onChange={(e) => setBillable(e.target.checked)}
-          className="cursor-pointer h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+          className="cursor-pointer h-4 w-4 rounded border-gray-300 text-foreground focus:ring-primary"
         />
         <label className="text-sm font-medium leading-none" htmlFor="ts-billable">
           Billable

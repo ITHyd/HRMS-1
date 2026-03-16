@@ -524,11 +524,11 @@ async def sync_master_data(
             # Resolve location
             our_loc_id = loc_id_map.get(hloc_id, default_loc_id) if hloc_id else default_loc_id
 
-            # Parse join date
-            join_date = now
+            # Parse join date — None when HRMS has no doj
+            join_date = None
             if doj_raw:
                 try:
-                    join_date = datetime.fromisoformat(doj_raw.replace("Z", "+00:00"))
+                    join_date = datetime.fromisoformat(str(doj_raw).replace("Z", "+00:00"))
                 except Exception:
                     pass
 
@@ -1312,7 +1312,7 @@ async def _sync_master_data_impl(
                     "department_id": general_dept_id,
                     "level": ROLE_TO_LEVEL.get(hemp.get("role", "Employee"), "mid"),
                     "location_id": loc_id_map.get(_to_int(hemp.get("location_id"), -1), default_loc_id),
-                    "join_date": _source_updated_at(hemp.get("doj")) or now,
+                    "join_date": _source_updated_at(hemp.get("doj")),
                     "is_active": True,
                 },
                 now=now,

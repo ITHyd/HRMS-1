@@ -19,7 +19,7 @@ class Employee(Document):
     department_id: str
     level: str  # "intern", "junior", "mid", "senior", "lead", "manager", "head", "director", "vp", "c-suite"
     location_id: str
-    join_date: datetime
+    join_date: Optional[datetime] = None
     photo_url: Optional[str] = None
     is_active: bool = True
 
