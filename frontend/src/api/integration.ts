@@ -52,6 +52,11 @@ export async function retrySync(
   return res.data
 }
 
+export async function getSyncLogDetail(syncId: string): Promise<SyncLogEntry & { integration_config_id?: string; config_name?: string; user_id?: string; parent_sync_id?: string }> {
+  const res = await client.get(`/integrations/sync-logs/${syncId}`)
+  return res.data
+}
+
 export async function getSyncLogs(params?: {
   integration_type?: string
   page?: number

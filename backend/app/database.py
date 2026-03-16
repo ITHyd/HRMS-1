@@ -62,6 +62,15 @@ async def init_db():
     db = client[settings.DATABASE_NAME]
     await init_beanie(database=db, document_models=ALL_MODELS)
 
+    # Ensure finance integration config is active (was seeded as inactive in older versions)
+    finance_cfg = await IntegrationConfig.find_one(
+        IntegrationConfig.integration_type == "finance",
+        IntegrationConfig.status == "inactive",
+    )
+    if finance_cfg:
+        finance_cfg.status = "active"
+        await finance_cfg.save()
+
 
 async def close_db():
     pass

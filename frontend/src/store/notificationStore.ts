@@ -54,7 +54,16 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   clearAll: () => {
-    set({ dismissed: new Set() })
-    localStorage.removeItem(LS_KEY)
+    const summary = get().summary
+    if (!summary) return
+    const all = new Set<string>()
+    for (const e of summary.details.bench_long) all.add(`bench_long:${e.employee_id}`)
+    all.add("bench_long:_summary")
+    for (const p of summary.details.project_ending) all.add(`project_ending:${p.project_id}`)
+    all.add("project_ending:_summary")
+    for (const b of summary.details.billable_low) all.add(`billable_low:${b.metric}`)
+    for (const s of summary.details.recent_syncs ?? []) all.add(`recent_syncs:${s.sync_id}`)
+    saveDismissed(all)
+    set({ dismissed: all })
   },
 }))
