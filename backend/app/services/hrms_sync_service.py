@@ -17,6 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import bcrypt
+from pymongo import UpdateOne
 
 from app.config import settings
 from app.models.attendance_summary import AttendanceSummary
@@ -270,6 +271,13 @@ async def _resolve_hrms_auth(
     return access_token, hr_id, base_url
 
 
+async def get_auth_token(integration_config_id: str | None = None) -> str:
+    """Resolve HRMS auth token (logs in if needed). Reuse to avoid duplicate logins."""
+    cfg_doc, hrms_cfg = await get_hrms_integration_config(integration_config_id)
+    token, _, _ = await _resolve_hrms_auth(None, hrms_cfg)
+    return token
+
+
 def _recent_periods(anchor_period: str, months: int) -> list[str]:
     """
     Return a chronological list of periods ending at anchor_period.
@@ -343,6 +351,97 @@ async def _upsert_by_source(
     )
     await new_doc.insert()
     return new_doc, True
+
+
+async def _bulk_upsert_by_source(
+    model_cls,
+    items: list[dict],
+    now: datetime,
+) -> list[tuple]:
+    """
+    Batch version of _upsert_by_source.
+
+    Each item in `items` is a dict with keys:
+      - source_id: str
+      - payload: dict
+      - source_updated_at: datetime | None (optional)
+      - fallback_filters: list[dict] (optional)
+
+    Returns list of (doc, created_bool) in same order as items.
+    """
+    if not items:
+        return []
+
+    # 1. Bulk fetch ALL existing docs by source_system + source_id (one query)
+    all_source_ids = [it["source_id"] for it in items]
+    existing = await model_cls.find(
+        {"source_system": SOURCE_SYSTEM, "source_id": {"$in": all_source_ids}}
+    ).to_list()
+    by_source = {doc.source_id: doc for doc in existing}
+
+    # 2. Match each item; fallback for unmatched
+    matched: dict[int, Any] = {}  # index -> existing doc
+    for i, item in enumerate(items):
+        doc = by_source.get(item["source_id"])
+        if not doc:
+            for f in item.get("fallback_filters") or []:
+                doc = await model_cls.find_one(f)
+                if doc:
+                    break
+        if doc:
+            matched[i] = doc
+
+    # 3. Bulk update matched docs via pymongo bulk_write
+    if matched:
+        ops = []
+        for i, doc in matched.items():
+            item = items[i]
+            update_fields = {
+                **item["payload"],
+                "source_system": SOURCE_SYSTEM,
+                "source_id": item["source_id"],
+                "last_synced_at": now,
+                "is_deleted": False,
+            }
+            if item.get("source_updated_at"):
+                update_fields["source_updated_at"] = item["source_updated_at"]
+            ops.append(UpdateOne({"_id": doc.id}, {"$set": update_fields}))
+        collection = model_cls.get_pymongo_collection()
+        await collection.bulk_write(ops, ordered=False)
+
+    # 4. Bulk insert new docs
+    to_insert_indices = [i for i in range(len(items)) if i not in matched]
+    new_docs: list[tuple[int, Any]] = []
+    for i in to_insert_indices:
+        item = items[i]
+        doc_kwargs = {
+            **item["payload"],
+            "source_system": SOURCE_SYSTEM,
+            "source_id": item["source_id"],
+            "last_synced_at": now,
+            "is_deleted": False,
+        }
+        if item.get("source_updated_at"):
+            doc_kwargs["source_updated_at"] = item["source_updated_at"]
+        new_doc = model_cls(**doc_kwargs)
+        new_docs.append((i, new_doc))
+
+    if new_docs:
+        docs_to_insert = [doc for _, doc in new_docs]
+        insert_result = await model_cls.insert_many(docs_to_insert)
+        # Beanie insert_many does NOT populate IDs on the original objects,
+        # so we must set them manually from the result.
+        for doc, inserted_id in zip(docs_to_insert, insert_result.inserted_ids):
+            doc.id = inserted_id
+
+    # 5. Build results in same order as items
+    results: list[tuple] = [None] * len(items)
+    for i, doc in matched.items():
+        results[i] = (doc, False)
+    for i, doc in new_docs:
+        results[i] = (doc, True)
+
+    return results
 
 
 async def _soft_delete_missing(
@@ -1052,12 +1151,14 @@ async def trigger_live_sync(
     user_id: str,
     integration_config_id: str | None = None,
     months_backfill_override: int | None = None,
+    token: str | None = None,
 ) -> dict:
     return await _trigger_live_sync_impl(
         period=period,
         user_id=user_id,
         integration_config_id=integration_config_id,
         months_backfill_override=months_backfill_override,
+        token=token,
     )
 
     # Legacy implementation retained below for reference.
@@ -1222,11 +1323,14 @@ async def _sync_master_data_impl(
         access_token, _hr_id, base_url = await _resolve_hrms_auth(token, hrms_cfg)
         client = HrmsClient(base_url=base_url, token=access_token)
 
-        hrms_employees = await client.get_employees()
-        hrms_projects = await client.get_projects()
-        hrms_locations = await client.get_locations()
-        hrms_managers = await client.get_managers()
-        hrms_hrs = await client.get_hrs()
+        # Fetch all master data in parallel (independent HTTP calls)
+        hrms_employees, hrms_projects, hrms_locations, hrms_managers, hrms_hrs = await asyncio.gather(
+            client.get_employees(),
+            client.get_projects(),
+            client.get_locations(),
+            client.get_managers(),
+            client.get_hrs(),
+        )
         sync_log.total_records = len(hrms_employees) + len(hrms_projects) + len(hrms_locations)
 
         seen_loc_ids: set[str] = set()
@@ -1293,6 +1397,8 @@ async def _sync_master_data_impl(
         general_dept_id = dept_id_map.get("General", "")
         emp_name_to_hid: dict[str, int] = {}
         seen_emp_ids: set[str] = set()
+        emp_bulk_items: list[dict] = []
+        emp_bulk_meta: list[tuple[int, str]] = []  # (hid_int, name_str)
         for hemp in hrms_employees:
             entity_counts["employees"]["processed"] += 1
             hid = hemp.get("employeeId")
@@ -1301,10 +1407,9 @@ async def _sync_master_data_impl(
                 continue
             source_id = f"employee:{hid}"
             seen_emp_ids.add(source_id)
-            emp, created = await _upsert_by_source(
-                Employee,
-                source_id=source_id,
-                payload={
+            emp_bulk_items.append({
+                "source_id": source_id,
+                "payload": {
                     "hrms_employee_id": _to_int(hid, 0),
                     "name": hemp.get("name", "Unknown"),
                     "email": hemp.get("email", ""),
@@ -1315,12 +1420,14 @@ async def _sync_master_data_impl(
                     "join_date": _source_updated_at(hemp.get("doj")) or now,
                     "is_active": True,
                 },
-                now=now,
-                source_updated_at=_source_updated_at(hemp.get("updated_at")),
-                fallback_filters=[{"hrms_employee_id": _to_int(hid, 0)}],
-            )
-            emp_id_map[_to_int(hid, 0)] = str(emp.id)
-            emp_name_to_hid[str(hemp.get("name", ""))] = _to_int(hid, 0)
+                "source_updated_at": _source_updated_at(hemp.get("updated_at")),
+                "fallback_filters": [{"hrms_employee_id": _to_int(hid, 0)}],
+            })
+            emp_bulk_meta.append((_to_int(hid, 0), str(hemp.get("name", ""))))
+        emp_results = await _bulk_upsert_by_source(Employee, emp_bulk_items, now)
+        for (emp, created), (hid_int, name_str) in zip(emp_results, emp_bulk_meta):
+            emp_id_map[hid_int] = str(emp.id)
+            emp_name_to_hid[name_str] = hid_int
             if created:
                 entity_counts["employees"]["imported"] += 1
                 imported += 1
@@ -1341,6 +1448,8 @@ async def _sync_master_data_impl(
 
         seen_proj_ids: set[str] = set()
         assignment_rows: list[tuple[int, int, str]] = []
+        proj_bulk_items: list[dict] = []
+        proj_bulk_meta: list[int] = []  # hpid_int for each item
         for hproj in hrms_projects:
             entity_counts["projects"]["processed"] += 1
             hpid = hproj.get("project_id")
@@ -1349,10 +1458,9 @@ async def _sync_master_data_impl(
                 continue
             source_id = f"project:{hpid}"
             seen_proj_ids.add(source_id)
-            project, created = await _upsert_by_source(
-                Project,
-                source_id=source_id,
-                payload={
+            proj_bulk_items.append({
+                "source_id": source_id,
+                "payload": {
                     "hrms_project_id": _to_int(hpid, 0),
                     "name": hproj.get("project_name", "Unknown"),
                     "status": "ACTIVE" if str(hproj.get("status", "Active")).lower() == "active" else str(hproj.get("status")).upper(),
@@ -1361,22 +1469,25 @@ async def _sync_master_data_impl(
                     "start_date": _source_updated_at(hproj.get("start_date")) or now,
                     "end_date": _source_updated_at(hproj.get("end_date")),
                 },
-                now=now,
-                source_updated_at=_source_updated_at(hproj.get("updated_at")),
-                fallback_filters=[{"hrms_project_id": _to_int(hpid, 0)}],
-            )
-            proj_id_map[_to_int(hpid, 0)] = str(project.id)
+                "source_updated_at": _source_updated_at(hproj.get("updated_at")),
+                "fallback_filters": [{"hrms_project_id": _to_int(hpid, 0)}],
+            })
+            proj_bulk_meta.append(_to_int(hpid, 0))
+            for a in hproj.get("assignments") or []:
+                if a.get("employee_id"):
+                    assignment_rows.append((_to_int(a.get("employee_id"), 0), _to_int(hpid, 0), str(a.get("role") or "contributor")))
+        proj_results = await _bulk_upsert_by_source(Project, proj_bulk_items, now)
+        for (project, created), hpid_int in zip(proj_results, proj_bulk_meta):
+            proj_id_map[hpid_int] = str(project.id)
             if created:
                 entity_counts["projects"]["imported"] += 1
                 imported += 1
             else:
                 entity_counts["projects"]["updated"] += 1
-            for a in hproj.get("assignments") or []:
-                if a.get("employee_id"):
-                    assignment_rows.append((_to_int(a.get("employee_id"), 0), _to_int(hpid, 0), str(a.get("role") or "contributor")))
         entity_counts["projects"]["deleted"] = await _soft_delete_missing(Project, seen_proj_ids, now)
 
         seen_assignment_ids: set[str] = set()
+        assign_bulk_items: list[dict] = []
         for hemp_id, hproj_id, role in assignment_rows:
             entity_counts["assignments"]["processed"] += 1
             emp_id = emp_id_map.get(hemp_id)
@@ -1388,18 +1499,18 @@ async def _sync_master_data_impl(
                 entity_counts["assignments"]["failed"] += 1
                 _add_error(errors, entity="assignments", key=source_id, error="Missing employee/project mapping")
                 continue
-            _doc, created = await _upsert_by_source(
-                EmployeeProject,
-                source_id=source_id,
-                payload={
+            assign_bulk_items.append({
+                "source_id": source_id,
+                "payload": {
                     "employee_id": emp_id,
                     "project_id": proj_id,
                     "role_in_project": role_norm,
                     "assigned_at": now,
                 },
-                now=now,
-                fallback_filters=[{"employee_id": emp_id, "project_id": proj_id, "role_in_project": role_norm}],
-            )
+                "fallback_filters": [{"employee_id": emp_id, "project_id": proj_id, "role_in_project": role_norm}],
+            })
+        assign_results = await _bulk_upsert_by_source(EmployeeProject, assign_bulk_items, now)
+        for _doc, created in assign_results:
             if created:
                 entity_counts["assignments"]["imported"] += 1
                 imported += 1
@@ -1408,6 +1519,7 @@ async def _sync_master_data_impl(
         entity_counts["assignments"]["deleted"] = await _soft_delete_missing(EmployeeProject, seen_assignment_ids, now)
 
         seen_rel_ids: set[str] = set()
+        rel_bulk_items: list[dict] = []
         for hemp in hrms_employees:
             hid = _to_int(hemp.get("employeeId"), 0)
             emp_id = emp_id_map.get(hid)
@@ -1422,18 +1534,11 @@ async def _sync_master_data_impl(
                 source_id = f"reporting:{hid}:{mgr_hid}:{rel_type}"
                 seen_rel_ids.add(source_id)
                 entity_counts["relationships"]["processed"] += 1
-                _doc, created = await _upsert_by_source(
-                    ReportingRelationship,
-                    source_id=source_id,
-                    payload={"employee_id": emp_id, "manager_id": mgr_id, "type": rel_type},
-                    now=now,
-                    fallback_filters=[{"employee_id": emp_id, "manager_id": mgr_id, "type": rel_type}],
-                )
-                if created:
-                    entity_counts["relationships"]["imported"] += 1
-                    imported += 1
-                else:
-                    entity_counts["relationships"]["updated"] += 1
+                rel_bulk_items.append({
+                    "source_id": source_id,
+                    "payload": {"employee_id": emp_id, "manager_id": mgr_id, "type": rel_type},
+                    "fallback_filters": [{"employee_id": emp_id, "manager_id": mgr_id, "type": rel_type}],
+                })
             for name in hemp.get("hr", []) or []:
                 hr_hid = emp_name_to_hid.get(str(name))
                 hr_id = emp_id_map.get(hr_hid) if hr_hid else None
@@ -1443,18 +1548,18 @@ async def _sync_master_data_impl(
                 source_id = f"reporting:{hid}:{hr_hid}:{rel_type}"
                 seen_rel_ids.add(source_id)
                 entity_counts["relationships"]["processed"] += 1
-                _doc, created = await _upsert_by_source(
-                    ReportingRelationship,
-                    source_id=source_id,
-                    payload={"employee_id": emp_id, "manager_id": hr_id, "type": rel_type},
-                    now=now,
-                    fallback_filters=[{"employee_id": emp_id, "manager_id": hr_id, "type": rel_type}],
-                )
-                if created:
-                    entity_counts["relationships"]["imported"] += 1
-                    imported += 1
-                else:
-                    entity_counts["relationships"]["updated"] += 1
+                rel_bulk_items.append({
+                    "source_id": source_id,
+                    "payload": {"employee_id": emp_id, "manager_id": hr_id, "type": rel_type},
+                    "fallback_filters": [{"employee_id": emp_id, "manager_id": hr_id, "type": rel_type}],
+                })
+        rel_results = await _bulk_upsert_by_source(ReportingRelationship, rel_bulk_items, now)
+        for _doc, created in rel_results:
+            if created:
+                entity_counts["relationships"]["imported"] += 1
+                imported += 1
+            else:
+                entity_counts["relationships"]["updated"] += 1
         entity_counts["relationships"]["deleted"] = await _soft_delete_missing(ReportingRelationship, seen_rel_ids, now)
 
         # Keep User.branch_location_id (and employee_id) in sync after every master sync.
@@ -1638,6 +1743,7 @@ async def _sync_single_period_upsert(
         allocations_raw = {"employees": [], "total_working_days": 22}
 
     seen_attendance_ids: set[str] = set()
+    att_bulk_items: list[dict] = []
     for a in attendance_raw:
         counts["attendance"]["processed"] += 1
         hrms_eid = _to_int(a.get("employee_id"), -1)
@@ -1647,10 +1753,9 @@ async def _sync_single_period_upsert(
             continue
         source_id = f"attendance:{period}:{hrms_eid}"
         seen_attendance_ids.add(source_id)
-        _doc, created = await _upsert_by_source(
-            AttendanceSummary,
-            source_id=source_id,
-            payload={
+        att_bulk_items.append({
+            "source_id": source_id,
+            "payload": {
                 "period": period,
                 "employee_id": str(emp.id),
                 "hrms_employee_id": hrms_eid,
@@ -1662,9 +1767,10 @@ async def _sync_single_period_upsert(
                 "sync_batch_id": batch_id,
                 "synced_at": now,
             },
-            now=now,
-            fallback_filters=[{"period": period, "employee_id": str(emp.id)}],
-        )
+            "fallback_filters": [{"period": period, "employee_id": str(emp.id)}],
+        })
+    att_results = await _bulk_upsert_by_source(AttendanceSummary, att_bulk_items, now)
+    for _doc, created in att_results:
         if created:
             counts["attendance"]["imported"] += 1
         else:
@@ -1724,40 +1830,60 @@ async def _sync_single_period_upsert(
                 })
                 row["hours"] += hours
 
-    seen_timesheet_ids: set[str] = set()
+    seen_timesheet_ids: set[str] = set(timesheet_rows.keys())
+
+    # Pre-fetch existing timesheets for this period in 2 bulk queries (replaces N*2 find_one)
+    all_ts_source_ids = list(seen_timesheet_ids)
+    existing_by_source: dict[str, Any] = {}
+    if all_ts_source_ids:
+        ts_existing = await TimesheetEntry.find(
+            {"source_system": SOURCE_SYSTEM, "source_id": {"$in": all_ts_source_ids}}
+        ).to_list()
+        existing_by_source = {doc.source_id: doc for doc in ts_existing}
+
+    # Fallback lookup: timesheets from hrms_sync for this period (for first-time matching)
+    existing_by_fallback: dict[str, Any] = {}
+    unmatched_source_ids = [sid for sid in all_ts_source_ids if sid not in existing_by_source]
+    if unmatched_source_ids:
+        fallback_ts = await TimesheetEntry.find(
+            {"period": period, "source": "hrms_sync"}
+        ).to_list()
+        for doc in fallback_ts:
+            key = f"{doc.employee_id}:{doc.date}:{doc.project_id}"
+            existing_by_fallback[key] = doc
+
+    # Separate into updates and inserts
+    ts_update_ops: list[UpdateOne] = []
+    ts_inserts: list[Any] = []
     for source_id, row in timesheet_rows.items():
         counts["timesheets"]["processed"] += 1
-        seen_timesheet_ids.add(source_id)
-        existing = await TimesheetEntry.find_one(TimesheetEntry.source_system == SOURCE_SYSTEM, TimesheetEntry.source_id == source_id)
+        existing = existing_by_source.get(source_id)
         if not existing:
-            existing = await TimesheetEntry.find_one(
-                TimesheetEntry.period == period,
-                TimesheetEntry.source == "hrms_sync",
-                TimesheetEntry.employee_id == row["employee_id"],
-                TimesheetEntry.date == row["date"],
-                TimesheetEntry.project_id == row["project_id"],
-            )
+            fallback_key = f"{row['employee_id']}:{row['date']}:{row['project_id']}"
+            existing = existing_by_fallback.get(fallback_key)
+
         if existing:
-            existing.hours = round(float(row["hours"]), 2)
-            existing.is_billable = bool(row["is_billable"])
-            existing.description = row["description"]
-            existing.status = "approved"
-            existing.submitted_at = now
-            existing.approved_by = "system"
-            existing.approved_at = now
-            existing.source = "hrms_sync"
-            existing.sync_batch_id = batch_id
-            existing.period = period
-            existing.branch_location_id = row["branch_location_id"]
-            existing.updated_at = now
-            existing.source_system = SOURCE_SYSTEM
-            existing.source_id = source_id
-            existing.last_synced_at = now
-            existing.is_deleted = False
-            await existing.save()
+            ts_update_ops.append(UpdateOne({"_id": existing.id}, {"$set": {
+                "hours": round(float(row["hours"]), 2),
+                "is_billable": bool(row["is_billable"]),
+                "description": row["description"],
+                "status": "approved",
+                "submitted_at": now,
+                "approved_by": "system",
+                "approved_at": now,
+                "source": "hrms_sync",
+                "sync_batch_id": batch_id,
+                "period": period,
+                "branch_location_id": row["branch_location_id"],
+                "updated_at": now,
+                "source_system": SOURCE_SYSTEM,
+                "source_id": source_id,
+                "last_synced_at": now,
+                "is_deleted": False,
+            }}))
             counts["timesheets"]["updated"] += 1
         else:
-            await TimesheetEntry(
+            ts_inserts.append(TimesheetEntry(
                 employee_id=row["employee_id"],
                 project_id=row["project_id"],
                 date=row["date"],
@@ -1778,11 +1904,20 @@ async def _sync_single_period_upsert(
                 source_id=source_id,
                 last_synced_at=now,
                 is_deleted=False,
-            ).insert()
+            ))
             counts["timesheets"]["imported"] += 1
+
+    # Bulk write updates and inserts
+    if ts_update_ops:
+        ts_collection = TimesheetEntry.get_pymongo_collection()
+        await ts_collection.bulk_write(ts_update_ops, ordered=False)
+    if ts_inserts:
+        await TimesheetEntry.insert_many(ts_inserts)
+
     counts["timesheets"]["deleted"] = await _delete_stale_period_docs(TimesheetEntry, period, seen_timesheet_ids)
 
     seen_alloc_ids: set[str] = set()
+    alloc_bulk_items: list[dict] = []
     total_working_days = int(allocations_raw.get("total_working_days", 22) or 22)
     for emp_entry in allocations_raw.get("employees", []) or []:
         hrms_eid = _to_int(emp_entry.get("employee_id"), -1)
@@ -1800,10 +1935,9 @@ async def _sync_single_period_upsert(
                 continue
             source_id = f"allocation:{period}:{hrms_eid}:{hrms_pid}"
             seen_alloc_ids.add(source_id)
-            _doc, created = await _upsert_by_source(
-                ProjectAllocation,
-                source_id=source_id,
-                payload={
+            alloc_bulk_items.append({
+                "source_id": source_id,
+                "payload": {
                     "period": period,
                     "employee_id": str(emp.id),
                     "hrms_employee_id": hrms_eid,
@@ -1820,13 +1954,14 @@ async def _sync_single_period_upsert(
                     "sync_batch_id": batch_id,
                     "synced_at": now,
                 },
-                now=now,
-                fallback_filters=[{"period": period, "employee_id": str(emp.id), "project_id": str(project.id)}],
-            )
-            if created:
-                counts["allocations"]["imported"] += 1
-            else:
-                counts["allocations"]["updated"] += 1
+                "fallback_filters": [{"period": period, "employee_id": str(emp.id), "project_id": str(project.id)}],
+            })
+    alloc_results = await _bulk_upsert_by_source(ProjectAllocation, alloc_bulk_items, now)
+    for _doc, created in alloc_results:
+        if created:
+            counts["allocations"]["imported"] += 1
+        else:
+            counts["allocations"]["updated"] += 1
     counts["allocations"]["deleted"] = await _delete_stale_period_docs(ProjectAllocation, period, seen_alloc_ids)
 
     return {
@@ -1847,6 +1982,7 @@ async def _trigger_live_sync_impl(
     user_id: str,
     integration_config_id: str | None = None,
     months_backfill_override: int | None = None,
+    token: str | None = None,
 ) -> dict:
     cfg_doc, hrms_cfg = await get_hrms_integration_config(integration_config_id)
 
@@ -1885,7 +2021,7 @@ async def _trigger_live_sync_impl(
     cursor: dict = {"periods": periods, "per_period": []}
 
     try:
-        access_token, hr_id, base_url = await _resolve_hrms_auth(None, hrms_cfg)
+        access_token, hr_id, base_url = await _resolve_hrms_auth(token, hrms_cfg)
         client = HrmsClient(base_url=base_url, token=access_token)
 
         hrms_mapped_emp = await Employee.find_one({"hrms_employee_id": {"$ne": None}, "is_deleted": False})
@@ -1897,30 +2033,39 @@ async def _trigger_live_sync_impl(
 
         total_records = 0
         imported_count = 0
-        for p in periods:
+
+        # Run all period syncs concurrently
+        async def _sync_period_safe(p: str) -> dict | None:
             try:
-                period_result = await _sync_single_period_upsert(
+                return await _sync_single_period_upsert(
                     client=client,
                     period=p,
                     hr_id=hr_id,
                     batch_id=batch_id,
                 )
-                cursor["per_period"].append(period_result["cursor"])
-                _merge_entity_counts(entity_counts, period_result["counts"])
-
-                period_counts = period_result["counts"]
-                total_records += (
-                    period_counts["attendance"]["processed"]
-                    + period_counts["timesheets"]["processed"]
-                    + period_counts["allocations"]["processed"]
-                )
-                imported_count += (
-                    period_counts["attendance"]["imported"]
-                    + period_counts["timesheets"]["imported"]
-                    + period_counts["allocations"]["imported"]
-                )
             except Exception as period_err:
                 _add_error(errors, entity="period_sync", key=p, error=str(period_err))
+                return None
+
+        period_results = await asyncio.gather(*[_sync_period_safe(p) for p in periods])
+
+        for period_result in period_results:
+            if period_result is None:
+                continue
+            cursor["per_period"].append(period_result["cursor"])
+            _merge_entity_counts(entity_counts, period_result["counts"])
+
+            period_counts = period_result["counts"]
+            total_records += (
+                period_counts["attendance"]["processed"]
+                + period_counts["timesheets"]["processed"]
+                + period_counts["allocations"]["processed"]
+            )
+            imported_count += (
+                period_counts["attendance"]["imported"]
+                + period_counts["timesheets"]["imported"]
+                + period_counts["allocations"]["imported"]
+            )
 
         try:
             holiday_counts = await _sync_holidays_upsert(client, now=now)

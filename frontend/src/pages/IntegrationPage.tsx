@@ -4,6 +4,7 @@ import { IntegrationConfigList } from "@/components/integration/IntegrationConfi
 import { SyncLogTimeline } from "@/components/integration/SyncLogTimeline"
 import { useToastStore } from "@/store/toastStore"
 import { useAuthStore } from "@/store/authStore" // used via .getState() after sync
+import { useNotificationStore } from "@/store/notificationStore"
 import {
   getIntegrationConfigs,
   updateIntegrationConfig,
@@ -36,6 +37,7 @@ export function IntegrationPage() {
   const [mode, setMode] = useState<string>("")
   const [switchingMode, setSwitchingMode] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
+  const refreshNotifications = useNotificationStore((s) => s.loadSummary)
 
   // Fetch integration configs
   const fetchConfigs = useCallback(async () => {
@@ -100,6 +102,9 @@ export function IntegrationPage() {
       await Promise.all([fetchConfigs(), fetchSyncLogs(activeTab)])
 
       await checkHrmsStatus()
+
+      // Refresh notifications so bell count updates immediately
+      refreshNotifications()
 
       // Refresh user profile (branch_code, employee_id) after sync updates the User doc
       try {
@@ -331,6 +336,32 @@ export function IntegrationPage() {
           {/* Finance Tab */}
           {activeTab === "finance" && (
             <div className="space-y-8">
+              {filteredLogs.filter((l) => l.status === "completed").length === 0 && (
+                <div className="flex items-center gap-3 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">
+                      No Finance data synced yet
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      Activate your Finance integration and click <strong>Sync Now</strong> to import billing and revenue data.
+                    </p>
+                  </div>
+                  {filteredConfigs.some((c) => c.status === "active") && (
+                    <button
+                      onClick={() => {
+                        const active = filteredConfigs.find((c) => c.status === "active")
+                        if (active) handleSync(active.id)
+                      }}
+                      disabled={!!syncingConfigId}
+                      className="flex items-center gap-1.5 rounded-md bg-yellow-500 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-yellow-600 disabled:opacity-60 shrink-0"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${syncingConfigId ? "animate-spin" : ""}`} />
+                      {syncingConfigId ? "Syncing..." : "Sync Now"}
+                    </button>
+                  )}
+                </div>
+              )}
               <IntegrationConfigList
                 configs={filteredConfigs}
                 onSync={handleSync}
@@ -349,6 +380,32 @@ export function IntegrationPage() {
           {/* Skills Tab */}
           {activeTab === "skills" && (
             <div className="space-y-8">
+              {filteredLogs.filter((l) => l.status === "completed").length === 0 && (
+                <div className="flex items-center gap-3 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">
+                      No Skills data synced yet
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      Activate your Skills integration and click <strong>Sync Now</strong> to import skill catalog from the Skills Portal.
+                    </p>
+                  </div>
+                  {filteredConfigs.some((c) => c.status === "active") && (
+                    <button
+                      onClick={() => {
+                        const active = filteredConfigs.find((c) => c.status === "active")
+                        if (active) handleSync(active.id)
+                      }}
+                      disabled={!!syncingConfigId}
+                      className="flex items-center gap-1.5 rounded-md bg-yellow-500 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-yellow-600 disabled:opacity-60 shrink-0"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${syncingConfigId ? "animate-spin" : ""}`} />
+                      {syncingConfigId ? "Syncing..." : "Sync Now"}
+                    </button>
+                  )}
+                </div>
+              )}
               <IntegrationConfigList
                 configs={filteredConfigs}
                 onSync={handleSync}

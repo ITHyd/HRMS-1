@@ -187,9 +187,12 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
         mode_cfg = (cfg.config or {}).get("mode", {}) if isinstance(cfg.config, dict) else {}
 
         if hrms_sync_service.is_live_sync_enabled_for_user(user_email, mode_cfg):
+            # Login once, reuse token for both sync steps
+            hrms_token = await hrms_sync_service.get_auth_token(str(cfg.id))
+
             # Step 1: Sync master data (employees, locations, projects, departments)
             master_result = await hrms_sync_service.sync_master_data(
-                token=None,
+                token=hrms_token,
                 user_id=user.user_id,
                 integration_config_id=str(cfg.id),
             )
@@ -198,6 +201,7 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
                 period=current_period,
                 user_id=user.user_id,
                 integration_config_id=str(cfg.id),
+                token=hrms_token,
             )
             # Combine counts from both steps
             master_status = master_result.get("status", "completed")
@@ -256,16 +260,22 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
     cfg.updated_at = datetime.now(timezone.utc)
     await cfg.save()
 
+    type_labels = {"hrms": "HRMS", "finance": "Finance", "skills": "Skills", "dynamics": "Dynamics"}
+    type_label = type_labels.get(cfg.integration_type, cfg.integration_type)
+
     await audit_service.log_change(
         action="SYNC",
-        entity_type="IntegrationConfig",
+        entity_type="Integration",
         entity_id=str(cfg.id),
         changed_by=user.user_id,
         branch_location_id=user.branch_location_id,
         new_value={
-            "sync_log_id": str(sync_log.id),
+            "integration_type": type_label,
+            "name": cfg.name,
             "status": sync_log.status,
             "records_processed": sync_log.records_processed,
+            "records_succeeded": sync_log.records_succeeded,
+            "records_failed": sync_log.records_failed,
         },
     )
 
@@ -330,16 +340,32 @@ async def retry_sync(sync_log_id: str, user) -> dict:
             cfg.updated_at = datetime.now(timezone.utc)
             await cfg.save()
 
+    # Resolve integration name for audit
+    retry_type_label = new_log.integration_type
+    retry_config_name = ""
+    if original.integration_config_id:
+        try:
+            retry_cfg = await IntegrationConfig.get(original.integration_config_id)
+            if retry_cfg:
+                type_labels = {"hrms": "HRMS", "finance": "Finance", "skills": "Skills", "dynamics": "Dynamics"}
+                retry_type_label = type_labels.get(retry_cfg.integration_type, retry_cfg.integration_type)
+                retry_config_name = retry_cfg.name
+        except Exception:
+            pass
+
     await audit_service.log_change(
         action="SYNC",
-        entity_type="SyncLog",
+        entity_type="Integration",
         entity_id=str(new_log.id),
         changed_by=user.user_id,
         branch_location_id=user.branch_location_id,
         new_value={
-            "parent_sync_id": str(original.id),
-            "retry_count": new_log.retry_count,
+            "integration_type": retry_type_label,
+            "name": retry_config_name or retry_type_label,
             "status": new_log.status,
+            "records_processed": new_log.records_processed,
+            "records_succeeded": new_log.records_succeeded,
+            "records_failed": new_log.records_failed,
         },
     )
 
@@ -357,6 +383,42 @@ async def retry_sync(sync_log_id: str, user) -> dict:
         "triggered_by": new_log.triggered_by,
         "retry_count": new_log.retry_count,
     }
+
+
+async def get_sync_log_detail(sync_id: str) -> dict:
+    """Get a single SyncLog by ID with full details."""
+    log = await SyncLog.get(sync_id)
+    if not log:
+        raise ValueError("Sync log not found")
+
+    result = {
+        "id": str(log.id),
+        "integration_type": log.integration_type,
+        "integration_config_id": log.integration_config_id,
+        "direction": log.direction,
+        "status": log.status,
+        "records_processed": log.records_processed,
+        "records_succeeded": log.records_succeeded,
+        "records_failed": log.records_failed,
+        "error_details": log.error_details,
+        "started_at": log.started_at,
+        "completed_at": log.completed_at,
+        "triggered_by": log.triggered_by,
+        "user_id": log.user_id,
+        "retry_count": log.retry_count,
+        "parent_sync_id": log.parent_sync_id,
+    }
+
+    # Include integration config name if linked
+    if log.integration_config_id:
+        try:
+            cfg = await IntegrationConfig.get(log.integration_config_id)
+            if cfg:
+                result["config_name"] = cfg.name
+        except Exception:
+            pass
+
+    return result
 
 
 async def get_sync_logs(

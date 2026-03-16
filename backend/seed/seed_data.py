@@ -976,7 +976,7 @@ async def seed(skip_init: bool = False):
                 "live_domains": ["nxzen.com"],
             },
         }),
-        ("finance", "Finance Data Feed", "inactive", {
+        ("finance", "Finance Data Feed", "active", {
             "endpoint": "https://api.example.com/finance", "version": "1.0",
         }),
         ("dynamics", "Dynamics 365 Export", "inactive", {
