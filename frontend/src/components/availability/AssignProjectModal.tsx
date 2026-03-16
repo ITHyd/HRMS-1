@@ -34,20 +34,21 @@ export function AssignProjectModal({
   const [newEndDate, setNewEndDate] = useState("")
   const [newDescription, setNewDescription] = useState("")
 
-  useEffect(() => {
-    loadProjects()
-  }, [])
-
-  const loadProjects = async (q?: string) => {
+  async function loadProjects(q?: string) {
     setLoading(true)
     try {
       const data = await listProjects({ search: q, status: "ACTIVE" })
       setProjects(data.projects)
     } catch {
       console.error("Failed to load projects")
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
+
+  useEffect(() => {
+    void loadProjects()
+  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()

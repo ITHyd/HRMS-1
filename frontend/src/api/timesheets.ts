@@ -131,16 +131,20 @@ export async function getPeriodLockStatus(
 }
 
 export async function getProjects(
-  _locationId: string
+  locationId: string
 ): Promise<{ id: string; name: string }[]> {
-  const res = await client.get<{ id: string; name: string }[]>("/org/projects")
+  const res = await client.get<{ id: string; name: string }[]>("/org/projects", {
+    params: { location_id: locationId },
+  })
   return res.data
 }
 
 export async function getEmployees(
-  _locationId: string
+  locationId: string
 ): Promise<{ id: string; name: string }[]> {
-  const res = await client.get<{ id: string; name: string }[]>("/org/employees")
+  const res = await client.get<{ id: string; name: string }[]>("/org/employees", {
+    params: { location_id: locationId },
+  })
   return res.data
 }
 

@@ -29,11 +29,22 @@ export function AuditStats({ locationId }: AuditStatsProps) {
 
   useEffect(() => {
     if (!locationId) return
-    setLoading(true)
-    getAuditStats(locationId)
-      .then(setStats)
-      .catch(console.error)
-      .finally(() => setLoading(false))
+    let isActive = true
+    queueMicrotask(() => {
+      if (!isActive) return
+      setLoading(true)
+      getAuditStats(locationId)
+        .then((data) => {
+          if (isActive) setStats(data)
+        })
+        .catch(console.error)
+        .finally(() => {
+          if (isActive) setLoading(false)
+        })
+    })
+    return () => {
+      isActive = false
+    }
   }, [locationId])
 
   if (loading) {

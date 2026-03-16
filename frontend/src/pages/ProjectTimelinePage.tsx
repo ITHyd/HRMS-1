@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import type { ProjectBrief, ProjectDetail } from "@/types/project"
 import type { SkillTag, SkillCatalogEntry } from "@/types/availability"
 import { useOrgChartStore } from "@/store/orgChartStore"
+import { useNotificationStore } from "@/store/notificationStore"
 
 // ─── constants ─────────────────────────────────────────────────────────────
 const COL_W = 44
@@ -58,9 +59,6 @@ function fmt(iso: string | null | undefined): string {
 function fmtFull(iso: string | null | undefined): string {
   if (!iso) return "—"
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-}
-function monthLabel(iso: string): string {
-  return new Date(iso + "-01").toLocaleString("default", { month: "long", year: "numeric" })
 }
 function daysUntilEnd(endDate: string | null | undefined): number | null {
   if (!endDate) return null
@@ -131,8 +129,10 @@ function buildGrid(ganttStart: Date): { weeks: WeekCell[]; months: MonthSpan[] }
 }
 
 // ─── Avatar helpers ─────────────────────────────────────────────────────────
-function avatarColor(_name: string): string {
-  return "#6366f1"
+function avatarColor(name: string): string {
+  const palette = ["#6366f1", "#0ea5e9", "#10b981", "#f97316", "#ef4444", "#8b5cf6"]
+  const hash = name.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
+  return palette[hash % palette.length]
 }
 function initials(name: string): string {
   return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
@@ -338,7 +338,6 @@ function SuggestProjectsModal({
 // ─── Employee Drawer ─────────────────────────────────────────────────────────
 function EmployeeDrawer({ emp, skills, onClose }: { emp: DrawerEmployee; skills: SkillTag[]; onClose: () => void }) {
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
-  const urgency = getUrgency(emp.end_date)
   const availableMonth = emp.end_date
     ? new Date(emp.end_date).toLocaleString("default", { month: "long", year: "numeric" })
     : null
@@ -438,7 +437,11 @@ function GanttChart({
   const toggle = (id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
     if (!details[id]) onLoadDetail(id)
@@ -493,7 +496,24 @@ function GanttChart({
                       ? <ChevronDown  className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium leading-tight">{p.name}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="truncate text-sm font-medium leading-tight">{p.name}</p>
+                        {(() => {
+                          const days = daysUntilEnd(p.end_date)
+                          if (days === null || days < 0 || days > 7) return null
+                          if (notifDismissed.has(`project_ending:${p.id}`)) return null
+                          const info = notifSummary?.details.project_ending.find((ep) => ep.project_id === p.id)
+                          return (
+                            <span
+                              title={`${info?.team_size ?? p.member_count} people freeing ${fmt(p.end_date)} · Right-click to dismiss`}
+                              onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); notifDismiss("project_ending", p.id) }}
+                              className="inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 cursor-context-menu select-none whitespace-nowrap"
+                            >
+                              🔔 Ends soon
+                            </span>
+                          )
+                        })()}
+                      </div>
                       <p className="truncate text-xs text-muted-foreground">
                         {p.client_name} | Ends {fmt(p.end_date)}
                       </p>
@@ -637,6 +657,9 @@ function GanttChart({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function ProjectTimelinePage() {
   const navigate = useNavigate()
+  const notifSummary = useNotificationStore((s) => s.summary)
+  const notifDismissed = useNotificationStore((s) => s.dismissed)
+  const notifDismiss = useNotificationStore((s) => s.dismiss)
   const [activeTab, setActiveTab] = useState<"timeline" | "freeing" | "opportunities">("timeline")
   const [projects, setProjects] = useState<ProjectBrief[]>([])
   const [details, setDetails] = useState<Record<string, ProjectDetail>>({})
@@ -1226,6 +1249,14 @@ export function ProjectTimelinePage() {
                         <span className="font-medium">{fmtFull(opp.earliestEnd)}</span> to discuss the next engagement and retain{" "}
                         <span className="font-medium">{opp.totalMembers} freed resource{opp.totalMembers !== 1 ? "s" : ""}</span>.
                       </p>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => navigate(`/projects?client_name=${encodeURIComponent(opp.client_name)}`)}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                      >
+                        Create Renewal →
+                      </button>
                     </div>
                   </div>
                 )

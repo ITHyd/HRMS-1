@@ -8,6 +8,11 @@ const CLIENT_COLORS = [
 ]
 
 export function ClientBreakdownChart({ data }: { data: ClientCount[] }) {
+  const formatEmployeeCount = (value: number | string | undefined): [string, string] => {
+    const count = typeof value === "number" ? value : Number(value ?? 0)
+    return [`${count} employees`, "Count"]
+  }
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -19,7 +24,7 @@ export function ClientBreakdownChart({ data }: { data: ClientCount[] }) {
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="client" tick={{ fontSize: 11 }} />
             <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(value: number) => [`${value} employees`, "Count"]} />
+            <Tooltip formatter={formatEmployeeCount} />
             <Bar dataKey="count" radius={[4, 4, 0, 0]}>
               {data.map((entry, i) => (
                 <Cell

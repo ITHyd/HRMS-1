@@ -7,11 +7,12 @@ import type {
   ResourceAllocationResponse,
 } from "@/types/dashboard"
 
-export async function getExecutiveDashboard(
+export async function getExecutiveDashboard(params: {
   period: string
-): Promise<ExecutiveDashboard> {
+  client_name?: string
+}): Promise<ExecutiveDashboard> {
   const res = await client.get<ExecutiveDashboard>("/dashboard/executive", {
-    params: { period },
+    params,
   })
   return res.data
 }
@@ -32,6 +33,7 @@ export async function getResourceDashboard(params: {
 export async function getProjectDashboard(params: {
   period: string
   project_id?: string
+  client_name?: string
   page?: number
   page_size?: number
 }): Promise<ProjectDashboardResponse> {

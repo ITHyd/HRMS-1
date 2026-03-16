@@ -15,10 +15,11 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 @router.get("/executive")
 async def executive_dashboard(
     period: str = Query(..., description="Period in YYYY-MM format", pattern=r"^\d{4}-\d{2}$"),
+    client_name: str = Query(None, description="Filter by client name"),
     user: CurrentUser = Depends(get_current_user),
 ):
     """Executive-level utilisation dashboard with KPIs, trends, and breakdowns."""
-    return await get_executive_dashboard(period, user.branch_location_id)
+    return await get_executive_dashboard(period, user.branch_location_id, client_name=client_name)
 
 
 @router.get("/resources")
@@ -45,6 +46,7 @@ async def resource_dashboard(
 async def project_dashboard(
     period: str = Query(..., description="Period in YYYY-MM format", pattern=r"^\d{4}-\d{2}$"),
     project_id: str = Query(None, description="Filter by specific project ID"),
+    client_name: str = Query(None, description="Filter by client name"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     user: CurrentUser = Depends(get_current_user),
@@ -54,6 +56,7 @@ async def project_dashboard(
         period=period,
         branch_location_id=user.branch_location_id,
         project_id=project_id,
+        client_name=client_name,
         page=page,
         page_size=page_size,
     )

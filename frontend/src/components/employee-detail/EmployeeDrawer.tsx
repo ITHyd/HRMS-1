@@ -54,39 +54,46 @@ export function EmployeeDrawer() {
 
   useEffect(() => {
     if (!selectedId || !isOpen) return
-    setLoading(true)
-    setError(null)
-    setEmployee(null)
-    setChain([])
-    setTimeline(null)
+    let isActive = true
+    queueMicrotask(() => {
+      if (!isActive) return
+      setLoading(true)
+      setError(null)
+      setEmployee(null)
+      setChain([])
+      setTimeline(null)
 
-    const loadEmployee = async () => {
-      try {
-        const emp = await getEmployee(selectedId, drawerPeriod ?? undefined)
-        setEmployee(emp)
-      } catch (err) {
-        console.error("Failed to load employee:", err)
-        setError(`Failed to load employee details`)
+      const loadEmployee = async () => {
+        try {
+          const emp = await getEmployee(selectedId, drawerPeriod ?? undefined)
+          if (isActive) setEmployee(emp)
+        } catch (err) {
+          console.error("Failed to load employee:", err)
+          if (isActive) setError("Failed to load employee details")
+        }
+
+        try {
+          const chainRes = await getReportingChain(selectedId)
+          if (isActive) setChain(chainRes.chain || [])
+        } catch (err) {
+          console.error("Failed to load chain:", err)
+        }
+
+        try {
+          const tl = await getEmployeeTimeline(selectedId)
+          if (isActive) setTimeline(tl)
+        } catch (err) {
+          console.error("Failed to load timeline:", err)
+        }
+
+        if (isActive) setLoading(false)
       }
 
-      try {
-        const chainRes = await getReportingChain(selectedId)
-        setChain(chainRes.chain || [])
-      } catch (err) {
-        console.error("Failed to load chain:", err)
-      }
-
-      try {
-        const tl = await getEmployeeTimeline(selectedId)
-        setTimeline(tl)
-      } catch (err) {
-        console.error("Failed to load timeline:", err)
-      }
-
-      setLoading(false)
+      void loadEmployee()
+    })
+    return () => {
+      isActive = false
     }
-
-    loadEmployee()
   }, [selectedId, isOpen, drawerPeriod])
 
   if (!isOpen) return null

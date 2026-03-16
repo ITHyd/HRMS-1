@@ -37,7 +37,10 @@ export function UtilisationTrendChart({ data }: UtilisationTrendChartProps) {
               tickFormatter={(v) => `${v}%`}
             />
             <Tooltip
-              formatter={(value: number) => `${value.toFixed(1)}%`}
+              formatter={(value: number | string | undefined) => {
+                const percent = typeof value === "number" ? value : Number(value ?? 0)
+                return `${percent.toFixed(1)}%`
+              }}
               labelFormatter={(label) => `Period: ${label}`}
             />
             <Legend

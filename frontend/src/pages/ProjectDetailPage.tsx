@@ -7,8 +7,63 @@ import { StatusBadge } from "@/components/shared/StatusBadge"
 import { PeriodSelector } from "@/components/shared/PeriodSelector"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import { getProjectDetail } from "@/api/projects"
-import { ArrowLeft, Calendar, Users, Clock, CalendarDays, Briefcase } from "lucide-react"
+import { ArrowLeft, Users, Clock, CalendarDays, Briefcase, ChevronDown, ChevronRight, Activity } from "lucide-react"
 import type { ProjectDetail } from "@/types/project"
+
+function HealthScoreCard({ score, breakdown }: { score: number; breakdown: { allocation: number; billable: number; timeline: number; team: number } }) {
+  const [open, setOpen] = useState(false)
+  const color = score >= 75 ? "#22c55e" : score >= 50 ? "#f59e0b" : "#ef4444"
+  const textColor = score >= 75 ? "text-green-700" : score >= 50 ? "text-amber-700" : "text-red-700"
+  const rows = [
+    { key: "Allocation",  val: breakdown.allocation  },
+    { key: "Billable",    val: breakdown.billable    },
+    { key: "Timeline",    val: breakdown.timeline    },
+    { key: "Team",        val: breakdown.team        },
+  ]
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="w-full flex items-center justify-between gap-2"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="rounded-lg p-2 bg-slate-100">
+              <Activity className="h-5 w-5 text-slate-600" />
+            </div>
+            <div className="text-left">
+              <p className="text-xs text-muted-foreground">Health Score</p>
+              <p className={`text-xl font-semibold tabular-nums ${textColor}`}>
+                {score.toFixed(0)}/100
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-full border-2 flex items-center justify-center" style={{ borderColor: color }}>
+              <span className="text-[10px] font-bold" style={{ color }}>{score.toFixed(0)}</span>
+            </div>
+            {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+          </div>
+        </button>
+        {open && (
+          <div className="mt-3 pt-3 border-t grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {rows.map(({ key, val }) => {
+              const c = val >= 75 ? "#22c55e" : val >= 50 ? "#f59e0b" : "#ef4444"
+              return (
+                <div key={key} className="text-center">
+                  <p className="text-[11px] text-muted-foreground mb-1">{key}</p>
+                  <div className="inline-flex items-center justify-center h-10 w-10 rounded-full border-2 mx-auto" style={{ borderColor: c }}>
+                    <span className="text-xs font-bold" style={{ color: c }}>{val.toFixed(0)}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -31,6 +86,7 @@ export function ProjectDetailPage() {
   const fetchProject = useCallback(() => {
     if (!projectId) return
     setLoading(true)
+    setError(null)
     getProjectDetail(projectId, selectedPeriod)
       .then(setProject)
       .catch((err) => {
@@ -41,7 +97,9 @@ export function ProjectDetailPage() {
   }, [projectId, selectedPeriod])
 
   useEffect(() => {
-    fetchProject()
+    queueMicrotask(() => {
+      fetchProject()
+    })
   }, [fetchProject])
 
   if (loading) {
@@ -188,6 +246,11 @@ export function ProjectDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Health Score */}
+      {project.health_score != null && (
+        <HealthScoreCard score={project.health_score} breakdown={project.health_breakdown} />
+      )}
 
       {/* Progress */}
       <Card>

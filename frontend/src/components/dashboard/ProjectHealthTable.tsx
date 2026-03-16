@@ -80,7 +80,12 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                       >
                         <td
                           className="py-2.5 pr-2 cursor-pointer"
-                          onClick={(e) => { e.stopPropagation(); project.members.length > 0 && toggleRow(project.project_id) }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (project.members.length > 0) {
+                              toggleRow(project.project_id)
+                            }
+                          }}
                         >
                           {project.members.length > 0 && (
                             isExpanded ? (

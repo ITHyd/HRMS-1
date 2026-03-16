@@ -15,7 +15,6 @@ import { ProjectListPage } from "@/pages/ProjectListPage"
 import { ProjectDetailPage } from "@/pages/ProjectDetailPage"
 import { ProjectTimelinePage } from "@/pages/ProjectTimelinePage"
 import { SearchResultsPage } from "@/pages/SearchResultsPage"
-import { useAuthStore } from "@/store/authStore"
 
 function App() {
   return (

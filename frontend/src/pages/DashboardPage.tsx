@@ -15,6 +15,7 @@ import {
   getProjectDashboard,
   getResourceAllocationDashboard,
 } from "@/api/dashboard"
+import { listProjectClients } from "@/api/projects"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import type { ExecutiveDashboard, ResourceAllocationEntry, ProjectDashboardEntry } from "@/types/dashboard"
 
@@ -93,13 +94,18 @@ export function DashboardPage() {
   const [resourcePageSize, setResourcePageSize] = useState(20)
   const [clientOptions, setClientOptions] = useState<string[]>([])
 
+  // Load client list for global filter
+  useEffect(() => {
+    listProjectClients().then(setClientOptions).catch(() => {})
+  }, [])
+
   // Projects tab state
   const [projectEntries, setProjectEntries] = useState<ProjectDashboardEntry[]>([])
 
-  const fetchExecutiveData = useCallback(async (period: string) => {
+  const fetchExecutiveData = useCallback(async (period: string, client?: string) => {
     setLoading(true)
     try {
-      const data = await getExecutiveDashboard(period)
+      const data = await getExecutiveDashboard({ period, client_name: client || undefined })
       setExecutiveData(data)
     } catch (err) {
       console.error("Failed to load executive dashboard:", err)
@@ -123,14 +129,6 @@ export function DashboardPage() {
         })
         setResourceEntries(data.entries)
         setResourceTotal(data.total)
-        // Extract unique client names for the filter dropdown
-        const uniqueClients = Array.from(
-          new Set(data.entries.map((e) => e.client_name).filter(Boolean) as string[])
-        ).sort()
-        setClientOptions((prev) => {
-          const merged = Array.from(new Set([...prev, ...uniqueClients])).sort()
-          return merged
-        })
       } catch (err) {
         console.error("Failed to load resource allocation dashboard:", err)
         setResourceEntries([])
@@ -142,10 +140,10 @@ export function DashboardPage() {
     []
   )
 
-  const fetchProjectData = useCallback(async (period: string) => {
+  const fetchProjectData = useCallback(async (period: string, client?: string) => {
     setLoading(true)
     try {
-      const data = await getProjectDashboard({ period, page_size: 100 })
+      const data = await getProjectDashboard({ period, client_name: client || undefined, page_size: 100 })
       setProjectEntries(data.projects)
     } catch (err) {
       console.error("Failed to load project dashboard:", err)
@@ -158,13 +156,13 @@ export function DashboardPage() {
   useEffect(() => {
     switch (activeTab) {
       case "executive":
-        fetchExecutiveData(selectedPeriod)
+        fetchExecutiveData(selectedPeriod, clientFilter)
         break
       case "resources":
         fetchResourceData(selectedPeriod, searchQuery, classificationFilter, clientFilter, resourcePage, resourcePageSize)
         break
       case "projects":
-        fetchProjectData(selectedPeriod)
+        fetchProjectData(selectedPeriod, clientFilter)
         break
     }
   }, [
@@ -184,7 +182,6 @@ export function DashboardPage() {
     setSearchInput("")
     setSearchQuery("")
     setClassificationFilter("")
-    setClientFilter("")
     setResourcePage(1)
   }
 
@@ -243,6 +240,18 @@ export function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {clientOptions.length > 0 && (
+            <SelectDropdown
+              value={clientFilter}
+              onChange={(v) => { setClientFilter(v); setResourcePage(1) }}
+              options={[
+                { value: "", label: "All Clients" },
+                ...clientOptions.map((c) => ({ value: c, label: c })),
+              ]}
+              placeholder="All Clients"
+              maxVisible={8}
+            />
+          )}
           <PeriodSelector value={selectedPeriod} onChange={handlePeriodChange} />
           {activeTab !== "executive" && (
             <button
@@ -308,22 +317,8 @@ export function DashboardPage() {
                 />
               )}
 
-              {/* Client filter — resources tab only */}
-              {activeTab === "resources" && clientOptions.length > 0 && (
-                <SelectDropdown
-                  value={clientFilter}
-                  onChange={(v) => { setClientFilter(v); setResourcePage(1) }}
-                  options={[
-                    { value: "", label: "All Clients" },
-                    ...clientOptions.map((c) => ({ value: c, label: c })),
-                  ]}
-                  placeholder="All Clients"
-                  maxVisible={5}
-                />
-              )}
-
               {/* Clear */}
-              {(searchQuery || classificationFilter || clientFilter) && (
+              {(searchQuery || classificationFilter) && (
                 <button
                   onClick={resetFilters}
                   className="cursor-pointer inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

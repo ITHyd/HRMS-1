@@ -17,11 +17,22 @@ export function AnalyticsPage() {
 
   useEffect(() => {
     if (!user) return
-    setLoading(true)
-    getBranchAnalytics(user.branch_location_id)
-      .then(setData)
-      .catch(console.error)
-      .finally(() => setLoading(false))
+    let isActive = true
+    queueMicrotask(() => {
+      if (!isActive) return
+      setLoading(true)
+      getBranchAnalytics(user.branch_location_id)
+        .then((result) => {
+          if (isActive) setData(result)
+        })
+        .catch(console.error)
+        .finally(() => {
+          if (isActive) setLoading(false)
+        })
+    })
+    return () => {
+      isActive = false
+    }
   }, [user])
 
   if (loading) {

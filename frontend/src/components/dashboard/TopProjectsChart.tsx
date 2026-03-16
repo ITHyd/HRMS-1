@@ -13,15 +13,25 @@ interface TopProjectsChartProps {
 
 const COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd", "#818cf8", "#7c3aed", "#5b21b6"]
 
-function CustomContent(props: any) {
-  const { x, y, width, height, name, total_hours, index } = props
+interface TreemapContentProps {
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  name?: string
+  total_hours?: number
+  index?: number
+}
+
+function CustomContent(props: TreemapContentProps) {
+  const { x = 0, y = 0, width = 0, height = 0, name, total_hours, index } = props
   if (width < 30 || height < 30) return null
 
   const displayName = name || "Unknown Project"
   const maxChars = Math.max(4, Math.floor(width / 8))
   const truncatedName =
     displayName.length > maxChars
-      ? displayName.slice(0, maxChars - 1) + "…"
+      ? displayName.slice(0, maxChars - 1) + "..."
       : displayName
 
   return (
@@ -101,7 +111,10 @@ export function TopProjectsChart({ data }: TopProjectsChartProps) {
             content={<CustomContent />}
           >
             <Tooltip
-              formatter={(value: number) => [`${value.toFixed(1)} hrs`, "Total Hours"]}
+              formatter={(value: number | string | undefined) => {
+                const hours = typeof value === "number" ? value : Number(value ?? 0)
+                return [`${hours.toFixed(1)} hrs`, "Total Hours"]
+              }}
               labelFormatter={(_label, payload) => {
                 if (payload && payload.length > 0) {
                   const item = payload[0].payload

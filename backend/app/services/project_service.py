@@ -13,6 +13,34 @@ from app.models.timesheet_entry import TimesheetEntry
 from app.services.audit_service import log_change
 
 
+def compute_project_health(
+    progress_percent: float,
+    billable_pct: float,
+    days_to_end: Optional[float],
+    avg_alloc_pct: Optional[float],
+) -> dict:
+    """Compute health score (0–100) and breakdown from existing project data."""
+    allocation_score = min(progress_percent, 100.0)
+    billable_score = min(billable_pct * 1.25, 100.0)
+    if days_to_end is None:
+        timeline_score = 50.0
+    elif days_to_end < 0:
+        timeline_score = 0.0
+    else:
+        timeline_score = max(0.0, min(100.0, 100.0 - (days_to_end / 30.0 * 25.0)))
+    team_score = min(avg_alloc_pct, 100.0) if avg_alloc_pct is not None else 75.0
+    health_score = (allocation_score + billable_score + timeline_score + team_score) / 4.0
+    return {
+        "health_score": round(health_score, 1),
+        "health_breakdown": {
+            "allocation": round(allocation_score, 1),
+            "billable": round(billable_score, 1),
+            "timeline": round(timeline_score, 1),
+            "team": round(team_score, 1),
+        },
+    }
+
+
 async def list_projects(
     branch_location_id: str,
     search: Optional[str] = None,
@@ -67,6 +95,9 @@ async def list_projects(
     planned_by_project: dict[str, float] = {}
     worked_by_project: dict[str, float] = {}
     allocated_members_by_project: dict[str, int] = {}
+    billable_hours_by_project: dict[str, float] = {}
+    alloc_pcts_by_project: dict[str, list] = {}
+    total_hours_by_project: dict[str, float] = {}
     if period:
         allocs = await ProjectAllocation.find(
             ProjectAllocation.period == period,
@@ -79,6 +110,7 @@ async def list_projects(
             allocated_members_by_project[a.project_id] = (
                 allocated_members_by_project.get(a.project_id, 0) + 1
             )
+            alloc_pcts_by_project.setdefault(a.project_id, []).append(a.allocation_percentage)
 
         timesheets = await TimesheetEntry.find(
             TimesheetEntry.period == period,
@@ -89,6 +121,12 @@ async def list_projects(
             worked_by_project[t.project_id] = (
                 worked_by_project.get(t.project_id, 0.0) + t.hours
             )
+            if t.is_billable:
+                billable_hours_by_project[t.project_id] = (
+                    billable_hours_by_project.get(t.project_id, 0.0) + t.hours
+                )
+        # Keep raw hours for health score before converting to days
+        total_hours_by_project = dict(worked_by_project)
         # Convert hours to days (8 hours = 1 day)
         worked_by_project = {k: round(v / 8, 1) for k, v in worked_by_project.items()}
 
@@ -115,6 +153,19 @@ async def list_projects(
         else:
             progress = 0.0
 
+        # Health score
+        raw_hours = total_hours_by_project.get(pid, 0.0)
+        bill_hours = billable_hours_by_project.get(pid, 0.0)
+        billable_pct = (bill_hours / raw_hours * 100) if raw_hours > 0 else 0.0
+        alloc_pcts_list = alloc_pcts_by_project.get(pid, [])
+        avg_alloc = sum(alloc_pcts_list) / len(alloc_pcts_list) if alloc_pcts_list else None
+        if p.end_date:
+            end_dt = p.end_date.replace(tzinfo=None) if p.end_date.tzinfo else p.end_date
+            days_to_end_val = (end_dt - now).days
+        else:
+            days_to_end_val = None
+        health = compute_project_health(round(progress, 1), billable_pct, days_to_end_val, avg_alloc)
+
         result.append({
             "id": pid,
             "name": p.name,
@@ -128,6 +179,8 @@ async def list_projects(
             "planned_days": round(planned_days, 1),
             "worked_days": round(worked_days, 1),
             "progress_percent": round(progress, 1),
+            "health_score": health["health_score"],
+            "health_breakdown": health["health_breakdown"],
         })
 
     total = len(result)
@@ -396,6 +449,7 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
     # Fetch per-member allocation and timesheet data for the period
     alloc_map: dict[str, ProjectAllocation] = {}
     worked_map: dict[str, float] = {}
+    billable_worked_map: dict[str, float] = {}
     if period:
         proj_allocs = await ProjectAllocation.find(
             ProjectAllocation.project_id == project_id,
@@ -413,6 +467,8 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
         ).to_list()
         for t in proj_timesheets:
             worked_map[t.employee_id] = worked_map.get(t.employee_id, 0.0) + t.hours
+            if t.is_billable:
+                billable_worked_map[t.employee_id] = billable_worked_map.get(t.employee_id, 0.0) + t.hours
 
     members = []
     for a in assignments:
@@ -453,6 +509,18 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
     else:
         progress = 0.0
 
+    # Health score
+    total_billable_h = sum(billable_worked_map.values()) if billable_worked_map else 0.0
+    billable_pct_detail = (total_billable_h / total_worked_hours * 100) if total_worked_hours > 0 else 0.0
+    alloc_pcts = [a.allocation_percentage for a in alloc_map.values() if a.allocation_percentage is not None]
+    avg_alloc_pct_detail = sum(alloc_pcts) / len(alloc_pcts) if alloc_pcts else None
+    if project.end_date:
+        end_dt = project.end_date.replace(tzinfo=None) if project.end_date.tzinfo else project.end_date
+        days_to_end_detail = (end_dt - now).days
+    else:
+        days_to_end_detail = None
+    health = compute_project_health(round(progress, 1), billable_pct_detail, days_to_end_detail, avg_alloc_pct_detail)
+
     return {
         "id": str(project.id),
         "name": project.name,
@@ -465,6 +533,8 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
         "planned_days": round(total_planned, 1),
         "worked_days": round(total_worked, 1),
         "progress_percent": round(progress, 1),
+        "health_score": health["health_score"],
+        "health_breakdown": health["health_breakdown"],
         "member_count": len(members),
         "members": members,
     }

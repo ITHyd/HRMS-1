@@ -1,13 +1,12 @@
 import { SearchBar } from "./SearchBar"
+import { NotificationBell } from "./NotificationBell"
 import { Button } from "@/components/ui/button"
 import { Download, Compass } from "lucide-react"
 import { useOrgChartStore } from "@/store/orgChartStore"
-import { useAuthStore } from "@/store/authStore"
 import { exportTeamReport } from "@/api/importExport"
 import { useLocation } from "react-router-dom"
 
 export function Header() {
-  const { user } = useAuthStore()
   const location = useLocation()
   const clearHighlight = useOrgChartStore((s) => s.clearHighlight)
   const clearTrace = useOrgChartStore((s) => s.clearTrace)
@@ -33,6 +32,7 @@ export function Header() {
       <SearchBar />
 
       <div className="ml-auto flex items-center gap-2">
+        <NotificationBell />
         {isOrgChart && (
           <Button
             variant="outline"

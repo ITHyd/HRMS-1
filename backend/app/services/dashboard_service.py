@@ -32,6 +32,7 @@ def _previous_periods(period: str, count: int) -> list[str]:
 async def get_executive_dashboard(
     period: str,
     branch_location_id: str,
+    client_name: str | None = None,
 ) -> dict:
     """
     Executive-level dashboard aggregated from UtilisationSnapshot.
@@ -45,6 +46,25 @@ async def get_executive_dashboard(
         UtilisationSnapshot.period == period,
         {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
     ).to_list()
+
+    # If filtering by client, narrow snapshots to employees who worked on that client's projects
+    client_proj_ids: set[str] | None = None
+    if client_name:
+        client_projects = await Project.find(
+            {"client_name": {"$regex": client_name, "$options": "i"}, "is_deleted": {"$ne": True}}
+        ).to_list()
+        client_proj_ids = {str(p.id) for p in client_projects}
+        if client_proj_ids:
+            client_ts = await TimesheetEntry.find(
+                TimesheetEntry.branch_location_id == branch_location_id,
+                TimesheetEntry.period == period,
+                TimesheetEntry.status != "rejected",
+                {"project_id": {"$in": list(client_proj_ids)}},
+            ).to_list()
+            client_emp_ids = {e.employee_id for e in client_ts}
+            snapshots = [s for s in snapshots if s.employee_id in client_emp_ids]
+        else:
+            snapshots = []
 
     total_active = len(snapshots)
     billable_count = 0
@@ -69,12 +89,15 @@ async def get_executive_dashboard(
     # Top consuming projects: aggregate TimesheetEntry by project for the period
     # Only include timesheet entries from branch-level employees (not corporate)
     branch_emp_ids = [s.employee_id for s in snapshots]
-    entries = await TimesheetEntry.find(
+    entry_filters: list = [
         TimesheetEntry.branch_location_id == branch_location_id,
         TimesheetEntry.period == period,
         TimesheetEntry.status != "rejected",
         {"employee_id": {"$in": branch_emp_ids}},
-    ).to_list()
+    ]
+    if client_proj_ids is not None:
+        entry_filters.append({"project_id": {"$in": list(client_proj_ids)}})
+    entries = await TimesheetEntry.find(*entry_filters).to_list()
 
     project_hours: dict[str, float] = defaultdict(float)
     project_members: dict[str, set] = defaultdict(set)
@@ -133,11 +156,17 @@ async def get_executive_dashboard(
 
     # Trend: last 6 periods
     trend_periods = _previous_periods(period, 6)
-    trend_snapshots = await UtilisationSnapshot.find(
+    trend_filters: list = [
         UtilisationSnapshot.branch_location_id == branch_location_id,
         {"period": {"$in": trend_periods}},
         {"employee_level": {"$nin": list(CORPORATE_LEVELS)}},
-    ).to_list()
+    ]
+    if branch_emp_ids:
+        trend_filters.append({"employee_id": {"$in": branch_emp_ids}})
+    elif client_name:
+        # client filter active but no employees matched — return empty trend
+        trend_filters.append({"employee_id": {"$in": []}})
+    trend_snapshots = await UtilisationSnapshot.find(*trend_filters).to_list()
 
     period_groups: dict[str, list[UtilisationSnapshot]] = defaultdict(list)
     for s in trend_snapshots:
@@ -311,6 +340,7 @@ async def get_project_dashboard(
     period: str,
     branch_location_id: str,
     project_id: str | None = None,
+    client_name: str | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> dict:
@@ -337,6 +367,12 @@ async def get_project_dashboard(
     ]
     if project_id:
         ts_filters.append(TimesheetEntry.project_id == project_id)
+    if client_name:
+        client_projects = await Project.find(
+            {"client_name": {"$regex": client_name, "$options": "i"}, "is_deleted": {"$ne": True}}
+        ).to_list()
+        client_proj_ids = [str(p.id) for p in client_projects]
+        ts_filters.append({"project_id": {"$in": client_proj_ids}})
 
     entries = await TimesheetEntry.find(*ts_filters).to_list()
 

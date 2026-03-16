@@ -6,8 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
 from app.routers import (
-    admin, analytics, audit, auth, availability, dashboard, employees, export_data,
-    finance, hrms_sync, integration, org, projects, search, timesheets, utilisation,
+    admin, alerts, analytics, audit, auth, availability, dashboard, employees, export_data,
+    finance, hrms_sync, integration, notifications, org, projects, search, timesheets, utilisation,
 )
 
 
@@ -33,6 +33,8 @@ app.add_middleware(
 )
 
 app.include_router(admin.router)
+app.include_router(alerts.router)
+app.include_router(notifications.router)
 app.include_router(auth.router)
 app.include_router(org.router)
 app.include_router(employees.router)

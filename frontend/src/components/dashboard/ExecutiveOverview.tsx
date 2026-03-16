@@ -1,12 +1,20 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Users, TrendingUp, TrendingDown, UserX, Percent, DollarSign } from "lucide-react"
 import type { ExecutiveDashboard } from "@/types/dashboard"
+import { useNotificationStore } from "@/store/notificationStore"
 
 interface ExecutiveOverviewProps {
   data: ExecutiveDashboard
 }
 
 export function ExecutiveOverview({ data }: ExecutiveOverviewProps) {
+  const dismissed = useNotificationStore((s) => s.dismissed)
+  const billableLow = useNotificationStore((s) => s.summary?.details.billable_low ?? [])
+  const dismiss = useNotificationStore((s) => s.dismiss)
+
+  const showBillableBadge =
+    billableLow.length > 0 && !dismissed.has("billable_low:branch")
+
   const stats = [
     {
       label: "Total Active",
@@ -61,6 +69,15 @@ export function ExecutiveOverview({ data }: ExecutiveOverviewProps) {
               <div>
                 <p className="text-xs text-muted-foreground">{stat.label}</p>
                 <p className="text-2xl font-bold mt-1">{stat.value}</p>
+                {stat.label === "Billable %" && showBillableBadge && (
+                  <span
+                    title={`Below ${billableLow[0]?.target_pct ?? 75}% target · Right-click to dismiss`}
+                    onContextMenu={(e) => { e.preventDefault(); dismiss("billable_low", "branch") }}
+                    className="mt-1 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 cursor-context-menu select-none"
+                  >
+                    📉 Below target
+                  </span>
+                )}
               </div>
               <div className={`rounded-lg p-2 ${stat.bg}`}>
                 <stat.icon className={`h-5 w-5 ${stat.color}`} />

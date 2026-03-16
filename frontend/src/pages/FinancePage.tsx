@@ -45,12 +45,17 @@ export function FinancePage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    await Promise.all([fetchBillable(), fetchHistory()])
-    setLoading(false)
+    try {
+      await Promise.all([fetchBillable(), fetchHistory()])
+    } finally {
+      setLoading(false)
+    }
   }, [fetchBillable, fetchHistory])
 
   useEffect(() => {
-    fetchAll()
+    queueMicrotask(() => {
+      void fetchAll()
+    })
   }, [fetchAll])
 
   const handleUploadComplete = () => {

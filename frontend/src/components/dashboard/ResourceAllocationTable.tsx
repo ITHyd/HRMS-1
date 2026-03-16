@@ -1,7 +1,9 @@
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { Pagination } from "@/components/shared/Pagination"
 import { useOrgChartStore } from "@/store/orgChartStore"
+import { useNotificationStore } from "@/store/notificationStore"
 import type { ResourceAllocationEntry } from "@/types/dashboard"
 
 interface ResourceAllocationTableProps {
@@ -22,8 +24,17 @@ export function ResourceAllocationTable({
   onPageSizeChange,
 }: ResourceAllocationTableProps) {
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
+  const summary = useNotificationStore((s) => s.summary)
+  const dismissed = useNotificationStore((s) => s.dismissed)
+  const dismiss = useNotificationStore((s) => s.dismiss)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; empId: string } | null>(null)
+
+  const longBenchMap = new Map(
+    summary?.details.bench_long.map((e) => [e.employee_id, e]) ?? []
+  )
 
   return (
+    <>
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Resource Allocations</CardTitle>
@@ -58,9 +69,24 @@ export function ResourceAllocationTable({
                     className="border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer group"
                   >
                     <td className="py-2.5 pr-4">
-                      <span className="font-medium text-primary group-hover:underline">
-                        {entry.employee_name}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-medium text-primary group-hover:underline">
+                          {entry.employee_name}
+                        </span>
+                        {(() => {
+                          const info = longBenchMap.get(entry.employee_id)
+                          if (!info || dismissed.has(`bench_long:${entry.employee_id}`)) return null
+                          return (
+                            <span
+                              title={`Benched ${info.bench_days}+ days · Right-click to dismiss`}
+                              onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, empId: entry.employee_id }) }}
+                              className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 cursor-context-menu select-none"
+                            >
+                              ⚠ Long bench
+                            </span>
+                          )
+                        })()}
+                      </div>
                     </td>
                     <td className="py-2.5 pr-4 text-muted-foreground">
                       {entry.project_name || "-"}
@@ -113,5 +139,21 @@ export function ResourceAllocationTable({
         />
       </CardContent>
     </Card>
+
+    {ctxMenu && (
+      <div
+        className="fixed z-[200] rounded-md border bg-popover shadow-md py-1 min-w-[90px]"
+        style={{ left: ctxMenu.x, top: ctxMenu.y }}
+        onMouseLeave={() => setCtxMenu(null)}
+      >
+        <button
+          onClick={() => { dismiss("bench_long", ctxMenu.empId); setCtxMenu(null) }}
+          className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted transition-colors cursor-pointer"
+        >
+          Dismiss
+        </button>
+      </div>
+    )}
+  </>
   )
 }

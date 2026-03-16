@@ -15,12 +15,22 @@ export function UserProfileModal({ employeeId, isOpen, onClose }: UserProfileMod
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (isOpen && employeeId) {
+    if (!isOpen || !employeeId) return
+    let isActive = true
+    queueMicrotask(() => {
+      if (!isActive) return
       setLoading(true)
       getEmployee(employeeId)
-        .then(setEmployee)
+        .then((data) => {
+          if (isActive) setEmployee(data)
+        })
         .catch(console.error)
-        .finally(() => setLoading(false))
+        .finally(() => {
+          if (isActive) setLoading(false)
+        })
+    })
+    return () => {
+      isActive = false
     }
   }, [isOpen, employeeId])
 

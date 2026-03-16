@@ -32,7 +32,6 @@ export function BenchPoolTable({
 }: BenchPoolTableProps) {
   const [managingEmployee, setManagingEmployee] = useState<AvailableEmployee | null>(null)
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
-  const totalPages = Math.ceil(total / pageSize)
 
   const handleSkillUpdate = () => {
     onRefresh()

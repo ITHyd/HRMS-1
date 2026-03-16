@@ -18,6 +18,11 @@ export function LevelPyramid({ data }: { data: LevelCount[] }) {
     }))
 
   const total = chartData.reduce((sum, d) => sum + d.value, 0)
+  const formatLevelCount = (value: number | string | undefined): [string, string] => {
+    const count = typeof value === "number" ? value : Number(value ?? 0)
+    const percentage = total > 0 ? ((count / total) * 100).toFixed(0) : "0"
+    return [`${count} (${percentage}%)`, "Count"]
+  }
 
   return (
     <Card>
@@ -42,12 +47,7 @@ export function LevelPyramid({ data }: { data: LevelCount[] }) {
                 <Cell key={index} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip
-              formatter={(value: number) => [
-                `${value} (${((value / total) * 100).toFixed(0)}%)`,
-                "Count",
-              ]}
-            />
+            <Tooltip formatter={formatLevelCount} />
             <Legend
               iconType="circle"
               iconSize={8}

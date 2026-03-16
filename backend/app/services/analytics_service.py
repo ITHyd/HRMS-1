@@ -190,7 +190,7 @@ async def get_branch_analytics(location_id: str):
     all_emp_projs = await EmployeeProject.find_all().to_list()
     assigned_project_ids = {ep.project_id for ep in all_emp_projs}
     orphaned = []
-    for proj in all_projects:
+    for proj in all_projects_list:
         if str(proj.id) not in assigned_project_ids:
             orphaned.append({
                 "id": str(proj.id),
