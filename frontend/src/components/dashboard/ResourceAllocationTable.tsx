@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge"
 import { Pagination } from "@/components/shared/Pagination"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import { useNotificationStore } from "@/store/notificationStore"
+import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react"
 import type { ResourceAllocationEntry } from "@/types/dashboard"
 
 interface ResourceAllocationTableProps {
@@ -13,6 +14,16 @@ interface ResourceAllocationTableProps {
   pageSize: number
   onPageChange: (page: number) => void
   onPageSizeChange?: (size: number) => void
+}
+
+type SortKey = "employee_name" | "project_name" | "client_name" | "allocation_percentage" | "billable_hours" | "non_billable_hours" | "classification" | "available_days"
+type SortDir = "asc" | "desc"
+
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey | null; sortDir: SortDir }) {
+  if (sortKey !== col) return <ChevronsUpDown className="inline h-3 w-3 ml-1 opacity-30" />
+  return sortDir === "asc"
+    ? <ChevronUp className="inline h-3 w-3 ml-1 opacity-80" />
+    : <ChevronDown className="inline h-3 w-3 ml-1 opacity-80" />
 }
 
 export function ResourceAllocationTable({
@@ -28,10 +39,36 @@ export function ResourceAllocationTable({
   const dismissed = useNotificationStore((s) => s.dismissed)
   const dismiss = useNotificationStore((s) => s.dismiss)
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; empId: string } | null>(null)
+  const [sortKey, setSortKey] = useState<SortKey | null>(null)
+  const [sortDir, setSortDir] = useState<SortDir>("asc")
 
   const longBenchMap = new Map(
     summary?.details.bench_long.map((e) => [e.employee_id, e]) ?? []
   )
+
+  function handleSort(col: SortKey) {
+    if (sortKey === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setSortKey(col)
+      setSortDir("asc")
+    }
+  }
+
+  const sorted = sortKey
+    ? [...entries].sort((a, b) => {
+        const av = a[sortKey] ?? ""
+        const bv = b[sortKey] ?? ""
+        const cmp = typeof av === "number" && typeof bv === "number"
+          ? av - bv
+          : String(av).localeCompare(String(bv))
+        return sortDir === "asc" ? cmp : -cmp
+      })
+    : entries
+
+  function thClass(align?: "right") {
+    return `pb-2 pr-4 font-medium cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap${align === "right" ? " text-right" : ""}`
+  }
 
   return (
     <>
@@ -44,25 +81,41 @@ export function ResourceAllocationTable({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-muted-foreground">
-                <th className="pb-2 pr-4 font-medium">Name</th>
-                <th className="pb-2 pr-4 font-medium">Project</th>
-                <th className="pb-2 pr-4 font-medium">Client</th>
-                <th className="pb-2 pr-4 font-medium text-right">Allocation %</th>
-                <th className="pb-2 pr-4 font-medium text-right">Billable Hrs</th>
-                <th className="pb-2 pr-4 font-medium text-right">Non-Billable Hrs</th>
-                <th className="pb-2 pr-4 font-medium">Classification</th>
-                <th className="pb-2 font-medium text-right">Available Days</th>
+                <th className={thClass()} onClick={() => handleSort("employee_name")}>
+                  Name <SortIcon col="employee_name" sortKey={sortKey} sortDir={sortDir} />
+                </th>
+                <th className={thClass()} onClick={() => handleSort("project_name")}>
+                  Project <SortIcon col="project_name" sortKey={sortKey} sortDir={sortDir} />
+                </th>
+                <th className={thClass()} onClick={() => handleSort("client_name")}>
+                  Client <SortIcon col="client_name" sortKey={sortKey} sortDir={sortDir} />
+                </th>
+                <th className={thClass("right")} onClick={() => handleSort("allocation_percentage")}>
+                  Allocation % <SortIcon col="allocation_percentage" sortKey={sortKey} sortDir={sortDir} />
+                </th>
+                <th className={thClass("right")} onClick={() => handleSort("billable_hours")}>
+                  Billable Hrs <SortIcon col="billable_hours" sortKey={sortKey} sortDir={sortDir} />
+                </th>
+                <th className={thClass("right")} onClick={() => handleSort("non_billable_hours")}>
+                  Non-Billable Hrs <SortIcon col="non_billable_hours" sortKey={sortKey} sortDir={sortDir} />
+                </th>
+                <th className={thClass()} onClick={() => handleSort("classification")}>
+                  Classification <SortIcon col="classification" sortKey={sortKey} sortDir={sortDir} />
+                </th>
+                <th className={`pb-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors text-right whitespace-nowrap`} onClick={() => handleSort("available_days")}>
+                  Available Days <SortIcon col="available_days" sortKey={sortKey} sortDir={sortDir} />
+                </th>
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 ? (
+              {sorted.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-muted-foreground">
                     No resource allocation data found for this period
                   </td>
                 </tr>
               ) : (
-                entries.map((entry, idx) => (
+                sorted.map((entry, idx) => (
                   <tr
                     key={`${entry.employee_id}-${entry.project_name ?? "bench"}-${idx}`}
                     onClick={() => selectEmployee(entry.employee_id)}

@@ -306,15 +306,23 @@ export function DashboardPage() {
                 />
               </div>
 
-              {/* Classification filter — resources tab only */}
+              {/* Classification filter — inline pills, resources tab only */}
               {activeTab === "resources" && (
-                <SelectDropdown
-                  value={classificationFilter}
-                  onChange={(v) => { setClassificationFilter(v); setResourcePage(1) }}
-                  options={CLASSIFICATION_OPTIONS}
-                  placeholder="All Classifications"
-                  maxVisible={5}
-                />
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {CLASSIFICATION_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => { setClassificationFilter(opt.value); setResourcePage(1) }}
+                      className={`cursor-pointer px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+                        classificationFilter === opt.value
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-transparent text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               )}
 
               {/* Clear */}
