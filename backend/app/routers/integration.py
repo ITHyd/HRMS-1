@@ -81,6 +81,18 @@ async def retry_sync(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.get("/sync-logs/{sync_id}")
+async def get_sync_log(
+    sync_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Get details for a single sync log entry."""
+    try:
+        return await integration_service.get_sync_log_detail(sync_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.get("/sync-logs")
 async def list_sync_logs(
     integration_type: str = Query(None),

@@ -21,7 +21,7 @@ export function SpanOfControl({ data }: { data: SpanData[] }) {
               className="cursor-pointer w-full text-left flex items-center justify-between rounded-lg border px-3 py-2 hover:bg-muted/50 transition-colors group"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate text-primary group-hover:underline">
+                <p className="text-sm font-medium truncate text-foreground group-hover:underline">
                   {mgr.manager_name}
                 </p>
                 <p className="text-xs text-muted-foreground">{mgr.designation}</p>

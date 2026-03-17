@@ -118,7 +118,7 @@ export function ResourceTable({
                     className="border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer group"
                   >
                     <td className="py-2.5 pr-4">
-                      <span className="font-medium text-primary group-hover:underline">
+                      <span className="font-medium text-foreground group-hover:underline">
                         {entry.employee_name}
                       </span>
                     </td>

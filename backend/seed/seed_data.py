@@ -501,6 +501,51 @@ async def seed(skip_init: bool = False):
 
     print(f"Created {len(assignments)} project assignments.")
 
+    # ── Historical Assignments (bench context only — NOT used for timesheet generation) ──
+    # These give bench employees a "last project" so the Talent Pool shows WHY they're benched.
+    # Employees with no active project assignment need at least one completed project reference.
+    historical_assignments = [
+        # Directors/Managers who rolled off completed client projects
+        (dir_eng_hyd,     "Cloud Migration",    "Engineering Director"),   # COMPLETED -1mo
+        (mgr_frontend_hyd,"Mobile App v2",      "Engineering Manager"),    # COMPLETED -3mo
+        (mgr_mobile_hyd,  "Mobile App v2",      "Mobile Tech Lead"),       # COMPLETED -3mo
+        (pm_hyd,          "HR Portal Redesign", "Product Owner"),          # COMPLETED -13mo
+        (mgr_ops_hyd,     "Cloud Migration",    "Delivery Manager"),       # COMPLETED -1mo
+        # HR / Finance bench employees
+        (hr1_hyd,         "HR Portal Redesign", "HR Lead"),                # already in main — skip if duplicate handled
+        (fin1_hyd,        "HR Portal Redesign", "Finance Lead"),           # COMPLETED -13mo
+        (fin2_hyd,        "Cloud Migration",    "Finance Analyst"),        # COMPLETED -1mo
+        # BLR bench
+        (mgr_eng_blr,     "Cloud Migration",    "Engineering Manager"),    # COMPLETED -1mo (note: also has Smart City active)
+        # LON bench
+        (sales2_lon,      "EMEA Market Launch", "Sales Executive"),        # COMPLETED soon — already active
+        # Ops bench
+        (ops2_hyd,        "HR Portal Redesign", "Ops Coordinator"),        # COMPLETED -13mo
+    ]
+
+    # De-duplicate: skip if the same (employee_id, project_id) already exists in main assignments
+    existing_pairs = {(emp_id, project_ids[proj_name]) for emp_id, proj_name, _ in assignments}
+    hist_count = 0
+    for emp_id, proj_name, role in historical_assignments:
+        proj_id = project_ids[proj_name]
+        if (emp_id, proj_id) in existing_pairs:
+            continue  # already assigned via main list
+        p_start, p_end = project_dates[proj_name]
+        ep = EmployeeProject(
+            employee_id=emp_id,
+            project_id=proj_id,
+            role_in_project=role,
+            start_date=p_start,
+            end_date=p_end,
+            assigned_at=p_start,
+            assigned_by="system",
+        )
+        await ep.insert()
+        existing_pairs.add((emp_id, proj_id))
+        hist_count += 1
+
+    print(f"Created {hist_count} historical (bench-context) project assignments.")
+
     # ── Users (Login Accounts) ──
     demo_hash = bcrypt.hashpw(b"demo123", bcrypt.gensalt()).decode("utf-8")
 
@@ -976,7 +1021,7 @@ async def seed(skip_init: bool = False):
                 "live_domains": ["nxzen.com"],
             },
         }),
-        ("finance", "Finance Data Feed", "inactive", {
+        ("finance", "Finance Data Feed", "active", {
             "endpoint": "https://api.example.com/finance", "version": "1.0",
         }),
         ("dynamics", "Dynamics 365 Export", "inactive", {

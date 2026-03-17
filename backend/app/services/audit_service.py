@@ -50,6 +50,10 @@ FIELD_LABELS: dict[str, str] = {
     "employee_name": "Employee",
     "description": "Description",
     "project_type": "Type",
+    "integration_type": "Integration",
+    "records_processed": "Processed",
+    "records_succeeded": "Succeeded",
+    "records_failed": "Failed",
 }
 
 
@@ -181,7 +185,18 @@ def _build_description(
     elif entry.action == "IMPORT":
         return f"Bulk import of {entity_label.lower()} data"
     elif entry.action == "SYNC":
-        return f"HRMS sync completed for {entity_label.lower()}"
+        sync_type = nv.get("integration_type", "")
+        sync_name = nv.get("name", "")
+        sync_status = nv.get("status", "completed")
+        records = nv.get("records_processed", "")
+        if sync_type:
+            label = f"{sync_type} sync"
+            if sync_name:
+                label = f"{sync_type} sync ({sync_name})"
+            status_text = "completed" if sync_status == "completed" else f"failed"
+            suffix = f" — {records} records" if records else ""
+            return f"{label} {status_text}{suffix}"
+        return f"Sync completed for {entity_label.lower()}"
     elif entry.action == "EXPORT":
         return f"{entity_label} data exported"
     elif entry.action == "UPLOAD":
@@ -210,7 +225,10 @@ async def get_audit_log(
     date_to: Optional[str] = None,
     search: Optional[str] = None,
 ):
-    filters: list = [AuditLog.branch_location_id == location_id]
+    filters: list = [{"$or": [
+        {"branch_location_id": location_id},
+        {"entity_type": "Integration", "action": "SYNC"},
+    ]}]
 
     if action:
         filters.append(AuditLog.action == action)
@@ -291,12 +309,26 @@ async def _search_audit_log(
     enriched = await _enrich_entries(all_entries)
 
     search_lower = search.lower()
-    filtered = [
-        r for r in enriched
-        if search_lower in r["description"].lower()
-        or search_lower in r.get("changed_by_name", "").lower()
-        or search_lower in r.get("entity_label", "").lower()
-    ]
+
+    def _matches(r: dict) -> bool:
+        # Search in description, user name, entity label, action
+        if search_lower in r["description"].lower():
+            return True
+        if search_lower in r.get("changed_by_name", "").lower():
+            return True
+        if search_lower in r.get("entity_label", "").lower():
+            return True
+        if search_lower in r.get("action", "").lower():
+            return True
+        # Search in old_value / new_value fields
+        for val in (r.get("old_value"), r.get("new_value")):
+            if val:
+                for k, v in val.items():
+                    if search_lower in str(k).lower() or search_lower in str(v).lower():
+                        return True
+        return False
+
+    filtered = [r for r in enriched if _matches(r)]
 
     total = len(filtered)
     skip = (page - 1) * page_size
@@ -316,7 +348,10 @@ async def get_audit_stats(location_id: str):
     since = since - timedelta(days=7)
 
     entries = await AuditLog.find(
-        AuditLog.branch_location_id == location_id,
+        {"$or": [
+            {"branch_location_id": location_id},
+            {"entity_type": "Integration", "action": "SYNC"},
+        ]},
         AuditLog.timestamp >= since,
     ).to_list()
 

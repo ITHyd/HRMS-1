@@ -115,7 +115,7 @@ export function ProjectDetailPage() {
       <div className="p-6">
         <button
           onClick={() => navigate("/projects")}
-          className="cursor-pointer inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors group mb-4"
+          className="cursor-pointer inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group mb-4"
         >
           <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
           <span className="group-hover:underline">Back to Projects</span>
@@ -139,7 +139,7 @@ export function ProjectDetailPage() {
       {/* Back button */}
       <button
         onClick={() => navigate("/projects")}
-        className="cursor-pointer inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors group"
+        className="cursor-pointer inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
       >
         <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
         <span className="group-hover:underline">Back to Projects</span>
@@ -330,7 +330,7 @@ export function ProjectDetailPage() {
                       className="border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer group"
                     >
                       <td className="py-2.5 px-3">
-                        <span className="font-medium text-primary group-hover:underline">
+                        <span className="font-medium text-foreground group-hover:underline">
                           {member.employee_name}
                         </span>
                       </td>

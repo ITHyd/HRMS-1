@@ -71,7 +71,7 @@ export function ResourceAllocationTable({
                   >
                     <td className="py-2.5 pr-4">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-medium text-primary group-hover:underline">
+                        <span className="font-medium text-foreground group-hover:underline">
                           {entry.employee_name}
                         </span>
                         {(() => {

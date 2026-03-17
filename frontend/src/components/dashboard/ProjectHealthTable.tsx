@@ -96,7 +96,7 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                           )}
                         </td>
                         <td className="py-2.5 pr-4">
-                          <span className="font-medium text-primary group-hover:underline">
+                          <span className="font-medium text-foreground group-hover:underline">
                             {project.project_name}
                           </span>
                         </td>
@@ -179,7 +179,7 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                                         className="border-t border-muted cursor-pointer hover:bg-muted/50 transition-colors group/member"
                                       >
                                         <td className="py-1.5">
-                                          <span className="text-primary group-hover/member:underline font-medium">
+                                          <span className="text-foreground group-hover/member:underline font-medium">
                                             {member.employee_name}
                                           </span>
                                         </td>

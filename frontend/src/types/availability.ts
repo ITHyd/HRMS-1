@@ -15,6 +15,17 @@ export interface SkillCatalogEntry {
   display_name: string
 }
 
+export interface ProjectRef {
+  project_id: string
+  project_name: string
+  status: string
+  role: string
+  end_date?: string | null
+  client_name?: string | null
+  /** YYYY-MM period string — shown as "last active: Jan 2026" in the table */
+  period?: string | null
+}
+
 export interface AvailableEmployee {
   employee_id: string
   employee_name: string
@@ -25,11 +36,15 @@ export interface AvailableEmployee {
   utilisation_percent: number
   classification: string
   available_from?: string
-  current_projects: Array<{
-    project_id: string
-    project_name: string
-    hours: number
-  }>
+  /** Active / on-hold projects (backward compat alias for active_projects) */
+  current_projects: ProjectRef[]
+  active_projects: ProjectRef[]
+  /** Last completed projects — shows why the person is on bench */
+  last_projects: ProjectRef[]
+  /** Date the last project ended (ISO date string) */
+  bench_since?: string | null
+  /** Days since bench_since */
+  bench_duration_days?: number | null
 }
 
 export interface BenchPoolResponse {
@@ -37,4 +52,5 @@ export interface BenchPoolResponse {
   total: number
   bench_count: number
   partial_count: number
+  avg_bench_days?: number | null
 }

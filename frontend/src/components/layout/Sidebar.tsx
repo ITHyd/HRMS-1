@@ -20,7 +20,7 @@ import {
 import { useAuthStore } from "@/store/authStore"
 import { cn } from "@/lib/utils"
 import { UserProfileModal } from "./UserProfileModal"
-import { getMode } from "@/api/admin"
+
 import { getMe } from "@/api/auth"
 
 const navItems = [
@@ -32,7 +32,7 @@ const navItems = [
   { to: "/project-timeline", icon: CalendarRange, label: "Timeline" },
   { to: "/timesheets", icon: Clock, label: "Timesheets" },
   { to: "/finance", icon: PoundSterling, label: "Finance" },
-  { to: "/availability", icon: Users, label: "Bench Pool" },
+  { to: "/availability", icon: Users, label: "Talent Pool" },
   { to: "/integrations", icon: Link2, label: "Integrations" },
   { to: "/audit", icon: ClipboardList, label: "Audit Log" },
 ]
@@ -45,10 +45,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user, logout } = useAuthStore()
   const [showProfileModal, setShowProfileModal] = useState(false)
-  const [mode, setMode] = useState<string>("")
-
   useEffect(() => {
-    getMode().then((r) => setMode(r.mode)).catch(() => {})
     // Refresh user data from DB on mount — picks up branch_code/employee_id
     // changes from HRMS sync without requiring re-login
     getMe().then((fresh) => {
@@ -70,33 +67,25 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       )}
     >
       {/* Header */}
-      <div className="flex items-center border-b px-3 py-4 min-h-16">
+      <div className="flex items-center border-b border-sidebar-border px-3 py-4 min-h-16">
         <div className={cn(
           "flex items-center gap-2 overflow-hidden transition-all duration-300 ease-in-out",
           collapsed ? "w-0 opacity-0" : "w-40 opacity-100"
         )}>
-          <Building2 className="h-6 w-6 shrink-0 text-sidebar-primary" />
+          <img
+            src="/nxzen-logo.jpg"
+            alt="NxZen"
+            className="h-11 w-11 shrink-0 rounded-lg object-cover"
+          />
           <div className="whitespace-nowrap">
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-sm font-bold text-sidebar-primary">Branch Command</h1>
-              {mode && (
-                <span className={cn(
-                  "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase leading-none",
-                  mode === "live"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-blue-100 text-blue-700"
-                )}>
-                  {mode}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">Center</p>
+            <h1 className="text-base font-bold text-sidebar-primary leading-tight">nxzen</h1>
+            <p className="text-xs text-sidebar-foreground/50">Branch Command</p>
           </div>
         </div>
         <button
           onClick={onToggle}
           className={cn(
-            "group relative cursor-pointer shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-sidebar-accent/50 transition-all duration-200",
+            "group relative cursor-pointer shrink-0 rounded-lg p-1.5 text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-200",
             collapsed ? "mx-auto" : "ml-auto"
           )}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -126,8 +115,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 "group relative flex items-center rounded-lg py-2 text-sm font-medium transition-all duration-200",
                 collapsed ? "justify-center px-2" : "gap-3 px-3",
                 isActive
-                  ? "bg-primary/10 text-primary font-semibold"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/60"
+                  ? "bg-sidebar-primary/15 text-sidebar-primary font-semibold"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
               )
             }
           >
@@ -150,7 +139,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t p-3">
+      <div className="border-t border-sidebar-border p-3">
         <div className="flex items-center gap-2">
           {/* Profile Avatar - Clickable */}
           <button
@@ -161,7 +150,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             )}
             aria-label="View profile"
           >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-white text-sm font-bold shadow-md">
+            <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#8DE971] to-[#AD96DC] flex items-center justify-center text-[#030304] text-sm font-bold shadow-md">
               {user?.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
             </div>
             {collapsed && (
@@ -181,10 +170,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               onClick={() => setShowProfileModal(true)}
               className="text-left w-full group"
             >
-              <p className="text-sm font-medium truncate whitespace-nowrap group-hover:text-primary transition-colors">
+              <p className="text-sm font-medium truncate whitespace-nowrap text-sidebar-foreground group-hover:text-sidebar-primary transition-colors">
                 {user?.name}
               </p>
-              <p className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+              <p className="text-xs text-sidebar-foreground/50 whitespace-nowrap flex items-center gap-1">
                 <Building2 className="h-3 w-3" />
                 Branch: {user?.branch_code}
               </p>
@@ -195,7 +184,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             onClick={logout}
             aria-label="Sign Out"
             className={cn(
-              "cursor-pointer shrink-0 rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors duration-200",
+              "cursor-pointer shrink-0 rounded-lg p-2 text-sidebar-foreground/50 hover:bg-destructive/20 hover:text-red-400 transition-colors duration-200",
               collapsed && "hidden"
             )}
           >

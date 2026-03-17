@@ -188,7 +188,7 @@ export function SearchBar() {
                   </button>
                   <button
                     onClick={() => handleViewInOrgChart(emp.id)}
-                    className="shrink-0 rounded p-1.5 mr-2 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                    className="shrink-0 rounded p-1.5 mr-2 text-muted-foreground hover:bg-primary/10 hover:text-foreground transition-colors"
                     title="View in Org Chart"
                   >
                     <Network className="h-3.5 w-3.5" />
@@ -291,7 +291,7 @@ export function SearchBar() {
           {/* View all results */}
           <button
             onClick={handleViewAll}
-            className="flex w-full items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium text-primary hover:bg-accent transition-colors border-t"
+            className="flex w-full items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium text-foreground hover:bg-accent transition-colors border-t"
           >
             View all results for &ldquo;{query}&rdquo;
             <ArrowRight className="h-3.5 w-3.5" />

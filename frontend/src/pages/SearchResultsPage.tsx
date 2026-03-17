@@ -217,7 +217,7 @@ export function SearchResultsPage() {
             onClick={() => setTab(tab.key)}
             className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.key
-                ? "border-primary text-primary"
+                ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -276,7 +276,7 @@ export function SearchResultsPage() {
                     <h3 className="text-sm font-semibold">Employees ({globalResults.employees.total})</h3>
                   </div>
                   {globalResults.employees.total > globalResults.employees.items.length && (
-                    <button onClick={() => setTab("employees")} className="text-xs text-primary hover:underline flex items-center gap-1">
+                    <button onClick={() => setTab("employees")} className="text-xs text-foreground hover:underline flex items-center gap-1">
                       View all <ArrowRight className="h-3 w-3" />
                     </button>
                   )}
@@ -285,7 +285,7 @@ export function SearchResultsPage() {
                   {globalResults.employees.items.map((emp) => (
                     <button key={emp.id} onClick={() => selectEmployee(emp.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50 transition-colors">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-primary">{emp.name}</p>
+                        <p className="text-sm font-medium text-foreground">{emp.name}</p>
                         <p className="text-xs text-muted-foreground">{emp.designation} · {emp.department}</p>
                       </div>
                       <span className="text-xs text-muted-foreground capitalize">{emp.level}</span>
@@ -307,7 +307,7 @@ export function SearchResultsPage() {
                     <h3 className="text-sm font-semibold">Projects ({globalResults.projects.total})</h3>
                   </div>
                   {globalResults.projects.total > globalResults.projects.items.length && (
-                    <button onClick={() => setTab("projects")} className="text-xs text-primary hover:underline flex items-center gap-1">
+                    <button onClick={() => setTab("projects")} className="text-xs text-foreground hover:underline flex items-center gap-1">
                       View all <ArrowRight className="h-3 w-3" />
                     </button>
                   )}
@@ -316,7 +316,7 @@ export function SearchResultsPage() {
                   {globalResults.projects.items.map((proj) => (
                     <button key={proj.id} onClick={() => navigate(`/projects/${proj.id}`)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50 transition-colors">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-primary">{proj.name}</p>
+                        <p className="text-sm font-medium text-foreground">{proj.name}</p>
                         <p className="text-xs text-muted-foreground">{proj.client_name} · {proj.member_count} members</p>
                       </div>
                       <Badge variant="outline" className={`text-[10px] ${proj.project_type === "client" ? "border-blue-300 text-blue-700 bg-blue-50" : "border-gray-300 text-gray-600 bg-gray-50"}`}>
@@ -340,7 +340,7 @@ export function SearchResultsPage() {
                     <h3 className="text-sm font-semibold">Skills ({globalResults.skills.total})</h3>
                   </div>
                   {globalResults.skills.total > globalResults.skills.items.length && (
-                    <button onClick={() => setTab("skills")} className="text-xs text-primary hover:underline flex items-center gap-1">
+                    <button onClick={() => setTab("skills")} className="text-xs text-foreground hover:underline flex items-center gap-1">
                       View all <ArrowRight className="h-3 w-3" />
                     </button>
                   )}
@@ -357,7 +357,7 @@ export function SearchResultsPage() {
                         <p className="text-sm font-medium">{skill.display_name}</p>
                         <p className="text-xs text-muted-foreground">{skill.category}</p>
                       </div>
-                      <span className="text-xs font-medium text-primary tabular-nums">{skill.employee_count}</span>
+                      <span className="text-xs font-medium text-foreground tabular-nums">{skill.employee_count}</span>
                     </button>
                   ))}
                 </div>
@@ -420,7 +420,7 @@ export function SearchResultsPage() {
                   ) : employees.map((emp) => (
                     <tr key={emp.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                       <td className="py-2.5 px-3">
-                        <button onClick={() => selectEmployee(emp.id)} className="font-medium text-primary hover:underline text-left">{emp.name}</button>
+                        <button onClick={() => selectEmployee(emp.id)} className="font-medium text-foreground hover:underline text-left">{emp.name}</button>
                       </td>
                       <td className="py-2.5 px-3 text-muted-foreground border-l border-border">{emp.email}</td>
                       <td className="py-2.5 px-3 text-muted-foreground border-l border-border">{emp.designation}</td>
@@ -460,7 +460,7 @@ export function SearchResultsPage() {
                   ) : projects.map((proj) => (
                     <tr key={proj.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                       <td className="py-2.5 px-3">
-                        <button onClick={() => navigate(`/projects/${proj.id}`)} className="font-medium text-primary hover:underline text-left">{proj.name}</button>
+                        <button onClick={() => navigate(`/projects/${proj.id}`)} className="font-medium text-foreground hover:underline text-left">{proj.name}</button>
                       </td>
                       <td className="py-2.5 px-3 border-l border-border">
                         <Badge variant="outline" className={`text-[10px] ${proj.project_type === "client" ? "border-blue-300 text-blue-700 bg-blue-50" : "border-gray-300 text-gray-600 bg-gray-50"}`}>{proj.project_type}</Badge>
@@ -529,7 +529,7 @@ export function SearchResultsPage() {
                         ) : skillEmployees.map((emp) => (
                           <tr key={emp.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                             <td className="py-2.5 px-3">
-                              <button onClick={() => selectEmployee(emp.id)} className="font-medium text-primary hover:underline text-left">{emp.name}</button>
+                              <button onClick={() => selectEmployee(emp.id)} className="font-medium text-foreground hover:underline text-left">{emp.name}</button>
                             </td>
                             <td className="py-2.5 px-3 text-muted-foreground border-l border-border">{emp.email}</td>
                             <td className="py-2.5 px-3 text-muted-foreground border-l border-border">{emp.designation}</td>

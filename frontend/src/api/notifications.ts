@@ -21,15 +21,28 @@ export interface BillableLowDetail {
   target_pct: number
 }
 
+export interface RecentSyncDetail {
+  sync_id: string
+  integration_type: string
+  type_label: string
+  status: "completed" | "failed" | "running"
+  records_processed: number
+  records_succeeded: number
+  records_failed: number
+  completed_at: string | null
+}
+
 export interface NotificationSummary {
   bench_long: number
   project_ending: number
   billable_low: number
+  recent_syncs: number
   total: number
   details: {
     bench_long: BenchLongDetail[]
     project_ending: ProjectEndingDetail[]
     billable_low: BillableLowDetail[]
+    recent_syncs: RecentSyncDetail[]
   }
 }
 

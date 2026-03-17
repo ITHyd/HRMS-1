@@ -37,7 +37,15 @@ class AvailableEmployee(BaseModel):
     utilisation_percent: float
     classification: str
     available_from: Optional[str] = None
+    # Active/on-hold project assignments (same as current_projects for backward compat)
     current_projects: list[dict]
+    active_projects: list[dict] = []
+    # Last completed projects (for bench context)
+    last_projects: list[dict] = []
+    # When the employee became bench (end date of their last completed project)
+    bench_since: Optional[str] = None
+    # Days on bench since bench_since
+    bench_duration_days: Optional[int] = None
 
 
 class BenchPoolResponse(BaseModel):
@@ -45,3 +53,4 @@ class BenchPoolResponse(BaseModel):
     total: int
     bench_count: int
     partial_count: int
+    avg_bench_days: Optional[int] = None

@@ -6,39 +6,11 @@ import type { AuditFilterParams } from "@/api/audit"
 import { AuditLogTable } from "@/components/audit/AuditLogTable"
 import { AuditStats } from "@/components/audit/AuditStats"
 import { ExportButton } from "@/components/shared/ExportButton"
-import { SelectDropdown } from "@/components/shared/SelectDropdown"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, SlidersHorizontal, Search, X } from "lucide-react"
 
 const PAGE_SIZE = 20
-
-const ACTION_OPTIONS = [
-  { value: "", label: "All Actions" },
-  { value: "CREATE", label: "CREATE" },
-  { value: "UPDATE", label: "UPDATE" },
-  { value: "DELETE", label: "DELETE" },
-  { value: "SYNC", label: "SYNC" },
-  { value: "EXPORT", label: "EXPORT" },
-  { value: "UPLOAD", label: "UPLOAD" },
-  { value: "SKILL_TAG", label: "SKILL_TAG" },
-  { value: "APPROVE", label: "APPROVE" },
-  { value: "REJECT", label: "REJECT" },
-  { value: "LOCK", label: "LOCK" },
-  { value: "COMPUTE", label: "COMPUTE" },
-]
-
-const ENTITY_OPTIONS = [
-  { value: "", label: "All Entities" },
-  { value: "employee", label: "Employee" },
-  { value: "relationship", label: "Relationship" },
-  { value: "project", label: "Project" },
-  { value: "timesheet", label: "Timesheet" },
-  { value: "finance", label: "Finance" },
-  { value: "utilisation", label: "Utilisation" },
-  { value: "integration", label: "Integration" },
-  { value: "skill", label: "Skill" },
-]
 
 export function AuditPage() {
   const user = useAuthStore((s) => s.user)
@@ -48,15 +20,13 @@ export function AuditPage() {
   const [loading, setLoading] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
 
-  const [action, setAction] = useState("")
-  const [entityType, setEntityType] = useState("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [search, setSearch] = useState("")
 
   const locationId = user?.branch_location_id ?? ""
 
-  const activeFilterCount = [action, entityType, dateFrom, dateTo, search].filter(Boolean).length
+  const activeFilterCount = [dateFrom, dateTo, search].filter(Boolean).length
 
   const fetchEntries = useCallback(
     async (currentPage: number) => {
@@ -64,8 +34,6 @@ export function AuditPage() {
       setLoading(true)
 
       const params: AuditFilterParams = {}
-      if (action) params.action = action
-      if (entityType) params.entity_type = entityType
       if (dateFrom) params.date_from = dateFrom
       if (dateTo) params.date_to = dateTo
       if (search) params.search = search
@@ -80,7 +48,7 @@ export function AuditPage() {
         setLoading(false)
       }
     },
-    [locationId, action, entityType, dateFrom, dateTo, search]
+    [locationId, dateFrom, dateTo, search]
   )
 
   useEffect(() => {
@@ -90,11 +58,9 @@ export function AuditPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1)
-  }, [action, entityType, dateFrom, dateTo, search])
+  }, [dateFrom, dateTo, search])
 
   const resetFilters = () => {
-    setAction("")
-    setEntityType("")
     setDateFrom("")
     setDateTo("")
     setSearch("")
@@ -147,25 +113,15 @@ export function AuditPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-4 flex-wrap">
-              <div className="relative w-52">
+              <div className="relative w-64">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
-                  placeholder="Search descriptions..."
+                  placeholder="Search anything..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full h-8 rounded-md border border-input bg-transparent pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
-              <SelectDropdown
-                options={ACTION_OPTIONS}
-                value={action}
-                onChange={setAction}
-              />
-              <SelectDropdown
-                options={ENTITY_OPTIONS}
-                value={entityType}
-                onChange={setEntityType}
-              />
               <div className="flex items-center gap-2">
                 <input
                   type="date"

@@ -3,7 +3,7 @@ Skills Portal sync service for syncing skills data from skills.nxzen.com
 """
 
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import Dict, Any
 from app.services.skills_client import skills_client
 from app.models.skill_catalog import SkillCatalog
 from app.models.sync_log import SyncLog
@@ -11,14 +11,16 @@ from app.models.sync_log import SyncLog
 
 async def sync_skills_from_portal() -> Dict[str, Any]:
     """
-    Sync skills from Skills Portal API to local skill_catalog collection
-    Returns sync result with success status and details
+    Sync skills from Skills Portal API to local skill_catalog collection.
+    Returns sync result with success status and details.
+    NOTE: SyncLog is created by the caller (integration_service.trigger_manual_sync),
+    so this function must NOT create its own SyncLog to avoid duplicates.
     """
-    
+
     try:
         # Fetch skills from API
         skills_data = await skills_client.get_skills()
-        
+
         if not skills_data:
             return {
                 "success": False,
@@ -26,10 +28,10 @@ async def sync_skills_from_portal() -> Dict[str, Any]:
                 "synced_count": 0,
                 "total_count": 0
             }
-        
+
         # Clear existing skills
         await SkillCatalog.find_all().delete()
-        
+
         # Insert new skills
         skill_docs = []
         for skill in skills_data:
@@ -37,30 +39,12 @@ async def sync_skills_from_portal() -> Dict[str, Any]:
                 name=skill.get("name", ""),
                 display_name=skill.get("name", ""),  # Use name as display_name
                 category=skill.get("category", ""),
-                # Note: removed fields that don't exist in the model
             )
             skill_docs.append(skill_doc)
-        
+
         if skill_docs:
             await SkillCatalog.insert_many(skill_docs)
-        
-        # Log the sync
-        sync_log = SyncLog(
-            integration_type="skills",
-            status="completed",
-            records_processed=len(skills_data),
-            records_successful=len(skill_docs),
-            records_failed=0,
-            started_at=datetime.utcnow(),
-            completed_at=datetime.utcnow(),
-            details={
-                "source": "skills.nxzen.com/api/skills",
-                "categories": len(set(skill.get("category", "") for skill in skills_data)),
-                "pathways": len(set(skill.get("pathway", "") for skill in skills_data))
-            }
-        )
-        await sync_log.insert()
-        
+
         return {
             "success": True,
             "message": f"Successfully synced {len(skill_docs)} skills",
@@ -69,22 +53,8 @@ async def sync_skills_from_portal() -> Dict[str, Any]:
             "categories": len(set(skill.get("category", "") for skill in skills_data)),
             "pathways": len(set(skill.get("pathway", "") for skill in skills_data))
         }
-        
+
     except Exception as e:
-        # Log the failed sync
-        sync_log = SyncLog(
-            integration_type="skills",
-            status="failed",
-            records_processed=0,
-            records_successful=0,
-            records_failed=0,
-            started_at=datetime.utcnow(),
-            completed_at=datetime.utcnow(),
-            error_message=str(e),
-            details={"source": "skills.nxzen.com/api/skills"}
-        )
-        await sync_log.insert()
-        
         return {
             "success": False,
             "message": f"Sync failed: {str(e)}",

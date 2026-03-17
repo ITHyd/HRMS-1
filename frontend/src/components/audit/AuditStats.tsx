@@ -77,7 +77,7 @@ export function AuditStats({ locationId }: AuditStatsProps) {
         <CardContent className="p-6">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Activity className="h-5 w-5 text-primary" />
+              <Activity className="h-5 w-5 text-foreground" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">
@@ -93,7 +93,7 @@ export function AuditStats({ locationId }: AuditStatsProps) {
         <CardContent className="p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <TrendingUp className="h-5 w-5 text-primary" />
+              <TrendingUp className="h-5 w-5 text-foreground" />
             </div>
             <p className="text-sm text-muted-foreground">Top Actions</p>
           </div>
@@ -119,7 +119,7 @@ export function AuditStats({ locationId }: AuditStatsProps) {
         <CardContent className="p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Layers className="h-5 w-5 text-primary" />
+              <Layers className="h-5 w-5 text-foreground" />
             </div>
             <p className="text-sm text-muted-foreground">By Entity</p>
           </div>
