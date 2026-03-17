@@ -10,6 +10,8 @@ from app.models.project import Project
 from app.models.project_allocation import ProjectAllocation
 from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
+from app.models.reporting_relationship import ReportingRelationship
+from app.models.reporting_relationship import ReportingRelationship
 
 
 CORPORATE_LEVELS = {"c-suite", "vp"}
@@ -644,7 +646,30 @@ async def get_resource_allocation_dashboard(
     )
     proj_client_map = {str(p.id): p.client_name or "General" for p in projects}
 
-    # 5. Build rows
+    # 5. Get line manager information for all employees
+    reporting_relationships = await ReportingRelationship.find(
+        {"employee_id": {"$in": branch_emp_ids}},
+        ReportingRelationship.type == "PRIMARY",
+        ReportingRelationship.is_deleted != True,
+    ).to_list()
+    
+    # Get manager employee details
+    manager_ids = [r.manager_id for r in reporting_relationships]
+    managers = (
+        await Employee.find(
+            {"_id": {"$in": [ObjectId(mid) for mid in manager_ids if ObjectId.is_valid(mid)]}}
+        ).to_list()
+        if manager_ids
+        else []
+    )
+    manager_map = {str(m.id): m.name for m in managers}
+    
+    # Create employee to line manager mapping
+    emp_manager_map = {}
+    for rel in reporting_relationships:
+        emp_manager_map[rel.employee_id] = manager_map.get(rel.manager_id, "No Manager")
+
+    # 6. Build rows
     rows: list[dict] = []
     employees_with_alloc: set[str] = set()
 
@@ -660,6 +685,7 @@ async def get_resource_allocation_dashboard(
         rows.append({
             "employee_id": a.employee_id,
             "employee_name": a.employee_name or snap.employee_name,
+            "line_manager": emp_manager_map.get(a.employee_id, "No Manager"),
             "project_name": a.project_name,
             "client_name": client,
             "allocation_percentage": a.allocation_percentage,
@@ -678,6 +704,7 @@ async def get_resource_allocation_dashboard(
         rows.append({
             "employee_id": snap.employee_id,
             "employee_name": snap.employee_name,
+            "line_manager": emp_manager_map.get(snap.employee_id, "No Manager"),
             "project_name": None,
             "client_name": None,
             "allocation_percentage": 0.0,

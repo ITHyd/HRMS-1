@@ -68,6 +68,7 @@ export interface ProjectDetail {
   members: Array<{
     employee_id: string
     employee_name: string
+    line_manager: string
     designation: string
     department: string
     location: string

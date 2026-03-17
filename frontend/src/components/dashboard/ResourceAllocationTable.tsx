@@ -45,6 +45,7 @@ export function ResourceAllocationTable({
             <thead>
               <tr className="border-b text-left text-muted-foreground">
                 <th className="pb-2 pr-4 font-medium">Name</th>
+                <th className="pb-2 pr-4 font-medium">Line Manager</th>
                 <th className="pb-2 pr-4 font-medium">Project</th>
                 <th className="pb-2 pr-4 font-medium">Client</th>
                 <th className="pb-2 pr-4 font-medium text-right">Allocation %</th>
@@ -57,7 +58,7 @@ export function ResourceAllocationTable({
             <tbody>
               {entries.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-8 text-center text-muted-foreground">
                     No resource allocation data found for this period
                   </td>
                 </tr>
@@ -87,6 +88,9 @@ export function ResourceAllocationTable({
                           )
                         })()}
                       </div>
+                    </td>
+                    <td className="py-2.5 pr-4 text-muted-foreground">
+                      {entry.line_manager || "No Manager"}
                     </td>
                     <td className="py-2.5 pr-4 text-muted-foreground">
                       {entry.project_name || "-"}

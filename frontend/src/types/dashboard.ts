@@ -107,6 +107,7 @@ export interface AllocationDashboardResponse {
 export interface ResourceAllocationEntry {
   employee_id: string
   employee_name: string
+  line_manager: string
   project_name: string | null
   client_name: string | null
   allocation_percentage: number
