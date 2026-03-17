@@ -16,7 +16,7 @@ interface ResourceAllocationTableProps {
   onPageSizeChange?: (size: number) => void
 }
 
-type SortKey = "employee_name" | "project_name" | "client_name" | "allocation_percentage" | "billable_hours" | "non_billable_hours" | "classification" | "available_days"
+type SortKey = "employee_name" | "line_manager" | "project_name" | "client_name" | "allocation_percentage" | "billable_hours" | "non_billable_hours" | "classification" | "available_days"
 type SortDir = "asc" | "desc"
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey | null; sortDir: SortDir }) {
@@ -84,6 +84,9 @@ export function ResourceAllocationTable({
                 <th className={thClass()} onClick={() => handleSort("employee_name")}>
                   Name <SortIcon col="employee_name" sortKey={sortKey} sortDir={sortDir} />
                 </th>
+                <th className={thClass()} onClick={() => handleSort("line_manager")}>
+                  Line Manager <SortIcon col="line_manager" sortKey={sortKey} sortDir={sortDir} />
+                </th>
                 <th className={thClass()} onClick={() => handleSort("project_name")}>
                   Project <SortIcon col="project_name" sortKey={sortKey} sortDir={sortDir} />
                 </th>
@@ -110,7 +113,7 @@ export function ResourceAllocationTable({
             <tbody>
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="py-8 text-center text-muted-foreground">
                     No resource allocation data found for this period
                   </td>
                 </tr>
@@ -140,6 +143,9 @@ export function ResourceAllocationTable({
                           )
                         })()}
                       </div>
+                    </td>
+                    <td className="py-2.5 pr-4 text-muted-foreground">
+                      {entry.line_manager || "No Manager"}
                     </td>
                     <td className="py-2.5 pr-4 text-muted-foreground">
                       {entry.project_name || "-"}

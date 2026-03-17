@@ -313,6 +313,7 @@ export function ProjectDetailPage() {
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="py-2 px-3 font-medium">Name</th>
+                    <th className="py-2 px-3 font-medium border-l border-border">Line Manager</th>
                     <th className="py-2 px-3 font-medium border-l border-border">Designation</th>
                     <th className="py-2 px-3 font-medium border-l border-border">Department</th>
                     <th className="py-2 px-3 font-medium border-l border-border">Role</th>
@@ -332,6 +333,9 @@ export function ProjectDetailPage() {
                         <span className="font-medium text-foreground group-hover:underline">
                           {member.employee_name}
                         </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-muted-foreground border-l border-border">
+                        {member.line_manager || "No Manager"}
                       </td>
                       <td className="py-2.5 px-3 text-muted-foreground border-l border-border">
                         {member.designation}

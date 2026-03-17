@@ -9,6 +9,7 @@ from app.models.employee_project import EmployeeProject
 from app.models.location import Location
 from app.models.project import Project
 from app.models.project_allocation import ProjectAllocation
+from app.models.reporting_relationship import ReportingRelationship
 from app.models.timesheet_entry import TimesheetEntry
 from app.services.audit_service import log_change
 
@@ -446,6 +447,29 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
     mdept_map = {str(d.id): d.name for d in member_depts}
     mloc_map = {str(l.id): l for l in member_locs}
 
+    # Fetch line manager information for team members
+    reporting_relationships = await ReportingRelationship.find(
+        {"employee_id": {"$in": emp_ids}},
+        ReportingRelationship.type == "PRIMARY",
+        ReportingRelationship.is_deleted != True,
+    ).to_list()
+    
+    # Get manager employee details
+    manager_ids = [r.manager_id for r in reporting_relationships]
+    managers = (
+        await Employee.find(
+            {"_id": {"$in": [ObjectId(mid) for mid in manager_ids if ObjectId.is_valid(mid)]}}
+        ).to_list()
+        if manager_ids
+        else []
+    )
+    manager_map = {str(m.id): m.name for m in managers}
+    
+    # Create employee to line manager mapping
+    emp_manager_map = {}
+    for rel in reporting_relationships:
+        emp_manager_map[rel.employee_id] = manager_map.get(rel.manager_id, "No Manager")
+
     # Fetch per-member allocation and timesheet data for the period
     alloc_map: dict[str, ProjectAllocation] = {}
     worked_map: dict[str, float] = {}
@@ -481,6 +505,7 @@ async def get_project_detail(project_id: str, period: Optional[str] = None):
             members.append({
                 "employee_id": eid,
                 "employee_name": emp.name,
+                "line_manager": emp_manager_map.get(eid, "No Manager"),
                 "designation": emp.designation,
                 "department": mdept_map.get(emp.department_id, "Unknown"),
                 "location": f"{loc.city}, {loc.country}" if loc else "Unknown",
