@@ -47,16 +47,29 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [showProfileModal, setShowProfileModal] = useState(false)
   useEffect(() => {
     // Refresh user data from DB on mount — picks up branch_code/employee_id
-    // changes from HRMS sync without requiring re-login
-    getMe().then((fresh) => {
-      useAuthStore.getState().setAuth(fresh.access_token, {
-        employee_id: fresh.employee_id,
-        branch_location_id: fresh.branch_location_id,
-        branch_code: fresh.branch_code,
-        name: fresh.name,
-        role: fresh.role || "branch_head",
-      })
-    }).catch(() => {})
+    // changes from HRMS sync without requiring re-login.
+    // Use a small delay so the initial render completes before the network call.
+    const timer = setTimeout(() => {
+      getMe().then((fresh) => {
+        const store = useAuthStore.getState()
+        const current = store.user
+        // Only update if something actually changed — avoids unnecessary re-renders
+        if (
+          current?.branch_code !== fresh.branch_code ||
+          current?.branch_location_id !== fresh.branch_location_id ||
+          current?.name !== fresh.name
+        ) {
+          store.setAuth(store.token!, {
+            employee_id: fresh.employee_id,
+            branch_location_id: fresh.branch_location_id,
+            branch_code: fresh.branch_code,
+            name: fresh.name,
+            role: fresh.role || "branch_head",
+          })
+        }
+      }).catch(() => {})
+    }, 500)
+    return () => clearTimeout(timer)
   }, [])
 
   return (

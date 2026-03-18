@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { Pagination } from "@/components/shared/Pagination"
@@ -42,8 +42,9 @@ export function ResourceAllocationTable({
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>("asc")
 
-  const longBenchMap = new Map(
-    summary?.details.bench_long.map((e) => [e.employee_id, e]) ?? []
+  const longBenchMap = useMemo(
+    () => new Map(summary?.details.bench_long.map((e) => [e.employee_id, e]) ?? []),
+    [summary]
   )
 
   function handleSort(col: SortKey) {

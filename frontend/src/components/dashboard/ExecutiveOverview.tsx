@@ -9,9 +9,10 @@ interface ExecutiveOverviewProps {
 
 export function ExecutiveOverview({ data }: ExecutiveOverviewProps) {
   const dismissed = useNotificationStore((s) => s.dismissed)
-  const billableLow = useNotificationStore((s) => s.summary?.details.billable_low ?? [])
+  const summary = useNotificationStore((s) => s.summary)
   const dismiss = useNotificationStore((s) => s.dismiss)
 
+  const billableLow = summary?.details.billable_low ?? []
   const showBillableBadge =
     billableLow.length > 0 && !dismissed.has("billable_low:branch")
 

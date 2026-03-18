@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Navigate } from "react-router-dom"
 import { Input } from "@/components/ui/input"
 import { useAuthStore } from "@/store/authStore"
 import { login } from "@/api/auth"
@@ -57,12 +57,16 @@ function NxZenPattern() {
 }
 
 export function LoginPage() {
+  const token = useAuthStore((s) => s.token)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<"demo" | "live" | "empty">("demo")
+
+  // Already logged in — skip the login page entirely
+  if (token) return <Navigate to="/" replace />
   const [switching, setSwitching] = useState(false)
   const setAuth = useAuthStore((s) => s.setAuth)
   const navigate = useNavigate()
