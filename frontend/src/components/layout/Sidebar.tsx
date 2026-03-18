@@ -32,7 +32,7 @@ const navItems = [
   { to: "/project-timeline", icon: CalendarRange, label: "Timeline" },
   { to: "/timesheets", icon: Clock, label: "Timesheets" },
   { to: "/finance", icon: PoundSterling, label: "Finance" },
-  { to: "/availability", icon: Users, label: "Talent Pool" },
+  { to: "/availability", icon: Users, label: "Standby Team" },
   { to: "/integrations", icon: Link2, label: "Integrations" },
   { to: "/audit", icon: ClipboardList, label: "Audit Log" },
 ]
