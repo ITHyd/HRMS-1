@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, TrendingUp, TrendingDown, UserX, Percent, DollarSign } from "lucide-react"
+import { Users, TrendingUp, TrendingDown, UserX, Percent, PoundSterling } from "lucide-react"
 import type { ExecutiveDashboard } from "@/types/dashboard"
 import { useNotificationStore } from "@/store/notificationStore"
 
@@ -39,7 +39,7 @@ export function ExecutiveOverview({ data }: ExecutiveOverviewProps) {
       bg: "bg-amber-50",
     },
     {
-      label: "Bench",
+      label: "Standby Period",
       value: data.bench_count,
       icon: UserX,
       color: "text-red-600",
@@ -55,7 +55,7 @@ export function ExecutiveOverview({ data }: ExecutiveOverviewProps) {
     {
       label: "Billable %",
       value: `${(data.overall_billable_percent ?? 0).toFixed(1)}%`,
-      icon: DollarSign,
+      icon: PoundSterling,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
     },

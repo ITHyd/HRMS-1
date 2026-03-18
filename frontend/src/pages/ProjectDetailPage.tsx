@@ -7,63 +7,8 @@ import { StatusBadge } from "@/components/shared/StatusBadge"
 import { PeriodSelector } from "@/components/shared/PeriodSelector"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import { getProjectDetail } from "@/api/projects"
-import { ArrowLeft, Users, Clock, CalendarDays, Briefcase, ChevronDown, ChevronRight, Activity } from "lucide-react"
+import { ArrowLeft, Users, Clock, CalendarDays, Briefcase, ChevronDown, ChevronRight } from "lucide-react"
 import type { ProjectDetail } from "@/types/project"
-
-function HealthScoreCard({ score, breakdown }: { score: number; breakdown: { allocation: number; billable: number; timeline: number; team: number } }) {
-  const [open, setOpen] = useState(false)
-  const color = score >= 75 ? "#22c55e" : score >= 50 ? "#f59e0b" : "#ef4444"
-  const textColor = score >= 75 ? "text-green-700" : score >= 50 ? "text-amber-700" : "text-red-700"
-  const rows = [
-    { key: "Allocation",  val: breakdown.allocation  },
-    { key: "Billable",    val: breakdown.billable    },
-    { key: "Timeline",    val: breakdown.timeline    },
-    { key: "Team",        val: breakdown.team        },
-  ]
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="w-full flex items-center justify-between gap-2"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="rounded-lg p-2 bg-slate-100">
-              <Activity className="h-5 w-5 text-slate-600" />
-            </div>
-            <div className="text-left">
-              <p className="text-xs text-muted-foreground">Health Score</p>
-              <p className={`text-xl font-semibold tabular-nums ${textColor}`}>
-                {score.toFixed(0)}/100
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full border-2 flex items-center justify-center" style={{ borderColor: color }}>
-              <span className="text-[10px] font-bold" style={{ color }}>{score.toFixed(0)}</span>
-            </div>
-            {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-          </div>
-        </button>
-        {open && (
-          <div className="mt-3 pt-3 border-t grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {rows.map(({ key, val }) => {
-              const c = val >= 75 ? "#22c55e" : val >= 50 ? "#f59e0b" : "#ef4444"
-              return (
-                <div key={key} className="text-center">
-                  <p className="text-[11px] text-muted-foreground mb-1">{key}</p>
-                  <div className="inline-flex items-center justify-center h-10 w-10 rounded-full border-2 mx-auto" style={{ borderColor: c }}>
-                    <span className="text-xs font-bold" style={{ color: c }}>{val.toFixed(0)}</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
 
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -247,19 +192,14 @@ export function ProjectDetailPage() {
         </Card>
       </div>
 
-      {/* Health Score */}
-      {project.health_score != null && (
-        <HealthScoreCard score={project.health_score} breakdown={project.health_breakdown} />
-      )}
-
       {/* Progress */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium">
               {project.planned_days > 0 ? "Allocation Progress" : "Timeline Progress"}
             </p>
-            <span className={`text-sm font-medium tabular-nums ${
+            <span className={`text-lg font-semibold tabular-nums ${
               project.progress_percent >= 80
                 ? "text-green-700"
                 : project.progress_percent >= 40
@@ -279,16 +219,60 @@ export function ProjectDetailPage() {
                   : "[&>div]:bg-red-500"
             }`}
           />
+
           {project.planned_days > 0 ? (
-            <p className="mt-2 text-xs text-muted-foreground tabular-nums">
-              {project.worked_days} / {project.planned_days} days worked
-            </p>
-          ) : startDate && endDate ? (
-            <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-              <span>{startDate.toLocaleDateString()}</span>
-              <span>{endDate.toLocaleDateString()}</span>
+            /* Allocation-based calculation */
+            <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-3 text-center">
+              <div>
+                <p className="text-[11px] text-muted-foreground">Worked Days</p>
+                <p className="text-sm font-semibold tabular-nums">{project.worked_days}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">Planned Days</p>
+                <p className="text-sm font-semibold tabular-nums">{project.planned_days}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">Formula</p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {project.worked_days} ÷ {project.planned_days} × 100
+                </p>
+              </div>
             </div>
-          ) : null}
+          ) : startDate && endDate ? (() => {
+            const today = new Date()
+            const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+            const elapsedDays = Math.max(0, Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
+            const remainingDays = Math.max(0, totalDays - elapsedDays)
+            return (
+              <div className="mt-3 pt-3 border-t space-y-3">
+                {/* Date range */}
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Start: {startDate.toLocaleDateString()}</span>
+                  <span>Today: {today.toLocaleDateString()}</span>
+                  <span>End: {endDate.toLocaleDateString()}</span>
+                </div>
+                {/* Calculation breakdown */}
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="rounded-md bg-muted/50 p-2">
+                    <p className="text-[10px] text-muted-foreground">Elapsed Days</p>
+                    <p className="text-sm font-semibold tabular-nums text-foreground">{elapsedDays}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/50 p-2">
+                    <p className="text-[10px] text-muted-foreground">Total Days</p>
+                    <p className="text-sm font-semibold tabular-nums text-foreground">{totalDays}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/50 p-2">
+                    <p className="text-[10px] text-muted-foreground">Remaining</p>
+                    <p className="text-sm font-semibold tabular-nums text-foreground">{remainingDays}</p>
+                  </div>
+                  <div className="rounded-md bg-muted/50 p-2">
+                    <p className="text-[10px] text-muted-foreground">Formula</p>
+                    <p className="text-xs font-medium tabular-nums text-foreground">{elapsedDays} ÷ {totalDays} × 100</p>
+                  </div>
+                </div>
+              </div>
+            )
+          })() : null}
         </CardContent>
       </Card>
 

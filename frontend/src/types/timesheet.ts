@@ -21,6 +21,8 @@ export interface TimesheetSummary {
   billable_percent: number
   employee_count: number
   project_count: number
+  billable_employee_count: number
+  non_billable_employee_count: number
 }
 
 export interface TimesheetFilterOptions {
@@ -115,5 +117,7 @@ export interface WorkloadHeatmapResponse {
     total_employees: number
     total_hours: number
     billable_hours: number
+    billable_employee_count: number
+    non_billable_employee_count: number
   }
 }

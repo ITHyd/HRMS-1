@@ -27,7 +27,7 @@ import {
   ClipboardList,
   LayoutGrid,
   Clock,
-  DollarSign,
+  PoundSterling,
   Percent,
   UserCheck,
   SlidersHorizontal,
@@ -74,6 +74,7 @@ export function TimesheetPage() {
   const [filterEmployee, setFilterEmployee] = useState("")
   const [filterProject, setFilterProject] = useState("")
   const [filterStatus, setFilterStatus] = useState("")
+  const [filterBillable, setFilterBillable] = useState<boolean | null>(null)
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -110,6 +111,7 @@ export function TimesheetPage() {
         employee_id: filterEmployee || undefined,
         project_id: filterProject || undefined,
         status: filterStatus || undefined,
+        is_billable: filterBillable ?? undefined,
         page,
         page_size: pageSize,
       })
@@ -122,7 +124,7 @@ export function TimesheetPage() {
     } finally {
       setLoading(false)
     }
-  }, [user, initialized, selectedPeriod, filterEmployee, filterProject, filterStatus, page, pageSize])
+  }, [user, initialized, selectedPeriod, filterEmployee, filterProject, filterStatus, filterBillable, page, pageSize])
 
   // Fetch period lock status
   const fetchLockStatus = useCallback(async () => {
@@ -143,17 +145,17 @@ export function TimesheetPage() {
   // Clear selection when period or filters change
   useEffect(() => {
     setSelectedIds(new Set())
-  }, [selectedPeriod, filterStatus, filterEmployee, filterProject])
+  }, [selectedPeriod, filterStatus, filterEmployee, filterProject, filterBillable])
 
   // Reset page when filters change
   useEffect(() => {
     setPage(1)
-  }, [filterEmployee, filterProject, filterStatus, selectedPeriod])
+  }, [filterEmployee, filterProject, filterStatus, filterBillable, selectedPeriod])
 
 
 
   // Derived data
-  const activeFilterCount = [filterEmployee, filterProject, filterStatus].filter(Boolean).length
+  const activeFilterCount = [filterEmployee, filterProject, filterStatus, filterBillable !== null ? "billable" : ""].filter(Boolean).length
 
   // Submitted entries in current page (for inline approval)
   const submittedEntries = entries.filter((e) => e.status === "submitted")
@@ -201,6 +203,7 @@ export function TimesheetPage() {
     setFilterEmployee("")
     setFilterProject("")
     setFilterStatus("")
+    setFilterBillable(null)
   }
 
   const handleToggleLock = async () => {
@@ -218,30 +221,47 @@ export function TimesheetPage() {
         {
           title: "Total Hours",
           value: summary.total_hours.toLocaleString(),
+          sub: `${summary.employee_count} employees`,
           icon: Clock,
           color: "text-blue-600",
           bgColor: "bg-blue-50",
+          filterKey: null as boolean | null,
         },
         {
-          title: "Billable Hours",
-          value: summary.billable_hours.toLocaleString(),
-          icon: DollarSign,
+          title: "Billable Employees",
+          value: summary.billable_employee_count,
+          sub: `${summary.billable_hours.toLocaleString()} hrs`,
+          icon: PoundSterling,
           color: "text-green-600",
           bgColor: "bg-green-50",
+          filterKey: true as boolean | null,
+        },
+        {
+          title: "Non-Billable Employees",
+          value: summary.non_billable_employee_count,
+          sub: `${(summary.total_hours - summary.billable_hours).toLocaleString()} hrs`,
+          icon: PoundSterling,
+          color: "text-red-600",
+          bgColor: "bg-red-50",
+          filterKey: false as boolean | null,
         },
         {
           title: "Billable %",
           value: `${summary.billable_percent}%`,
+          sub: undefined,
           icon: Percent,
           color: "text-amber-600",
           bgColor: "bg-amber-50",
+          filterKey: null as boolean | null,
         },
         {
           title: "Employees",
           value: summary.employee_count,
+          sub: undefined,
           icon: UserCheck,
           color: "text-purple-600",
           bgColor: "bg-purple-50",
+          filterKey: null as boolean | null,
         },
       ]
     : []
@@ -307,22 +327,40 @@ export function TimesheetPage() {
         <div className="space-y-4">
           {/* Summary Cards */}
           {summary && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {summaryCards.map((card) => (
-                <Card key={card.title}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`rounded-lg p-2 ${card.bgColor}`}>
-                        <card.icon className={`h-5 w-5 ${card.color}`} />
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {summaryCards.map((card) => {
+                const isActive = card.filterKey !== null && filterBillable === card.filterKey
+                const isClickable = card.filterKey !== null
+                return (
+                  <Card
+                    key={card.title}
+                    className={`transition-all ${isClickable ? "cursor-pointer hover:shadow-md" : ""} ${isActive ? "ring-2 ring-primary" : ""}`}
+                    onClick={() => {
+                      if (!isClickable) return
+                      setFilterBillable(filterBillable === card.filterKey ? null : card.filterKey)
+                      setPage(1)
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`rounded-lg p-2 ${isActive ? "bg-primary/10" : card.bgColor}`}>
+                          <card.icon className={`h-5 w-5 ${isActive ? "text-primary" : card.color}`} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">{card.title}</p>
+                          <p className="text-2xl font-semibold tabular-nums">{card.value}</p>
+                          {"sub" in card && card.sub && (
+                            <p className="text-[11px] text-muted-foreground">{card.sub}</p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">{card.title}</p>
-                        <p className="text-2xl font-semibold tabular-nums">{card.value}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      {isActive && (
+                        <p className="mt-1.5 text-[10px] text-primary font-medium">Filtered ✕ click to clear</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           )}
 

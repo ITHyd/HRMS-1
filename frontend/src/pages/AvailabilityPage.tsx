@@ -113,12 +113,12 @@ export function AvailabilityPage() {
       sub: null,
     },
     {
-      title: "On Bench",
+      title: "On Standby Period",
       value: loading ? "—" : String(benchCount),
       icon: UserMinus,
       color: "text-red-600",
       bgColor: "bg-red-50",
-      sub: avgBenchDays != null ? `Avg ${fmtAvgDays(avgBenchDays)} on bench` : null,
+      sub: avgBenchDays != null ? `Avg ${fmtAvgDays(avgBenchDays)} on standby period` : null,
     },
     {
       title: "Partially Billed",
@@ -129,7 +129,7 @@ export function AvailabilityPage() {
       sub: null,
     },
     {
-      title: "Avg. Bench Duration",
+      title: "Avg. Standby Period Duration",
       value: loading ? "—" : fmtAvgDays(avgBenchDays),
       icon: Clock,
       color: avgBenchDays != null && avgBenchDays > 45 ? "text-red-600" : "text-violet-600",

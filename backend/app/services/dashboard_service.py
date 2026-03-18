@@ -480,16 +480,6 @@ async def get_project_dashboard(
             if emp_util > 100:
                 over_utilised_members.append(eid)
 
-        # Health: compare actual billable % against expected
-        # "healthy" if variance < 10%, "warning" if < 25%, "critical" otherwise
-        variance = abs(100 - billable_pct)
-        if variance < 10:
-            health = "healthy"
-        elif variance < 25:
-            health = "warning"
-        else:
-            health = "critical"
-
         # Project type, dates, and progress
         proj_type = proj.project_type if proj else "client"
         proj_start = proj.start_date.isoformat() if proj and proj.start_date else None
@@ -519,9 +509,8 @@ async def get_project_dashboard(
             "billable_percent": billable_pct,
             "member_count": member_count,
             "members": members_list,
-            "health": health,
             "over_utilised_members": over_utilised_members,
-            "resource_variance": round(variance, 2),
+            "resource_variance": round(abs(100 - billable_pct), 2),
         })
 
     return {"period": period, "projects": result_projects, "total": total}

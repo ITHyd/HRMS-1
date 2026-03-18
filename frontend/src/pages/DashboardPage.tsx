@@ -31,7 +31,7 @@ const CLASSIFICATION_OPTIONS = [
   { value: "", label: "All Classifications" },
   { value: "fully_billed", label: "Fully Billed" },
   { value: "partially_billed", label: "Partially Billed" },
-  { value: "bench", label: "Bench" },
+  { value: "bench", label: "Standby Period" },
 ]
 
 const AVAILABILITY_COLORS: Record<string, string> = {

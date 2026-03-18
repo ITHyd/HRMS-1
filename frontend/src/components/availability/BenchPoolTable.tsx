@@ -103,7 +103,7 @@ export function BenchPoolTable({
                   <th className="pb-2 px-3 font-medium border-l border-border">Skills</th>
                   <th className="pb-2 px-3 font-medium border-l border-border">Status</th>
                   <th className="pb-2 px-3 font-medium border-l border-border">Last Project(s)</th>
-                  <th className="pb-2 px-3 font-medium border-l border-border whitespace-nowrap">Bench Since</th>
+                  <th className="pb-2 px-3 font-medium border-l border-border whitespace-nowrap">Standby Period Since</th>
                   <th className="pb-2 px-3 font-medium border-l border-border">Duration</th>
                   <th className="pb-2 px-3 font-medium border-l border-border whitespace-nowrap">Available From</th>
                 </tr>
@@ -237,7 +237,7 @@ export function BenchPoolTable({
                           )}
                         </td>
 
-                        {/* Bench Since */}
+                        {/* Standby Since */}
                         <td className="py-2.5 px-3 border-l border-border whitespace-nowrap">
                           {isBench ? (
                             emp.bench_since ? (
@@ -250,7 +250,7 @@ export function BenchPoolTable({
                           )}
                         </td>
 
-                        {/* Bench Duration — color-coded */}
+                        {/* Standby Duration — color-coded */}
                         <td className="py-2.5 px-3 border-l border-border">
                           {isBench && emp.bench_duration_days != null ? (
                             <span

@@ -157,6 +157,7 @@ async def list_entries(
     project_id: Optional[str] = None,
     period: Optional[str] = None,
     status: Optional[str] = None,
+    is_billable: Optional[bool] = None,
     branch_location_id: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
@@ -174,6 +175,8 @@ async def list_entries(
         filters["period"] = period
     if status:
         filters["status"] = status
+    if is_billable is not None:
+        filters["is_billable"] = is_billable
 
     skip = (page - 1) * page_size
 
@@ -245,6 +248,10 @@ async def list_entries(
     unique_employees = len({e.employee_id for e in all_period_entries})
     unique_projects = len({e.project_id for e in all_period_entries})
 
+    # Billable vs non-billable employee counts
+    billable_emp_ids = {e.employee_id for e in all_period_entries if e.is_billable}
+    non_billable_emp_ids = {e.employee_id for e in all_period_entries if not e.is_billable} - billable_emp_ids
+
     # Build filter options (distinct employees and projects for dropdowns)
     filter_emp_ids = list({e.employee_id for e in all_period_entries})
     filter_proj_ids = list({e.project_id for e in all_period_entries})
@@ -267,6 +274,8 @@ async def list_entries(
             "billable_percent": round((billable_hours / total_hours * 100) if total_hours > 0 else 0, 1),
             "employee_count": unique_employees,
             "project_count": unique_projects,
+            "billable_employee_count": len(billable_emp_ids),
+            "non_billable_employee_count": len(non_billable_emp_ids),
         },
         "filter_options": {
             "employees": sorted(
@@ -539,10 +548,16 @@ async def get_workload_heatmap(
 
     # Build response rows sorted by employee name
     rows = []
+    billable_emp_set: set[str] = set()
+    non_billable_only_emp_set: set[str] = set()
     for eid in sorted(employee_ids, key=lambda x: emp_map.get(x, "ZZZ").lower()):
         emp_grid = grid.get(eid, {})
         total = sum(c["total_hours"] for c in emp_grid.values())
         billable = sum(c["billable_hours"] for c in emp_grid.values())
+        if billable > 0:
+            billable_emp_set.add(eid)
+        else:
+            non_billable_only_emp_set.add(eid)
         days = {}
         for dt in all_dates:
             ds = dt.isoformat()
@@ -584,6 +599,8 @@ async def get_workload_heatmap(
             "total_employees": len(rows),
             "total_hours": round(sum(r["total_hours"] for r in rows), 1),
             "billable_hours": round(sum(r["billable_hours"] for r in rows), 1),
+            "billable_employee_count": len(billable_emp_set),
+            "non_billable_employee_count": len(non_billable_only_emp_set),
         },
     }
 

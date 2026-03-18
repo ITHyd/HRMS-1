@@ -20,7 +20,7 @@ const CLASSIFICATION_COLORS: Record<string, string> = {
 const LABEL_MAP: Record<string, string> = {
   fully_billed: "Fully Billed",
   partially_billed: "Partially Billed",
-  bench: "Bench",
+  bench: "Standby Period",
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

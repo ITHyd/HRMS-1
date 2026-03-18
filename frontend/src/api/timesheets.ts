@@ -15,6 +15,7 @@ export async function getTimesheets(params: {
   project_id?: string
   period?: string
   status?: string
+  is_billable?: boolean
   page?: number
   page_size?: number
 }): Promise<TimesheetListResponse> {

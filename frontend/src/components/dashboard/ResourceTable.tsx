@@ -11,7 +11,7 @@ const CLASSIFICATION_OPTIONS = [
   { value: "", label: "All" },
   { value: "fully_billed", label: "Fully Billed" },
   { value: "partially_billed", label: "Partially Billed" },
-  { value: "bench", label: "Bench" },
+  { value: "bench", label: "Standby Period" },
 ]
 
 interface ResourceTableProps {

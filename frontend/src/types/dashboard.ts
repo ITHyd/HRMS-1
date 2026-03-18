@@ -74,7 +74,6 @@ export interface ProjectDashboardEntry {
     hours: number
     billable_hours: number
   }>
-  health: string
   over_utilised_members: string[]
   resource_variance: number
 }

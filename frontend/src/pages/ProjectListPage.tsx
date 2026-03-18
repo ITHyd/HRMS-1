@@ -263,14 +263,13 @@ export function ProjectListPage() {
                     <th className="py-2.5 px-3 font-medium text-right border-l border-border">Planned Days</th>
                     <th className="py-2.5 px-3 font-medium text-right border-l border-border">Worked Days</th>
                     <th className="py-2.5 px-3 font-medium border-l border-border min-w-50">Progress</th>
-                    <th className="py-2.5 px-3 font-medium text-center border-l border-border">Health</th>
                     <th className="py-2.5 px-3 font-medium text-right border-l border-border">Members</th>
                   </tr>
                 </thead>
                 <tbody>
                   {projects.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
                         {activeFilterCount > 0
                           ? "No projects match the current filters"
                           : "No projects found"}
@@ -335,36 +334,18 @@ export function ProjectListPage() {
                                 {proj.progress_percent.toFixed(0)}%
                               </span>
                             </div>
-                            {proj.planned_days > 0 && (
+                            {proj.planned_days > 0 ? (
                               <p className="text-[11px] text-muted-foreground tabular-nums">
-                                {proj.worked_days} / {proj.planned_days} days
+                                {proj.worked_days} / {proj.planned_days} days worked
                               </p>
+                            ) : proj.start_date && proj.end_date ? (
+                              <p className="text-[11px] text-muted-foreground tabular-nums">
+                                {new Date(proj.start_date).toLocaleDateString()} → {new Date(proj.end_date).toLocaleDateString()}
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-muted-foreground">Timeline based</p>
                             )}
                           </div>
-                        </td>
-                        <td className="py-2.5 px-3 text-center border-l border-border">
-                          {proj.health_score != null ? (
-                            <div className="inline-flex items-center gap-1.5">
-                              <span
-                                className="h-3 w-3 rounded-full shrink-0"
-                                style={{
-                                  backgroundColor:
-                                    proj.health_score >= 75 ? "#22c55e"
-                                    : proj.health_score >= 50 ? "#f59e0b"
-                                    : "#ef4444",
-                                }}
-                              />
-                              <span className={`text-xs font-semibold tabular-nums ${
-                                proj.health_score >= 75 ? "text-green-700"
-                                : proj.health_score >= 50 ? "text-amber-700"
-                                : "text-red-700"
-                              }`}>
-                                {proj.health_score.toFixed(0)}/100
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">-</span>
-                          )}
                         </td>
                         <td className="py-2.5 px-3 text-right border-l border-border">
                           <div className="flex items-center justify-end gap-1 text-muted-foreground">

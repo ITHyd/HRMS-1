@@ -6,7 +6,7 @@ import type {
   HeatmapDayCell,
   HeatmapEmployeeRow,
 } from "@/types/timesheet"
-import { Users, Clock, DollarSign, Percent, Search } from "lucide-react"
+import { Users, Clock, Percent, Search } from "lucide-react"
 
 interface WorkloadHeatmapProps {
   period: string
@@ -299,13 +299,29 @@ export function WorkloadHeatmap({ period }: WorkloadHeatmapProps) {
   return (
     <div className="space-y-5">
       {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatCard
           icon={Users}
-          label="Employees"
+          label="Total Employees"
           value={summary.total_employees}
           iconBg="bg-violet-50"
           iconColor="text-violet-600"
+        />
+        <StatCard
+          icon={Users}
+          label="Billable Employees"
+          value={summary.billable_employee_count}
+          sub={`${summary.billable_hours.toLocaleString()} hrs`}
+          iconBg="bg-emerald-50"
+          iconColor="text-emerald-600"
+        />
+        <StatCard
+          icon={Users}
+          label="Non-Billable Employees"
+          value={summary.non_billable_employee_count}
+          sub={`${(summary.total_hours - summary.billable_hours).toLocaleString()} hrs`}
+          iconBg="bg-red-50"
+          iconColor="text-red-500"
         />
         <StatCard
           icon={Clock}
@@ -314,13 +330,6 @@ export function WorkloadHeatmap({ period }: WorkloadHeatmapProps) {
           sub={`${workingDaysCount} working days`}
           iconBg="bg-blue-50"
           iconColor="text-blue-600"
-        />
-        <StatCard
-          icon={DollarSign}
-          label="Billable Hours"
-          value={summary.billable_hours.toLocaleString()}
-          iconBg="bg-emerald-50"
-          iconColor="text-emerald-600"
         />
         <StatCard
           icon={Percent}

@@ -28,7 +28,7 @@ interface BenchFiltersProps {
 
 const CLASSIFICATION_OPTIONS = [
   { value: "", label: "All Classifications" },
-  { value: "bench", label: "Bench" },
+  { value: "bench", label: "Standby Period" },
   { value: "partially_billed", label: "Partially Billed" },
 ]
 

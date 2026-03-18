@@ -1,10 +1,3 @@
-export interface HealthBreakdown {
-  allocation: number
-  billable: number
-  timeline: number
-  team: number
-}
-
 export interface ProjectBrief {
   id: string
   name: string
@@ -18,8 +11,6 @@ export interface ProjectBrief {
   progress_percent: number
   planned_days: number
   worked_days: number
-  health_score: number
-  health_breakdown: HealthBreakdown
 }
 
 export interface EmployeeTimelineEntry {
@@ -62,8 +53,6 @@ export interface ProjectDetail {
   planned_days: number
   worked_days: number
   progress_percent: number
-  health_score: number
-  health_breakdown: HealthBreakdown
   member_count: number
   members: Array<{
     employee_id: string

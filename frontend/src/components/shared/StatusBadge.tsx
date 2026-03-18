@@ -14,9 +14,6 @@ const STATUS_STYLES: Record<string, string> = {
   partially_billed: "bg-amber-100 text-amber-700",
   non_billable: "bg-gray-100 text-gray-700",
   bench: "bg-red-100 text-red-700",
-  healthy: "bg-green-100 text-green-700",
-  warning: "bg-amber-100 text-amber-700",
-  critical: "bg-red-100 text-red-700",
   active: "bg-blue-100 text-blue-700",
   inactive: "bg-gray-100 text-gray-700",
   on_hold: "bg-amber-100 text-amber-700",
@@ -28,9 +25,17 @@ interface StatusBadgeProps {
   className?: string
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  bench: "Standby Period",
+  fully_billed: "Fully Billed",
+  partially_billed: "Partially Billed",
+  non_billable: "Non Billable",
+}
+
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const style = STATUS_STYLES[status.toLowerCase()] || "bg-gray-100 text-gray-700"
-  const label = status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  const label = STATUS_LABELS[status.toLowerCase()] 
+    ?? status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
 
   return (
     <span

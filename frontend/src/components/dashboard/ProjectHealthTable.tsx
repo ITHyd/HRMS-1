@@ -111,13 +111,20 @@ export function ProjectHealthTable({ projects }: ProjectHealthTableProps) {
                         <td className="py-2.5 pr-4">
                           <StatusBadge status={project.status} />
                         </td>
-                        <td className="py-2.5 pr-4 w-32">
+                        <td className="py-2.5 pr-4 w-44">
                           <div className="flex items-center gap-2">
                             <Progress value={project.progress_percent} className="flex-1 h-2" />
                             <span className="text-xs tabular-nums font-medium w-10 text-right">
                               {(project.progress_percent ?? 0).toFixed(0)}%
                             </span>
                           </div>
+                          {project.start_date && project.end_date ? (
+                            <p className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
+                              {new Date(project.start_date).toLocaleDateString()} → {new Date(project.end_date).toLocaleDateString()}
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">No dates set</p>
+                          )}
                         </td>
                         <td className="py-2.5 pr-4 text-xs">
                           {project.end_date ? (

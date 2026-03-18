@@ -135,7 +135,7 @@ export function ResourceAllocationTable({
                           if (!info || dismissed.has(`bench_long:${entry.employee_id}`)) return null
                           return (
                             <span
-                              title={`Benched ${info.bench_days}+ days · Right-click to dismiss`}
+                              title={`On standby ${info.bench_days}+ days · Right-click to dismiss`}
                               onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, empId: entry.employee_id }) }}
                               className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 cursor-context-menu select-none"
                             >

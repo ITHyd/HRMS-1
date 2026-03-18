@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback, useRef, useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
   Calendar, Users, TrendingUp, Building2, ExternalLink, X,
@@ -18,7 +18,7 @@ const COL_W = 44
 const LEFT_W = 300
 const ROW_H = 52
 const HEADER_H = 64
-const NUM_WEEKS = 30
+const NUM_WEEKS = 30 // fallback only — overridden dynamically
 
 type WindowFilter = "<30d" | "30-90d" | "90d+" | "all"
 const WINDOW_OPTIONS: { value: WindowFilter; label: string }[] = [
@@ -114,11 +114,11 @@ const TIMELINE_BAR_TONE: Record<Urgency, { fill: string; border: string }> = {
 interface WeekCell  { date: Date; label: string; isCurrent: boolean }
 interface MonthSpan { label: string; weekCount: number }
 
-function buildGrid(ganttStart: Date): { weeks: WeekCell[]; months: MonthSpan[] } {
+function buildGrid(ganttStart: Date, numWeeks: number = NUM_WEEKS): { weeks: WeekCell[]; months: MonthSpan[] } {
   const weeks: WeekCell[] = []
   const months: MonthSpan[] = []
   let prevMonth = ""
-  for (let i = 0; i < NUM_WEEKS; i++) {
+  for (let i = 0; i < numWeeks; i++) {
     const d = addWeeks(ganttStart, i)
     const ml = d.toLocaleString("default", { month: "short", year: "2-digit" })
     weeks.push({ date: d, label: `${d.getDate()}/${d.getMonth() + 1}`, isCurrent: weekDiff(d, getMonday(new Date())) === 0 })
@@ -414,13 +414,14 @@ function EmployeeDrawer({ emp, skills, onClose }: { emp: DrawerEmployee; skills:
 
 // ─── Gantt chart ─────────────────────────────────────────────────────────────
 function GanttChart({
-  projects, ganttStart, weeks, months,
+  projects, ganttStart, weeks, months, numWeeks,
   details, loadingDetailId, onLoadDetail,
 }: {
   projects: ProjectBrief[]
   ganttStart: Date
   weeks: WeekCell[]
   months: MonthSpan[]
+  numWeeks: number
   details: Record<string, ProjectDetail>
   loadingDetailId: string | null
   onLoadDetail: (id: string) => void
@@ -448,14 +449,14 @@ function GanttChart({
   }
 
   function barStyle(p: ProjectBrief) {
-    const ganttEnd = addWeeks(ganttStart, NUM_WEEKS)
+    const ganttEnd = addWeeks(ganttStart, numWeeks)
     const s = p.start_date ? new Date(p.start_date) : ganttStart
     const e = p.end_date ? new Date(p.end_date) : null
     const effStart = s < ganttStart ? ganttStart : s
     const effEnd = e ? (e > ganttEnd ? ganttEnd : e) : null
     if (!effEnd || effStart >= ganttEnd) return null
     const sw = Math.max(0, weekDiff(ganttStart, getMonday(effStart)))
-    const ew = Math.min(NUM_WEEKS, Math.max(sw + 1, weekDiff(ganttStart, getMonday(effEnd)) + 1))
+    const ew = Math.min(numWeeks, Math.max(sw + 1, weekDiff(ganttStart, getMonday(effEnd)) + 1))
     const urgency = getUrgency(p.end_date)
     const tone = TIMELINE_BAR_TONE[urgency]
     return {
@@ -467,7 +468,7 @@ function GanttChart({
   }
 
   const todayWeek = weekDiff(ganttStart, getMonday(new Date()))
-  const todayOffset = todayWeek >= 0 && todayWeek < NUM_WEEKS ? todayWeek * COL_W + COL_W / 2 : null
+  const todayOffset = todayWeek >= 0 && todayWeek < numWeeks ? todayWeek * COL_W + COL_W / 2 : null
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
@@ -552,7 +553,7 @@ function GanttChart({
         </div>
 
         <div ref={scrollRef} className="relative flex-1 overflow-x-auto scrollbar-thin">
-          <div style={{ width: NUM_WEEKS * COL_W, position: "relative" }}>
+          <div style={{ width: numWeeks * COL_W, position: "relative" }}>
             {todayOffset !== null && (
               <>
                 <div
@@ -600,7 +601,7 @@ function GanttChart({
               const detail = details[p.id]
               const expandedH = exp ? Math.max(40, (detail?.members.length ?? 0) * 24 + 16) : 0
               const barHeight = ROW_H - 18
-              const tooltipLeft = bar ? Math.min(NUM_WEEKS * COL_W - 12, Math.max(12, bar.left + bar.width / 2)) : 0
+              const tooltipLeft = bar ? Math.min(numWeeks * COL_W - 12, Math.max(12, bar.left + bar.width / 2)) : 0
               return (
                 <div key={p.id}>
                   <div
@@ -678,8 +679,26 @@ export function ProjectTimelinePage() {
   const [selectedSkills, setSelectedSkills] = useState<string[]>([])
   const [skillDropdownOpen, setSkillDropdownOpen] = useState(false)
 
-  const ganttStart = addWeeks(getMonday(new Date()), -4 + weekOffset)
-  const { weeks, months } = buildGrid(ganttStart)
+  const ganttStart = useMemo(() => {
+    if (projects.length === 0) return addWeeks(getMonday(new Date()), -4 + weekOffset)
+    const dates = projects
+      .filter((p) => p.start_date)
+      .map((p) => new Date(p.start_date!))
+    const earliest = dates.length > 0 ? new Date(Math.min(...dates.map((d) => d.getTime()))) : new Date()
+    return addWeeks(getMonday(earliest), -1 + weekOffset)
+  }, [projects, weekOffset])
+
+  const numWeeks = useMemo(() => {
+    if (projects.length === 0) return 30
+    const endDates = projects
+      .filter((p) => p.end_date)
+      .map((p) => new Date(p.end_date!))
+    const latest = endDates.length > 0 ? new Date(Math.max(...endDates.map((d) => d.getTime()))) : addWeeks(ganttStart, 30)
+    const weeks = weekDiff(ganttStart, addWeeks(getMonday(latest), 2))
+    return Math.max(30, weeks)
+  }, [projects, ganttStart])
+
+  const { weeks, months } = buildGrid(ganttStart, numWeeks)
 
   useEffect(() => {
     getSkillCatalog().then(setSkillCatalog).catch(() => {})
@@ -1001,7 +1020,7 @@ export function ProjectTimelinePage() {
             </div>
           ) : (
             <GanttChart
-              projects={projects} ganttStart={ganttStart} weeks={weeks} months={months}
+              projects={projects} ganttStart={ganttStart} weeks={weeks} months={months} numWeeks={numWeeks}
               details={details} loadingDetailId={loadingDetailId} onLoadDetail={loadDetailForId}
             />
           )}

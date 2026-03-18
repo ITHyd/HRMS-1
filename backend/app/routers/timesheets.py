@@ -55,6 +55,7 @@ async def list_entries(
     project_id: str = Query(None),
     period: str = Query(None),
     status: str = Query(None),
+    is_billable: str = Query(None),  # "true" or "false"
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: CurrentUser = Depends(get_current_user),
@@ -64,6 +65,7 @@ async def list_entries(
         project_id=project_id,
         period=period,
         status=status,
+        is_billable=None if is_billable is None else (is_billable.lower() == "true"),
         branch_location_id=user.branch_location_id,
         page=page,
         page_size=page_size,

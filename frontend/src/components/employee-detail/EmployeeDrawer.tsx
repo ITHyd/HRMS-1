@@ -383,7 +383,7 @@ export function EmployeeDrawer() {
                           return (
                             <div
                               key={entry.period}
-                              title={isBench ? `${entry.period}: Bench` : `${entry.period}: ${projectNames}`}
+                              title={isBench ? `${entry.period}: Standby Period` : `${entry.period}: ${projectNames}`}
                               className="flex flex-col items-center gap-1"
                             >
                               <div
@@ -407,7 +407,7 @@ export function EmployeeDrawer() {
                           { color: "bg-green-400", label: "Fully Billed" },
                           { color: "bg-amber-300", label: "Partial" },
                           { color: "bg-blue-300", label: "Allocated" },
-                          { color: "bg-red-200", label: "Bench" },
+                          { color: "bg-red-200", label: "Standby Period" },
                         ].map((item) => (
                           <div key={item.label} className="flex items-center gap-1">
                             <div className={`w-3 h-3 rounded-sm ${item.color}`} />
