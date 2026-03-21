@@ -14,7 +14,7 @@ const DEMO_ACCOUNTS = [
 ]
 
 const LIVE_ACCOUNTS = [
-  { label: "HYD Branch", email: "vamsi.krishna@nxzen.com" },
+  { label: "HYD Branch", email: "manager@nxzen.com" },
   { label: "BLR Branch", email: "ganapathy.thimmaiah@nxzen.com" },
 ]
 
@@ -137,7 +137,7 @@ export function LoginPage() {
         </div>
 
         <h1 className="text-white text-[1.6rem] font-bold text-center mb-7 leading-tight">
-          Sign in to Branch Command
+          Sign in to Workforce Intelligence Hub
         </h1>
 
         {/* Mode Toggle */}
@@ -250,7 +250,7 @@ export function LoginPage() {
                 <button
                   key={account.email}
                   type="button"
-                  onClick={() => { setEmail(account.email); setPassword("password123") }}
+                  onClick={() => { setEmail(account.email); setPassword("pass123") }}
                   className="rounded-lg border border-white/8 bg-white/3 p-2.5 text-left hover:bg-white/7 hover:text-[#8DE971] transition-colors cursor-pointer"
                 >
                   <p className="font-medium text-white/70">{account.label}</p>
@@ -258,7 +258,7 @@ export function LoginPage() {
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-white/25 text-center mt-3">Password: password123</p>
+            <p className="text-[11px] text-white/25 text-center mt-3">Password: pass123</p>
           </div>
         )}
       </div>

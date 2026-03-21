@@ -33,8 +33,8 @@ from app.models.user import User
 
 USERS = [
     {
-        "email": "vamsi.krishna@nxzen.com",
-        "password": "password123",
+        "email": "manager@nxzen.com",
+        "password": "pass123",
         "name": "Vamsi Ramadugu",
         "role": "branch_head",
         # branch_location_id will be set automatically during the first HRMS sync
@@ -43,7 +43,7 @@ USERS = [
     },
     {
         "email": "ganapathy.thimmaiah@nxzen.com",
-        "password": "password123",
+        "password": "pass123",
         "name": "Ganapathy Munjandira Thimmaiah",
         "role": "branch_head",
         "branch_location_id": "pending_sync",
@@ -69,7 +69,7 @@ INTEGRATION_CONFIGS = [
             "mode": {
                 "demo_users": ["vikram.patel@company.com"],
                 "live_domains": ["nxzen.com"],
-                "live_users": ["vamsi.krishna@nxzen.com"],
+                "live_users": ["manager@nxzen.com"],
             },
         },
     },

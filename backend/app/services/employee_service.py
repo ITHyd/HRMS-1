@@ -7,11 +7,27 @@ from app.models.employee_skill import EmployeeSkill
 from app.models.location import Location
 from app.models.project import Project
 from app.models.reporting_relationship import ReportingRelationship
-from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
+from app.services.billable_hours_service import (
+    get_effective_timesheet_entries,
+    summarise_hours,
+)
+from app.services.excel_utilisation_service import (
+    EXCEL_EMPLOYEE_PREFIX,
+    get_excel_employee_detail,
+    get_excel_overlay_for_employee,
+)
 
 
-async def get_employee_detail(employee_id: str, requester_branch_location_id: str, period: str | None = None):
+async def get_employee_detail(
+    employee_id: str,
+    requester_branch_location_id: str,
+    period: str | None = None,
+    data_source: str | None = None,
+):
+    if employee_id.startswith(EXCEL_EMPLOYEE_PREFIX):
+        return await get_excel_employee_detail(employee_id, requester_branch_location_id, period=period)
+
     emp = await Employee.get(employee_id)
     if not emp:
         return None
@@ -165,21 +181,40 @@ async def get_employee_detail(employee_id: str, requester_branch_location_id: st
         if not ts_period:
             now = datetime.now(timezone.utc)
             ts_period = f"{now.year:04d}-{now.month:02d}"
-        ts_entries = await TimesheetEntry.find(
-            TimesheetEntry.employee_id == employee_id,
-            TimesheetEntry.period == ts_period,
-            TimesheetEntry.status != "rejected",
-        ).to_list()
+        ts_entries = await get_effective_timesheet_entries(
+            period=ts_period,
+            employee_id=employee_id,
+        )
 
         if ts_entries:
-            total_hours = sum(e.hours for e in ts_entries)
-            billable_hours = sum(e.hours for e in ts_entries if e.is_billable)
+            totals = summarise_hours(ts_entries)
             result["timesheet_summary"] = {
                 "period": ts_period,
-                "total_hours": round(total_hours, 2),
-                "billable_hours": round(billable_hours, 2),
+                "total_hours": round(totals["total"], 2),
+                "billable_hours": round(totals["billable"], 2),
                 "entry_count": len(ts_entries),
             }
+
+    if is_own_branch and data_source == "excel":
+        overlay = await get_excel_overlay_for_employee(
+            employee_id=employee_id,
+            employee_name=emp.name,
+            branch_location_id=requester_branch_location_id,
+            period=period,
+        )
+        if overlay:
+            result["utilisation"] = {
+                "period": overlay["period"],
+                "utilisation_percent": overlay["utilisation_percent"],
+                "billable_percent": overlay["billable_percent"],
+                "total_hours": overlay["total_hours"],
+                "billable_hours": overlay["billable_hours"],
+                "non_billable_hours": overlay["non_billable_hours"],
+                "capacity_hours": overlay["capacity_hours"],
+                "classification": overlay["classification"],
+            }
+            result["timesheet_summary"] = overlay["timesheet_summary"]
+            result["data_source"] = "excel"
 
     return result
 

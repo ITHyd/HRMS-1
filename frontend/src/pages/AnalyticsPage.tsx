@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useAuthStore } from "@/store/authStore"
 import { getBranchAnalytics } from "@/api/analytics"
+import { DataSourceToggle } from "@/components/shared/DataSourceToggle"
 import type { BranchAnalytics } from "@/types/analytics"
 import { WorkforceOverview } from "@/components/analytics/WorkforceOverview"
 import { ClientBreakdownChart } from "@/components/analytics/DeptBreakdownChart"
@@ -9,11 +10,29 @@ import { TrendLineChart } from "@/components/analytics/TrendLineChart"
 import { SpanOfControl } from "@/components/analytics/SpanOfControl"
 import { CrossReportingView } from "@/components/analytics/CrossReportingView"
 import { ProjectOverview } from "@/components/analytics/ProjectOverview"
+import { useDataSourceStore } from "@/store/dataSourceStore"
+import { useOrgChartStore } from "@/store/orgChartStore"
+import { useReportPeriodStore } from "@/store/reportPeriodStore"
+import { PeriodSelector } from "@/components/shared/PeriodSelector"
 
 export function AnalyticsPage() {
   const user = useAuthStore((s) => s.user)
+  const dataSource = useDataSourceStore((s) => s.dataSource)
+  const selectedPeriod = useReportPeriodStore((s) => s.selectedPeriod)
+  const setSelectedPeriod = useReportPeriodStore((s) => s.setSelectedPeriod)
+  const setDrawerPeriod = useOrgChartStore((s) => s.setDrawerPeriod)
+  const setDrawerDataSource = useOrgChartStore((s) => s.setDrawerDataSource)
   const [data, setData] = useState<BranchAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setDrawerDataSource(dataSource)
+  }, [dataSource, setDrawerDataSource])
+
+  useEffect(() => {
+    setDrawerPeriod(dataSource === "excel" ? data?.period ?? null : null)
+    return () => setDrawerPeriod(null)
+  }, [data?.period, dataSource, setDrawerPeriod])
 
   useEffect(() => {
     if (!user) return
@@ -21,7 +40,11 @@ export function AnalyticsPage() {
     queueMicrotask(() => {
       if (!isActive) return
       setLoading(true)
-      getBranchAnalytics(user.branch_location_id)
+      getBranchAnalytics(
+        user.branch_location_id,
+        dataSource,
+        dataSource === "excel" ? selectedPeriod : undefined
+      )
         .then((result) => {
           if (isActive) setData(result)
         })
@@ -33,7 +56,7 @@ export function AnalyticsPage() {
     return () => {
       isActive = false
     }
-  }, [user])
+  }, [dataSource, selectedPeriod, user])
 
   if (loading) {
     return (
@@ -53,11 +76,21 @@ export function AnalyticsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h2 className="text-lg font-semibold">Branch Analytics</h2>
-        <p className="text-sm text-muted-foreground">
-          Workforce insights for {user?.branch_code} branch
-        </p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">Branch Analytics</h2>
+          <p className="text-sm text-muted-foreground">
+            {dataSource === "excel" && data?.period
+              ? `Excel-enriched workforce insights for ${user?.branch_code} branch (${data.period})`
+              : `Workforce insights for ${user?.branch_code} branch`}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <DataSourceToggle />
+          {dataSource === "excel" && (
+            <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
+          )}
+        </div>
       </div>
 
       <WorkforceOverview data={data} />

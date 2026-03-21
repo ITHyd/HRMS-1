@@ -40,6 +40,7 @@ export async function confirmFinanceUpload(
 
 export async function getFinanceBillable(params: {
   period: string
+  data_source?: "hrms" | "excel"
   version?: number
   page?: number
   page_size?: number
@@ -50,7 +51,11 @@ export async function getFinanceBillable(params: {
   return res.data
 }
 
-export async function getFinanceUploadHistory(): Promise<FinanceUploadHistoryEntry[]> {
-  const res = await client.get<FinanceUploadHistoryEntry[]>("/finance/uploads")
+export async function getFinanceUploadHistory(
+  dataSource: "hrms" | "excel" = "hrms"
+): Promise<FinanceUploadHistoryEntry[]> {
+  const res = await client.get<FinanceUploadHistoryEntry[]>("/finance/uploads", {
+    params: { data_source: dataSource },
+  })
   return res.data
 }

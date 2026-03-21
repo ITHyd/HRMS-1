@@ -32,6 +32,7 @@ export interface FinanceUploadValidationResponse {
 }
 
 export interface FinanceBillableListResponse {
+  data_source?: "hrms" | "excel"
   entries: FinanceBillableEntry[]
   total: number
   period: string

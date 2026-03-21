@@ -4,6 +4,7 @@ from app.middleware.auth_middleware import CurrentUser, get_current_user
 from app.models.user import User
 from app.schemas.hrms_sync import HrmsSyncTriggerRequest
 from app.services.hrms_sync_service import (
+    get_billable_diagnostic,
     get_hrms_integration_config,
     get_sync_logs,
     is_live_sync_enabled_for_user,
@@ -13,6 +14,11 @@ from app.services.hrms_sync_service import (
 )
 
 router = APIRouter(prefix="/hrms-sync", tags=["HRMS Sync"])
+
+
+def _ensure_branch_admin(user: CurrentUser) -> None:
+    if user.role not in {"branch_head", "admin"}:
+        raise HTTPException(status_code=403, detail="Branch admin access required")
 
 
 @router.post("/trigger")
@@ -77,6 +83,19 @@ async def list_sync_logs(
     return await get_sync_logs(user.branch_location_id, page, page_size)
 
 
+@router.get("/billable-diagnostic")
+async def billable_diagnostic(
+    period: str = Query(..., description="Period in YYYY-MM format", pattern=r"^\d{4}-\d{2}$"),
+    branch_location_id: str | None = Query(None, description="Optional branch location override"),
+    user: CurrentUser = Depends(get_current_user),
+):
+    _ensure_branch_admin(user)
+    target_branch = branch_location_id or user.branch_location_id
+    if user.role != "admin" and target_branch != user.branch_location_id:
+        raise HTTPException(status_code=403, detail="You can only diagnose your own branch")
+    return await get_billable_diagnostic(period=period, branch_location_id=target_branch)
+
+
 @router.get("/logs/{batch_id}")
 async def get_sync_log(
     batch_id: str,
@@ -107,4 +126,97 @@ async def get_sync_log(
         "cursor": log.cursor,
         "started_at": log.started_at.isoformat(),
         "completed_at": log.completed_at.isoformat() if log.completed_at else None,
+    }
+
+
+@router.get("/raw-debug")
+async def raw_hrms_debug(
+    period: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """
+    Debug endpoint: fetches raw HRMS data for a period and returns a summary
+    showing what allocations and daily attendance look like, so we can diagnose
+    why is_billable is not being set correctly.
+    """
+    from app.models.employee import Employee
+    from app.models.project import Project
+    from app.services.hrms_sync_service import (
+        _resolve_hrms_auth,
+        _to_int,
+    )
+    from app.services.hrms_client import HrmsClient
+
+    cfg_doc, hrms_cfg = await get_hrms_integration_config()
+    access_token, hr_id, base_url = await _resolve_hrms_auth(None, hrms_cfg)
+    client = HrmsClient(base_url=base_url, token=access_token)
+
+    year, month = int(period[:4]), int(period[5:7])
+
+    # Fetch allocations
+    allocations_raw = await client.get_allocations(period)
+    alloc_employees = allocations_raw.get("employees", []) if isinstance(allocations_raw, dict) else []
+
+    # Fetch attendance summary
+    attendance_raw = await client.get_attendance_summary(hr_id=hr_id, year=year, month=month)
+    if not isinstance(attendance_raw, list):
+        attendance_raw = []
+
+    # Sample: fetch daily for first 3 employees with hours > 0
+    sample_daily = []
+    sample_eids = [
+        int(a["employee_id"])
+        for a in attendance_raw
+        if a.get("employee_id") is not None and float(a.get("total_hours", 0) or 0) > 0
+    ][:3]
+    for eid in sample_eids:
+        try:
+            daily = await client.get_daily_attendance(employee_id=eid, year=year, month=month)
+            # Show first 3 days only
+            sample_daily.append({
+                "employee_id": eid,
+                "days_sample": (daily or [])[:3],
+            })
+        except Exception as e:
+            sample_daily.append({"employee_id": eid, "error": str(e)})
+
+    await client.close()
+
+    # Summarise allocations
+    alloc_summary = []
+    for ea in alloc_employees[:10]:  # first 10 employees
+        alloc_summary.append({
+            "employee_id": ea.get("employee_id"),
+            "employee_name": ea.get("employee_name"),
+            "allocations": [
+                {
+                    "project_id": a.get("project_id"),
+                    "project_name": a.get("project_name"),
+                    "client_name": a.get("client_name"),
+                    "allocation_percentage": a.get("allocation_percentage"),
+                }
+                for a in (ea.get("allocations") or [])
+            ],
+        })
+
+    # Check project_type values in DB
+    projects = await Project.find({"hrms_project_id": {"$ne": None}, "is_deleted": {"$ne": True}}).to_list()
+    proj_type_summary = {
+        "client": sum(1 for p in projects if (p.project_type or "").lower() == "client"),
+        "internal": sum(1 for p in projects if (p.project_type or "").lower() == "internal"),
+        "other": sum(1 for p in projects if (p.project_type or "").lower() not in ("client", "internal")),
+        "sample_projects": [
+            {"name": p.name, "project_type": p.project_type, "client_name": p.client_name}
+            for p in projects[:10]
+        ],
+    }
+
+    return {
+        "period": period,
+        "attendance_count": len(attendance_raw),
+        "employees_with_hours": len(sample_eids),
+        "allocation_employees_count": len(alloc_employees),
+        "allocation_sample": alloc_summary,
+        "daily_sample": sample_daily,
+        "project_type_summary": proj_type_summary,
     }

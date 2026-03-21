@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { StatusBadge } from "@/components/shared/StatusBadge"
-import { PeriodSelector } from "@/components/shared/PeriodSelector"
+import { PeriodSelector, getCurrentPeriod } from "@/components/shared/PeriodSelector"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import { getProjectDetail } from "@/api/projects"
 import { ArrowLeft, Users, Clock, CalendarDays, Briefcase, ChevronDown, ChevronRight } from "lucide-react"
@@ -18,10 +18,7 @@ export function ProjectDetailPage() {
   const [project, setProject] = useState<ProjectDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedPeriod, setSelectedPeriod] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-  })
+  const [selectedPeriod, setSelectedPeriod] = useState(() => getCurrentPeriod())
 
   useEffect(() => {
     setDrawerPeriod(selectedPeriod)

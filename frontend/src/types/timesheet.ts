@@ -9,7 +9,7 @@ export interface TimesheetEntry {
   is_billable: boolean
   description?: string
   status: "draft" | "submitted" | "approved" | "rejected"
-  source: "manual" | "hrms_sync"
+  source: "manual" | "hrms_sync" | "excel_upload"
   period: string
   created_at: string
   updated_at: string

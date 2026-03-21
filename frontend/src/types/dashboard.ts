@@ -106,14 +106,14 @@ export interface AllocationDashboardResponse {
 export interface ResourceAllocationEntry {
   employee_id: string
   employee_name: string
-  line_manager: string
+  line_manager: string | null
   project_name: string | null
   client_name: string | null
   allocation_percentage: number
   billable_hours: number
   non_billable_hours: number
   classification: string
-  available_days: number
+  available_days: number | null
 }
 
 export interface ResourceAllocationResponse {

@@ -43,7 +43,7 @@ export function ResourceAllocationTable({
   const [sortDir, setSortDir] = useState<SortDir>("asc")
 
   const longBenchMap = useMemo(
-    () => new Map(summary?.details.bench_long.map((e) => [e.employee_id, e]) ?? []),
+    () => new Map((summary?.details?.bench_long ?? []).map((e) => [e.employee_id, e])),
     [summary]
   )
 
@@ -181,7 +181,9 @@ export function ResourceAllocationTable({
                       <StatusBadge status={entry.classification} />
                     </td>
                     <td className="py-2.5 text-right tabular-nums">
-                      {entry.available_days.toFixed(1)}
+                      {typeof entry.available_days === "number"
+                        ? entry.available_days.toFixed(1)
+                        : "-"}
                     </td>
                   </tr>
                 ))

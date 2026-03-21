@@ -73,10 +73,10 @@ async def _seed_live():
     now = datetime.now(timezone.utc)
 
     users = [
-        {"email": "vamsi.krishna@nxzen.com", "password": "password123",
+        {"email": "manager@nxzen.com", "password": "pass123",
          "name": "Vamsi Ramadugu", "role": "branch_head",
          "branch_location_id": "pending_sync", "employee_id": "pending_sync"},
-        {"email": "ganapathy.thimmaiah@nxzen.com", "password": "password123",
+        {"email": "ganapathy.thimmaiah@nxzen.com", "password": "pass123",
          "name": "Ganapathy Munjandira Thimmaiah", "role": "branch_head",
          "branch_location_id": "pending_sync", "employee_id": "pending_sync"},
     ]
@@ -96,7 +96,7 @@ async def _seed_live():
             "sync_scope": {"months_backfill": 6, "manual_only": True},
             "mode": {"demo_users": ["vikram.patel@company.com"],
                      "live_domains": ["nxzen.com"],
-                     "live_users": ["vamsi.krishna@nxzen.com"]},
+                     "live_users": ["manager@nxzen.com"]},
         }),
         ("finance", "Finance Data Feed", "inactive",
          {"endpoint": "https://api.example.com/finance", "version": "1.0"}),

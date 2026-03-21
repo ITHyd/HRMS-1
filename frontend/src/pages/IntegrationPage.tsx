@@ -34,6 +34,7 @@ export function IntegrationPage() {
   const [syncingConfigId, setSyncingConfigId] = useState<string | null>(null)
   const [retryingLogId, setRetryingLogId] = useState<string | null>(null)
   const [hrmsDataSynced, setHrmsDataSynced] = useState<boolean | null>(null)
+  const [hrmsBranchMapped, setHrmsBranchMapped] = useState<boolean | null>(null)
   const [mode, setMode] = useState<string>("")
   const [switchingMode, setSwitchingMode] = useState(false)
   const addToast = useToastStore((s) => s.addToast)
@@ -75,8 +76,10 @@ export function IntegrationPage() {
     try {
       const status = await getHrmsStatus()
       setHrmsDataSynced(status.synced)
+      setHrmsBranchMapped(status.branch_mapped ?? true)
     } catch {
       setHrmsDataSynced(false)
+      setHrmsBranchMapped(false)
     }
   }, [])
 
@@ -297,10 +300,19 @@ export function IntegrationPage() {
                   <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900">
-                      No HRMS data synced yet
+                      {hrmsBranchMapped === false ? "Branch mapping pending" : "No HRMS data synced yet"}
                     </p>
                     <p className="text-xs text-gray-600 mt-0.5">
-                      Activate your HRMS integration and click <strong>Sync Now</strong> to import employees, projects, attendance, and timesheets from HRMS.
+                      {hrmsBranchMapped === false ? (
+                        <>
+                          HRMS data may already be imported, but your login is not attached to a branch yet.
+                          Run <strong>Sync Now</strong> again after the mapping fix so employees and dashboards can resolve to your branch.
+                        </>
+                      ) : (
+                        <>
+                          Activate your HRMS integration and click <strong>Sync Now</strong> to import employees, projects, attendance, and timesheets from HRMS.
+                        </>
+                      )}
                     </p>
                   </div>
                   {filteredConfigs.some((c) => c.status === "active") && (

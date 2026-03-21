@@ -11,6 +11,8 @@ import {
 } from "@/api/availability"
 
 interface BenchFiltersProps {
+  dataSource: "hrms" | "excel"
+  period?: string
   onSearch: (query: string) => void
   onSkillFilter: (skill: string) => void
   onClassificationFilter: (classification: string) => void
@@ -33,6 +35,8 @@ const CLASSIFICATION_OPTIONS = [
 ]
 
 export function BenchFilters({
+  dataSource,
+  period,
   onSearch,
   onSkillFilter,
   onClassificationFilter,
@@ -80,7 +84,7 @@ export function BenchFilters({
 
   // Fetch designation options on mount
   useEffect(() => {
-    getDesignations()
+    getDesignations(period, dataSource)
       .then((desigs) =>
         setDesignationOptions([
           { value: "", label: "All Roles" },
@@ -88,7 +92,7 @@ export function BenchFilters({
         ])
       )
       .catch(() => {})
-  }, [])
+  }, [dataSource, period])
 
   useEffect(() => {
     setLocalSearch(searchQuery)

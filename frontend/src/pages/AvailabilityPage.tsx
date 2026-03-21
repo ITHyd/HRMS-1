@@ -3,12 +3,22 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Users, UserMinus, UserCheck, SlidersHorizontal, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ExportButton } from "@/components/shared/ExportButton"
+import { DataSourceToggle } from "@/components/shared/DataSourceToggle"
+import { PeriodSelector } from "@/components/shared/PeriodSelector"
 import { BenchFilters } from "@/components/availability/BenchFilters"
 import { BenchPoolTable } from "@/components/availability/BenchPoolTable"
 import { getBenchPool, exportBenchPool } from "@/api/availability"
+import { useDataSourceStore } from "@/store/dataSourceStore"
+import { useOrgChartStore } from "@/store/orgChartStore"
+import { useReportPeriodStore } from "@/store/reportPeriodStore"
 import type { AvailableEmployee } from "@/types/availability"
 
 export function AvailabilityPage() {
+  const dataSource = useDataSourceStore((s) => s.dataSource)
+  const selectedPeriod = useReportPeriodStore((s) => s.selectedPeriod)
+  const setSelectedPeriod = useReportPeriodStore((s) => s.setSelectedPeriod)
+  const setDrawerPeriod = useOrgChartStore((s) => s.setDrawerPeriod)
+  const setDrawerDataSource = useOrgChartStore((s) => s.setDrawerDataSource)
   const [searchQuery, setSearchQuery] = useState("")
   const [skillFilter, setSkillFilter] = useState("")
   const [classificationFilter, setClassificationFilter] = useState("")
@@ -26,10 +36,19 @@ export function AvailabilityPage() {
   const [loading, setLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
 
+  useEffect(() => {
+    setDrawerDataSource(dataSource)
+  }, [dataSource, setDrawerDataSource])
+
+  useEffect(() => {
+    return () => setDrawerPeriod(null)
+  }, [setDrawerPeriod])
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       const data = await getBenchPool({
+        period: dataSource === "excel" ? selectedPeriod : undefined,
         search: searchQuery || undefined,
         skill: skillFilter || undefined,
         classification: classificationFilter || undefined,
@@ -37,6 +56,7 @@ export function AvailabilityPage() {
         designation: designationFilter || undefined,
         utilisation_min: utilisationMin,
         utilisation_max: utilisationMax,
+        data_source: dataSource,
         page,
         page_size: pageSize,
       })
@@ -45,8 +65,9 @@ export function AvailabilityPage() {
       setBenchCount(data.bench_count)
       setPartialCount(data.partial_count)
       setAvgBenchDays(data.avg_bench_days ?? null)
+      setDrawerPeriod(dataSource === "excel" ? data.period ?? selectedPeriod : null)
     } catch (err) {
-      console.error("Failed to load talent pool:", err)
+      console.error("Failed to load standby team:", err)
       setEmployees([])
       setTotal(0)
       setBenchCount(0)
@@ -65,11 +86,18 @@ export function AvailabilityPage() {
     utilisationMax,
     page,
     pageSize,
+    dataSource,
+    selectedPeriod,
+    setDrawerPeriod,
   ])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  useEffect(() => {
+    setPage(1)
+  }, [selectedPeriod, dataSource])
 
   const handleSearch = (query: string) => { setSearchQuery(query); setPage(1) }
   const handleSkillFilter = (skill: string) => { setSkillFilter(skill); setPage(1) }
@@ -143,12 +171,18 @@ export function AvailabilityPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Talent Pool</h2>
+          <h2 className="text-lg font-semibold">Standby Team</h2>
           <p className="text-sm text-muted-foreground">
-            Track bench status, project history, and resource availability
+            {dataSource === "excel"
+              ? "Excel-driven standby status with HRMS enrichment for skills and project history"
+              : "Track bench status, project history, and resource availability"}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <DataSourceToggle />
+          {dataSource === "excel" && (
+            <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
+          )}
           <Button
             variant={showFilters ? "default" : "outline"}
             size="sm"
@@ -163,11 +197,13 @@ export function AvailabilityPage() {
               </span>
             )}
           </Button>
-          <ExportButton
-            onExport={exportBenchPool}
-            filename="talent-pool.csv"
-            label="Export CSV"
-          />
+          {dataSource === "hrms" && (
+            <ExportButton
+              onExport={exportBenchPool}
+              filename="standby-team.csv"
+              label="Export CSV"
+            />
+          )}
         </div>
       </div>
 
@@ -196,6 +232,8 @@ export function AvailabilityPage() {
       {/* Collapsible Filters */}
       {showFilters && (
         <BenchFilters
+          dataSource={dataSource}
+          period={dataSource === "excel" ? selectedPeriod : undefined}
           onSearch={handleSearch}
           onSkillFilter={handleSkillFilter}
           onClassificationFilter={handleClassificationFilter}

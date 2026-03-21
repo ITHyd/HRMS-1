@@ -149,7 +149,7 @@ interface DrawerEmployee {
   end_date: string | null
 }
 
-// ─── Freeing Card ────────────────────────────────────────────────────────────
+// ─── Bandwidth Forecast Card ─────────────────────────────────────────────────
 function FreeingCard({
   emp, risk, selected, onSelect, onViewProfile, onMatchProjects,
 }: {
@@ -506,7 +506,7 @@ function GanttChart({
                           const info = notifSummary?.details.project_ending.find((ep) => ep.project_id === p.id)
                           return (
                             <span
-                              title={`${info?.team_size ?? p.member_count} people freeing ${fmt(p.end_date)} · Right-click to dismiss`}
+                              title={`${info?.team_size ?? p.member_count} people becoming available ${fmt(p.end_date)} · Right-click to dismiss`}
                               onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); notifDismiss("project_ending", p.id) }}
                               className="inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 cursor-context-menu select-none whitespace-nowrap"
                             >
@@ -661,7 +661,7 @@ export function ProjectTimelinePage() {
   const notifSummary = useNotificationStore((s) => s.summary)
   const notifDismissed = useNotificationStore((s) => s.dismissed)
   const notifDismiss = useNotificationStore((s) => s.dismiss)
-  const [activeTab, setActiveTab] = useState<"timeline" | "freeing" | "opportunities">("timeline")
+  const [activeTab, setActiveTab] = useState<"timeline" | "bandwidth_forecast" | "opportunities">("timeline")
   const [projects, setProjects] = useState<ProjectBrief[]>([])
   const [details, setDetails] = useState<Record<string, ProjectDetail>>({})
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null)
@@ -672,7 +672,7 @@ export function ProjectTimelinePage() {
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null)
 
-  // Freeing Up filters
+  // Bandwidth Forecast filters
   const [windowFilter, setWindowFilter] = useState<WindowFilter>("all")
   const [empSkills, setEmpSkills] = useState<Record<string, SkillTag[]>>({})
   const [skillCatalog, setSkillCatalog] = useState<SkillCatalogEntry[]>([])
@@ -729,9 +729,9 @@ export function ProjectTimelinePage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Pre-fetch project details when Freeing Up tab opens (12-month horizon)
+  // Pre-fetch project details when Bandwidth Forecast tab opens (12-month horizon)
   useEffect(() => {
-    if (activeTab !== "freeing" || projects.length === 0) return
+    if (activeTab !== "bandwidth_forecast" || projects.length === 0) return
     const cutoff = addMonths(new Date(), 12)
     const toFetch = projects.filter((p) => p.end_date && new Date(p.end_date) <= cutoff)
     const fetchSequentially = async () => {
@@ -746,7 +746,7 @@ export function ProjectTimelinePage() {
   // Fetch employee skills after project details load
   const detailsCount = Object.keys(details).length
   useEffect(() => {
-    if (activeTab !== "freeing") return
+    if (activeTab !== "bandwidth_forecast") return
     const allEmpIds = new Set<string>()
     Object.values(details).forEach((d) => d.members.forEach((m) => allEmpIds.add(m.employee_id)))
     const toFetch = [...allEmpIds].filter((id) => !(id in empSkills))
@@ -765,7 +765,7 @@ export function ProjectTimelinePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailsCount, activeTab])
 
-  // ── build flat list of all freeing employees (from loaded details) ──────────
+  // ── build flat list of all employees becoming available (from loaded details) ──────────
   const allFreeingEmps: DrawerEmployee[] = []
   for (const p of projects) {
     if (!p.end_date) continue
@@ -865,7 +865,7 @@ export function ProjectTimelinePage() {
 
   const tabs = [
     { key: "timeline"      as const, label: "Timeline" },
-    { key: "freeing"       as const, label: `Freeing Up${freeingTotal ? ` (${freeingTotal})` : ""}` },
+    { key: "bandwidth_forecast" as const, label: `Bandwidth Forecast${freeingTotal ? ` (${freeingTotal})` : ""}` },
     { key: "opportunities" as const, label: `Client Opportunities${clientOpps.length ? ` (${clientOpps.length})` : ""}` },
   ]
 
@@ -884,7 +884,7 @@ export function ProjectTimelinePage() {
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Project Timeline</h2>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Track project end dates, see who's freeing up, and plan client renewals
+          Track project end dates, see who's becoming available, and plan client renewals
         </p>
       </div>
 
@@ -935,7 +935,7 @@ export function ProjectTimelinePage() {
             </div>
           </div>
         </div>
-        {/* Freeing Up */}
+        {/* Bandwidth Forecast */}
         <div
           className="rounded-xl border p-4 shadow-sm transition-all duration-200 bc-hover-surface hover:border-primary/30"
           style={{ background: "#f9fafb" }}
@@ -945,7 +945,7 @@ export function ProjectTimelinePage() {
               <Users className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Freeing Up (90d)</p>
+              <p className="text-xs text-muted-foreground">Bandwidth Forecast (90d)</p>
               <p className="text-2xl font-semibold tabular-nums" style={{ color: "#111827" }}>{freeing90}</p>
               {(freeing_lt30 + freeing_30_90 + freeing_gt90) > 0 && (
                 <p className="text-[10px] text-muted-foreground mt-0.5 whitespace-nowrap tabular-nums">
@@ -1030,11 +1030,11 @@ export function ProjectTimelinePage() {
         </div>
       )}
 
-      {/* ── TAB 2: Freeing Up ── */}
-      {activeTab === "freeing" && (
+      {/* ── TAB 2: Bandwidth Forecast ── */}
+      {activeTab === "bandwidth_forecast" && (
         <div className="space-y-6">
 
-          {/* ── Freeing Up header: summary + segmented control + skill filter ── */}
+          {/* ── Bandwidth Forecast header: summary + segmented control + skill filter ── */}
           <div className="flex items-center justify-between gap-4 flex-wrap rounded-xl border bg-card px-5 py-4">
             {/* Summary text */}
             <div>
@@ -1045,7 +1045,7 @@ export function ProjectTimelinePage() {
               ) : (
                 <>
                   <p className="text-base font-bold text-foreground leading-tight">
-                    Freeing Up: {allFreeingEmps.length}
+                    Bandwidth Forecast: {allFreeingEmps.length}
                     {" · "}
                     <span>&lt;30d: {allFreeingEmps.filter(e => urgencyToRisk(getUrgency(e.end_date)) === "red").length}</span>
                     {" | "}

@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { PeriodSelector } from "@/components/shared/PeriodSelector"
+import { PeriodSelector, getCurrentPeriod } from "@/components/shared/PeriodSelector"
+import { DataSourceToggle } from "@/components/shared/DataSourceToggle"
 import { PeriodLockBanner } from "@/components/timesheet/PeriodLockBanner"
 import { TimesheetTable } from "@/components/timesheet/TimesheetTable"
 import { TimesheetApprovalPanel } from "@/components/timesheet/TimesheetApprovalPanel"
 import { WorkloadHeatmap } from "@/components/timesheet/WorkloadHeatmap"
 import { useAuthStore } from "@/store/authStore"
+import { useDataSourceStore } from "@/store/dataSourceStore"
 import { useOrgChartStore } from "@/store/orgChartStore"
+import { useReportPeriodStore } from "@/store/reportPeriodStore"
 import { useToastStore } from "@/store/toastStore"
 import {
   getTimesheets,
@@ -16,6 +19,7 @@ import {
   getPeriodLockStatus,
   togglePeriodLock,
 } from "@/api/timesheets"
+import { getExcelTimesheets } from "@/api/excelUtilisation"
 import type {
   TimesheetEntry,
   TimesheetSummary,
@@ -32,6 +36,7 @@ import {
   UserCheck,
   SlidersHorizontal,
   X,
+  FileSpreadsheet,
 } from "lucide-react"
 
 type Tab = "my" | "heatmap"
@@ -43,17 +48,15 @@ const TAB_CONFIG: { key: Tab; label: string; icon: typeof ClipboardList }[] = [
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
 
-function getCurrentPeriod(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-}
-
 export function TimesheetPage() {
   const user = useAuthStore((s) => s.user)
+  const dataSource = useDataSourceStore((s) => s.dataSource)
+  const selectedPeriod = useReportPeriodStore((s) => s.selectedPeriod)
+  const setSelectedPeriod = useReportPeriodStore((s) => s.setSelectedPeriod)
   const setDrawerPeriod = useOrgChartStore((s) => s.setDrawerPeriod)
+  const setDrawerDataSource = useOrgChartStore((s) => s.setDrawerDataSource)
 
   // State
-  const [selectedPeriod, setSelectedPeriod] = useState(getCurrentPeriod)
   const [activeTab, setActiveTab] = useState<Tab>("my")
   const [entries, setEntries] = useState<TimesheetEntry[]>([])
   const [total, setTotal] = useState(0)
@@ -68,6 +71,10 @@ export function TimesheetPage() {
     setDrawerPeriod(selectedPeriod)
     return () => setDrawerPeriod(null)
   }, [selectedPeriod, setDrawerPeriod])
+
+  useEffect(() => {
+    setDrawerDataSource(dataSource)
+  }, [dataSource, setDrawerDataSource])
 
   // Filters
   const [showFilters, setShowFilters] = useState(false)
@@ -86,11 +93,15 @@ export function TimesheetPage() {
 
   // Detect initial period on mount (runs once)
   useEffect(() => {
-    if (!user || initialized) return
+    if (!user || initialized || dataSource !== "hrms") return
     let active = true
     ;(async () => {
       try {
         const currentPeriod = getCurrentPeriod()
+        if (selectedPeriod !== currentPeriod) {
+          if (active) setInitialized(true)
+          return
+        }
         const data = await getTimesheets({ period: currentPeriod, page: 1, page_size: 1 })
         if (active && data.entries.length === 0 && data.latest_period && data.latest_period !== currentPeriod) {
           setSelectedPeriod(data.latest_period)
@@ -99,14 +110,14 @@ export function TimesheetPage() {
       if (active) setInitialized(true)
     })()
     return () => { active = false }
-  }, [user, initialized])
+  }, [user, initialized, dataSource, selectedPeriod, setSelectedPeriod])
 
   // Fetch timesheets (only after init)
   const fetchTimesheets = useCallback(async () => {
     if (!user || !initialized) return
     setLoading(true)
     try {
-      const data = await getTimesheets({
+      const params = {
         period: selectedPeriod,
         employee_id: filterEmployee || undefined,
         project_id: filterProject || undefined,
@@ -114,28 +125,34 @@ export function TimesheetPage() {
         is_billable: filterBillable ?? undefined,
         page,
         page_size: pageSize,
-      })
+      }
+      const data = dataSource === "excel"
+        ? await getExcelTimesheets(params)
+        : await getTimesheets(params)
       setEntries(data.entries)
       setTotal(data.total)
       setSummary(data.summary)
       setFilterOptions(data.filter_options)
+      if (dataSource === "excel") {
+        setPeriodLocked(false)
+      }
     } catch (err) {
       console.error("Failed to fetch timesheets:", err)
     } finally {
       setLoading(false)
     }
-  }, [user, initialized, selectedPeriod, filterEmployee, filterProject, filterStatus, filterBillable, page, pageSize])
+  }, [user, initialized, selectedPeriod, filterEmployee, filterProject, filterStatus, filterBillable, page, pageSize, dataSource])
 
   // Fetch period lock status
   const fetchLockStatus = useCallback(async () => {
-    if (!user) return
+    if (!user || dataSource === "excel") return
     try {
       const status = await getPeriodLockStatus(user.branch_location_id, selectedPeriod)
       setPeriodLocked(status.locked)
     } catch (err) {
       console.error("Failed to fetch lock status:", err)
     }
-  }, [user, selectedPeriod])
+  }, [user, selectedPeriod, dataSource])
 
   useEffect(() => {
     fetchTimesheets()
@@ -145,12 +162,20 @@ export function TimesheetPage() {
   // Clear selection when period or filters change
   useEffect(() => {
     setSelectedIds(new Set())
-  }, [selectedPeriod, filterStatus, filterEmployee, filterProject, filterBillable])
+  }, [selectedPeriod, filterStatus, filterEmployee, filterProject, filterBillable, dataSource])
 
   // Reset page when filters change
   useEffect(() => {
     setPage(1)
-  }, [filterEmployee, filterProject, filterStatus, filterBillable, selectedPeriod])
+  }, [filterEmployee, filterProject, filterStatus, filterBillable, selectedPeriod, dataSource])
+
+  useEffect(() => {
+    setFilterEmployee("")
+    setFilterProject("")
+    setFilterStatus("")
+    setFilterBillable(null)
+    setShowFilters(false)
+  }, [dataSource])
 
 
 
@@ -273,10 +298,13 @@ export function TimesheetPage() {
         <div>
           <h2 className="text-lg font-semibold">Timesheets</h2>
           <p className="text-sm text-muted-foreground">
-            Manage timesheet entries, workload overview, and HRMS sync
+            {dataSource === "excel"
+              ? "Review Excel-imported utilisation rows in timesheet view"
+              : "Manage timesheet entries, workload overview, and HRMS sync"}
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <DataSourceToggle />
           <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
           {activeTab === "my" && (
             <Button
@@ -298,11 +326,13 @@ export function TimesheetPage() {
       </div>
 
       {/* Period Lock Banner */}
-      <PeriodLockBanner
-        isLocked={periodLocked}
-        onToggle={handleToggleLock}
-        period={selectedPeriod}
-      />
+      {dataSource === "hrms" && (
+        <PeriodLockBanner
+          isLocked={periodLocked}
+          onToggle={handleToggleLock}
+          period={selectedPeriod}
+        />
+      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b">
@@ -419,7 +449,7 @@ export function TimesheetPage() {
           )}
 
           {/* Inline Approval Bar (shown when filtering by "submitted") */}
-          {showApprovalBar && (
+          {dataSource === "hrms" && showApprovalBar && (
             <TimesheetApprovalPanel
               count={
                 selectedIds.size > 0
@@ -460,7 +490,19 @@ export function TimesheetPage() {
         </div>
       )}
 
-      {activeTab === "heatmap" && <WorkloadHeatmap period={selectedPeriod} />}
+      {activeTab === "heatmap" && (
+        dataSource === "excel" ? (
+          <div className="rounded-xl border-2 border-dashed border-gray-200 p-12 text-center">
+            <FileSpreadsheet className="mx-auto mb-3 h-10 w-10 text-gray-300" />
+            <p className="text-sm font-medium text-gray-600">Heatmap is unavailable for Excel report mode</p>
+            <p className="text-xs text-gray-400 mt-1">
+              The uploaded workbook contains monthly utilisation snapshots, not day-level timesheet rows.
+            </p>
+          </div>
+        ) : (
+          <WorkloadHeatmap period={selectedPeriod} />
+        )
+      )}
     </div>
   )
 }

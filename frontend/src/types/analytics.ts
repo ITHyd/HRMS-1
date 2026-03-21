@@ -41,6 +41,8 @@ export interface ProjectSummary {
 }
 
 export interface BranchAnalytics {
+  period?: string | null
+  data_source?: "hrms" | "excel"
   total_headcount: number
   active_count: number
   client_breakdown: ClientCount[]

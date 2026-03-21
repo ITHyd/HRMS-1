@@ -17,6 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import bcrypt
+from bson import ObjectId
 from pymongo import UpdateOne
 
 from app.config import settings
@@ -33,6 +34,11 @@ from app.models.project_allocation import ProjectAllocation
 from app.models.reporting_relationship import ReportingRelationship
 from app.models.timesheet_entry import TimesheetEntry
 from app.models.user import User
+from app.models.utilisation_snapshot import UtilisationSnapshot
+from app.services.billable_hours_service import (
+    get_effective_timesheet_entries,
+    summarise_hours_by_employee,
+)
 from app.services.hrms_client import HrmsClient
 from app.services.utilisation_service import compute_utilisation
 
@@ -1064,7 +1070,12 @@ async def _sync_single_period(
 
                 proj = proj_map.get(hrms_pid) if hrms_pid is not None else None
                 project_id = str(proj.id) if proj else "bench"
-                is_billable = bool(proj and proj.project_type == "client")
+                if proj:
+                    _ptype = str(proj.project_type or "").strip().lower()
+                    is_billable = (_ptype == "client")
+                else:
+                    _client_name = str(pe.get("client_name") or pe.get("label") or "").strip().lower()
+                    is_billable = bool(_client_name) and _client_name not in ("internal", "bench", "general", "")
 
                 timesheet_docs.append(
                     TimesheetEntry(
@@ -1458,12 +1469,25 @@ async def _sync_master_data_impl(
                 continue
             source_id = f"project:{hpid}"
             seen_proj_ids.add(source_id)
+            # Derive project_type from HRMS data:
+            # 1) Use explicit "project_type" field if present
+            # 2) Fall back to "type" field
+            # 3) Infer from account/client_name: "internal"/"bench"/"general" → internal, else client
+            _raw_ptype = str(hproj.get("project_type") or hproj.get("type") or "").strip().lower()
+            _account_name = str(hproj.get("account") or "").strip().lower()
+            if _raw_ptype in ("client", "internal"):
+                _project_type = _raw_ptype
+            elif _account_name in ("internal", "bench", "general", ""):
+                _project_type = "internal"
+            else:
+                _project_type = "client"
             proj_bulk_items.append({
                 "source_id": source_id,
                 "payload": {
                     "hrms_project_id": _to_int(hpid, 0),
                     "name": hproj.get("project_name", "Unknown"),
                     "status": "ACTIVE" if str(hproj.get("status", "Active")).lower() == "active" else str(hproj.get("status")).upper(),
+                    "project_type": _project_type,
                     "client_name": str(hproj.get("account") or "General").strip() or "General",
                     "department_id": dept_id_map.get(str(hproj.get("account")), general_dept_id),
                     "start_date": _source_updated_at(hproj.get("start_date")) or now,
@@ -1565,19 +1589,33 @@ async def _sync_master_data_impl(
         # Keep User.branch_location_id (and employee_id) in sync after every master sync.
         # Match by email (stable) so this works even after a full DB wipe + re-sync.
         emp_email_map: dict[int, str] = {}  # hrms_employee_id -> email
+        emp_name_map: dict[int, str] = {}  # hrms_employee_id -> employee name
         for hemp in hrms_employees:
             hid = _to_int(hemp.get("employeeId"), 0)
             email = str(hemp.get("email") or "").strip().lower()
+            name = str(hemp.get("name") or "").strip()
             if hid and email:
                 emp_email_map[hid] = email
+            if hid and name:
+                emp_name_map[hid] = name
 
         for hloc_id, hemp_id in BRANCH_HEAD_OVERRIDES.items():
             new_loc_id = loc_id_map.get(hloc_id)
             emp_mongo_id = emp_id_map.get(hemp_id)
             emp_email = emp_email_map.get(hemp_id)
+            emp_name = emp_name_map.get(hemp_id)
             if not new_loc_id or not emp_email:
                 continue
             user_doc = await User.find_one(User.email == emp_email)
+            if not user_doc and emp_name:
+                # Support branch-head login aliases that differ from the HRMS employee email.
+                # Example: the seeded live login may use a generic mailbox, while HRMS stores
+                # the person under their real corporate email. Name fallback lets master sync
+                # still attach the user to the correct employee and branch.
+                user_doc = await User.find_one(
+                    User.name == emp_name,
+                    User.role == "branch_head",
+                )
             if user_doc:
                 changed = False
                 if user_doc.branch_location_id != new_loc_id:
@@ -1777,11 +1815,60 @@ async def _sync_single_period_upsert(
             counts["attendance"]["updated"] += 1
     counts["attendance"]["deleted"] = await _delete_stale_period_docs(AttendanceSummary, period, seen_attendance_ids)
 
+    # Pre-build allocation map for use inside the daily loop:
+    # hrms_eid -> list of allocation dicts (populated after allocations_raw is fetched above)
+    _alloc_map_daily: dict[int, list[dict]] = {}
+    for _emp_entry in allocations_raw.get("employees", []) or []:
+        _eid = _to_int(_emp_entry.get("employee_id"), -1)
+        if _eid > 0:
+            _alloc_map_daily[_eid] = _emp_entry.get("allocations", []) or []
+
+    def _billable_for_project(project, alloc_client_name: str = "") -> bool:
+        """Return True if the project should be treated as billable."""
+        if project:
+            return str(project.project_type or "").strip().lower() == "client"
+        # Unmapped project — fall back to client_name hint
+        cn = alloc_client_name.strip().lower()
+        return bool(cn) and cn not in ("internal", "bench", "general", "")
+
+    # HRMS project IDs that are catch-all / unassigned placeholders.
+    # When ALL projects on a day resolve to these, treat the day as if
+    # projects_data was empty and fall back to allocation-based distribution.
+    HRMS_UNASSIGNED_PROJECT_IDS = {123}
+
+    def _is_unassigned_project(pe_entry: dict) -> bool:
+        """Return True if this project entry is an unassigned/passthrough placeholder."""
+        hrms_pid = _to_int(pe_entry.get("value") or pe_entry.get("project_id"), -1)
+        if hrms_pid in HRMS_UNASSIGNED_PROJECT_IDS:
+            return True
+        # Also catch by name: label contains "unassigned" and maps to a non-client project
+        label = str(pe_entry.get("label") or "").strip().lower()
+        if "unassigned" in label:
+            proj = proj_map.get(hrms_pid)
+            if proj is None or str(proj.project_type or "").strip().lower() != "client":
+                return True
+        return False
+
     timesheet_rows: dict[str, dict] = {}
     for hrms_eid, day_rows in daily_raw.items():
         emp = emp_map.get(hrms_eid)
         if not emp:
             continue
+        emp_allocations = _alloc_map_daily.get(hrms_eid, [])
+        # Pre-compute allocation weights for this employee (used when no project breakdown)
+        _alloc_weights: list[tuple] = []  # (project_id_str, project_obj_or_None, pct, client_name)
+        if emp_allocations:
+            _total_pct = sum(float(a.get("allocation_percentage", 0) or 0) for a in emp_allocations)
+            if _total_pct <= 0:
+                _total_pct = 100.0
+            for _a in emp_allocations:
+                _hpid = _to_int(_a.get("project_id"), -1)
+                _proj = proj_map.get(_hpid)
+                _pid = str(_proj.id) if _proj else "bench"
+                _pct = float(_a.get("allocation_percentage", 0) or 0) / _total_pct
+                _cn = str(_a.get("client_name") or "")
+                _alloc_weights.append((_pid, _proj, _pct, _cn))
+
         for day_row in day_rows or []:
             day_raw = str(day_row.get("date", ""))[:10]
             if not day_raw:
@@ -1794,23 +1881,50 @@ async def _sync_single_period_upsert(
             if action == "Leave":
                 continue
             projects_data = day_row.get("projects", []) or []
-            if not projects_data:
-                hours = float(day_row.get("hours", 0) or 0)
-                if hours <= 0:
+            day_hours = float(day_row.get("hours", 0) or 0)
+
+            # Treat days where ALL project entries are unassigned/internal the same as
+            # empty projects_data — fall back to allocation-based distribution.
+            effective_projects_data = projects_data
+            if projects_data and all(_is_unassigned_project(pe) for pe in projects_data):
+                effective_projects_data = []
+
+            if not effective_projects_data:
+                if day_hours <= 0:
                     continue
-                source_id = f"timesheet:{emp.id}:{day_date.isoformat()}:bench"
-                row = timesheet_rows.setdefault(source_id, {
-                    "employee_id": str(emp.id),
-                    "project_id": "bench",
-                    "date": day_date,
-                    "hours": 0.0,
-                    "is_billable": False,
-                    "description": f"{action or 'Work'} - HRMS sync",
-                    "branch_location_id": emp.location_id,
-                })
-                row["hours"] += hours
+                if _alloc_weights:
+                    # Distribute day hours across allocated projects proportionally
+                    for _pid, _proj, _pct, _cn in _alloc_weights:
+                        _ph = round(day_hours * _pct, 2)
+                        if _ph <= 0:
+                            continue
+                        source_id = f"timesheet:{emp.id}:{day_date.isoformat()}:{_pid}"
+                        row = timesheet_rows.setdefault(source_id, {
+                            "employee_id": str(emp.id),
+                            "project_id": _pid,
+                            "date": day_date,
+                            "hours": 0.0,
+                            "is_billable": _billable_for_project(_proj, _cn),
+                            "description": f"{action or 'Work'} - HRMS sync",
+                            "branch_location_id": emp.location_id,
+                        })
+                        row["hours"] = round(row["hours"] + _ph, 2)
+                else:
+                    # No allocations — genuinely bench
+                    source_id = f"timesheet:{emp.id}:{day_date.isoformat()}:bench"
+                    row = timesheet_rows.setdefault(source_id, {
+                        "employee_id": str(emp.id),
+                        "project_id": "bench",
+                        "date": day_date,
+                        "hours": 0.0,
+                        "is_billable": False,
+                        "description": f"{action or 'Work'} - HRMS sync",
+                        "branch_location_id": emp.location_id,
+                    })
+                    row["hours"] = round(row["hours"] + day_hours, 2)
                 continue
-            for pe in projects_data:
+
+            for pe in effective_projects_data:
                 hours = float(pe.get("total_hours", 0) or 0)
                 if hours <= 0:
                     continue
@@ -1818,17 +1932,132 @@ async def _sync_single_period_upsert(
                 hrms_pid = _to_int(hrms_pid, -1)
                 project = proj_map.get(hrms_pid)
                 project_id = str(project.id) if project else "bench"
+                _cn = str(pe.get("client_name") or pe.get("label") or "")
                 source_id = f"timesheet:{emp.id}:{day_date.isoformat()}:{project_id}"
                 row = timesheet_rows.setdefault(source_id, {
                     "employee_id": str(emp.id),
                     "project_id": project_id,
                     "date": day_date,
                     "hours": 0.0,
-                    "is_billable": bool(project and project.project_type == "client"),
+                    "is_billable": _billable_for_project(project, _cn),
                     "description": f"{action or 'Work'} - {pe.get('label', 'Project')} - HRMS sync",
                     "branch_location_id": emp.location_id,
                 })
-                row["hours"] += hours
+                row["hours"] = round(row["hours"] + hours, 2)
+
+    # ── Allocation-based fallback ──────────────────────────────────────────────
+    # For employees who have attendance hours but no daily project breakdown
+    # (either total_hours=0 in summary so daily fetch was skipped, or HRMS returned
+    # days with no projects[] array), distribute their total attendance hours across
+    # their allocated projects proportionally — matching the seed script logic.
+    # This prevents employees with real client allocations from being misclassified
+    # as bench simply because HRMS didn't return per-day project breakdowns.
+
+    # Build allocation map from allocations_raw: hrms_eid -> list of allocation dicts
+    alloc_by_hrms_eid: dict[int, list[dict]] = {}
+    for emp_entry in allocations_raw.get("employees", []) or []:
+        hrms_eid = _to_int(emp_entry.get("employee_id"), -1)
+        if hrms_eid > 0:
+            alloc_by_hrms_eid[hrms_eid] = emp_entry.get("allocations", []) or []
+
+    # Build attendance total_hours map: hrms_eid -> total_hours
+    att_hours_map: dict[int, float] = {}
+    for a in attendance_raw:
+        hrms_eid = _to_int(a.get("employee_id"), -1)
+        if hrms_eid > 0:
+            total_h = float(a.get("total_hours", 0) or 0)
+            present = int(a.get("present", 0) or 0) + int(a.get("wfh", 0) or 0)
+            if total_h > 0:
+                att_hours_map[hrms_eid] = total_h
+            elif present > 0:
+                att_hours_map[hrms_eid] = present * 8.0
+
+    # Working days for the period (Mon-Fri) — used to spread hours across days
+    import calendar as _cal
+    _working_days = [
+        date(year, month, d)
+        for d in range(1, _cal.monthrange(year, month)[1] + 1)
+        if date(year, month, d).weekday() < 5
+    ]
+
+    # Build a set of employee IDs that already have timesheet rows from daily data
+    emps_with_daily_rows: set[str] = {row["employee_id"] for row in timesheet_rows.values()}
+
+    for hrms_eid, emp in emp_map.items():
+        # Skip if this employee already has timesheet rows from daily data
+        if str(emp.id) in emps_with_daily_rows:
+            continue
+
+        total_hours = att_hours_map.get(hrms_eid, 0.0)
+        if total_hours <= 0:
+            continue
+
+        allocations = alloc_by_hrms_eid.get(hrms_eid, [])
+        if not allocations:
+            # Truly bench — no allocations, spread hours as non-billable
+            if not _working_days:
+                continue
+            hours_per_day = round(total_hours / len(_working_days), 2)
+            remaining = total_hours
+            for wd in _working_days:
+                if remaining <= 0:
+                    break
+                day_h = round(min(hours_per_day, remaining, 8.0), 2)
+                if day_h <= 0:
+                    continue
+                source_id = f"timesheet:{emp.id}:{wd.isoformat()}:bench"
+                row = timesheet_rows.setdefault(source_id, {
+                    "employee_id": str(emp.id),
+                    "project_id": "bench",
+                    "date": wd,
+                    "hours": 0.0,
+                    "is_billable": False,
+                    "description": "Bench - HRMS sync (allocation fallback)",
+                    "branch_location_id": emp.location_id,
+                })
+                row["hours"] = round(row["hours"] + day_h, 2)
+                remaining = round(remaining - day_h, 2)
+        else:
+            # Distribute proportionally across allocated projects
+            total_pct = sum(float(a.get("allocation_percentage", 0) or 0) for a in allocations)
+            if total_pct <= 0:
+                total_pct = 100.0
+            if not _working_days:
+                continue
+            for alloc in allocations:
+                hrms_pid = _to_int(alloc.get("project_id"), -1)
+                project = proj_map.get(hrms_pid)
+                project_id = str(project.id) if project else "bench"
+                pct = float(alloc.get("allocation_percentage", 0) or 0) / total_pct
+                proj_hours = round(total_hours * pct, 2)
+                if proj_hours <= 0:
+                    continue
+                if project:
+                    _ptype = str(project.project_type or "").strip().lower()
+                    _is_billable = (_ptype == "client")
+                else:
+                    _client_name = str(alloc.get("client_name") or "").strip().lower()
+                    _is_billable = bool(_client_name) and _client_name not in ("internal", "bench", "general", "")
+                hours_per_day = round(proj_hours / len(_working_days), 2)
+                remaining = proj_hours
+                for wd in _working_days:
+                    if remaining <= 0:
+                        break
+                    day_h = round(min(hours_per_day, remaining, 8.0), 2)
+                    if day_h <= 0:
+                        continue
+                    source_id = f"timesheet:{emp.id}:{wd.isoformat()}:{project_id}"
+                    row = timesheet_rows.setdefault(source_id, {
+                        "employee_id": str(emp.id),
+                        "project_id": project_id,
+                        "date": wd,
+                        "hours": 0.0,
+                        "is_billable": _is_billable,
+                        "description": f"Work - {alloc.get('project_name', 'Project')} - HRMS sync (allocation fallback)",
+                        "branch_location_id": emp.location_id,
+                    })
+                    row["hours"] = round(row["hours"] + day_h, 2)
+                    remaining = round(remaining - day_h, 2)
 
     seen_timesheet_ids: set[str] = set(timesheet_rows.keys())
 
@@ -1995,7 +2224,12 @@ async def _trigger_live_sync_impl(
             hrms_cfg.get("sync_scope", {}).get("months_backfill"),
             settings.HRMS_SYNC_MONTHS_BACKFILL,
         )
-    periods = _recent_periods(period, max(1, months_backfill))
+    # Cap the anchor period at 2026-02 — March data is not ready yet.
+    MAX_SYNC_PERIOD = "2026-02"
+    capped_period = period if period <= MAX_SYNC_PERIOD else MAX_SYNC_PERIOD
+    periods = [p for p in _recent_periods(capped_period, max(1, months_backfill)) if p <= MAX_SYNC_PERIOD]
+    if not periods:
+        periods = [MAX_SYNC_PERIOD]
 
     sync_log = HrmsSyncLog(
         integration_config_id=str(cfg_doc.id) if cfg_doc else None,
@@ -2371,4 +2605,169 @@ async def get_sync_logs(
             for log in logs
         ],
         "total": total,
+    }
+
+
+async def get_billable_diagnostic(
+    period: str,
+    branch_location_id: str,
+) -> dict:
+    """Diagnose local billable-hour derivation for a branch and period."""
+    corporate_levels = {"c-suite", "vp"}
+    diagnosis_order = {
+        "PROJECT_TYPE_MISSING": 0,
+        "ALLOCATED_BUT_NO_TIMESHEET": 1,
+        "TIMESHEET_EXISTS_BUT_NOT_BILLABLE": 2,
+        "CORRECTLY_BENCH": 3,
+        "OK": 4,
+    }
+
+    employees = await Employee.find(
+        Employee.location_id == branch_location_id,
+        Employee.is_active == True,
+        {"level": {"$nin": list(corporate_levels)}},
+    ).to_list()
+
+    summary = {
+        "PROJECT_TYPE_MISSING": 0,
+        "ALLOCATED_BUT_NO_TIMESHEET": 0,
+        "TIMESHEET_EXISTS_BUT_NOT_BILLABLE": 0,
+        "CORRECTLY_BENCH": 0,
+        "OK": 0,
+    }
+    if not employees:
+        return {
+            "period": period,
+            "branch_location_id": branch_location_id,
+            "total_employees": 0,
+            "summary": summary,
+            "employees": [],
+        }
+
+    employee_ids = [str(emp.id) for emp in employees]
+    employee_name_map = {str(emp.id): emp.name for emp in employees}
+
+    allocations = await ProjectAllocation.find(
+        ProjectAllocation.period == period,
+        ProjectAllocation.is_deleted != True,
+        {"employee_id": {"$in": employee_ids}},
+    ).to_list()
+    allocations_by_employee: dict[str, list[ProjectAllocation]] = defaultdict(list)
+    allocation_project_ids: set[str] = set()
+    for allocation in allocations:
+        allocations_by_employee[allocation.employee_id].append(allocation)
+        if allocation.project_id and allocation.project_id != "bench":
+            allocation_project_ids.add(allocation.project_id)
+
+    timesheet_rows = await get_effective_timesheet_entries(
+        period=period,
+        branch_location_id=branch_location_id,
+        employee_ids=employee_ids,
+    )
+    timesheets_by_employee: dict[str, list[TimesheetEntry]] = defaultdict(list)
+    timesheet_project_ids: set[str] = set()
+    for row in timesheet_rows:
+        timesheets_by_employee[row.employee_id].append(row)
+        if row.project_id and row.project_id != "bench":
+            timesheet_project_ids.add(row.project_id)
+    hours_by_employee = summarise_hours_by_employee(timesheet_rows)
+
+    snapshots = await UtilisationSnapshot.find(
+        UtilisationSnapshot.branch_location_id == branch_location_id,
+        UtilisationSnapshot.period == period,
+        {"employee_id": {"$in": employee_ids}},
+    ).to_list()
+    classification_map = {snapshot.employee_id: snapshot.classification for snapshot in snapshots}
+
+    all_project_ids = allocation_project_ids | timesheet_project_ids
+    project_map: dict[str, Project] = {}
+    if all_project_ids:
+        valid_project_object_ids = [
+            ObjectId(project_id)
+            for project_id in all_project_ids
+            if ObjectId.is_valid(project_id)
+        ]
+        projects = await Project.find(
+            {"_id": {"$in": valid_project_object_ids}},
+            Project.is_deleted != True,
+        ).to_list()
+        project_map = {str(project.id): project for project in projects}
+
+    def _project_type_for(project_id: str | None) -> str | None:
+        if not project_id or project_id == "bench":
+            return None
+        project = project_map.get(project_id)
+        if not project:
+            return None
+        project_type = str(project.project_type or "").strip().lower()
+        return project_type or None
+
+    def _allocation_project_type(employee_allocations: list[ProjectAllocation]) -> str | None:
+        project_types = {
+            project_type
+            for project_type in (_project_type_for(allocation.project_id) for allocation in employee_allocations)
+            if project_type
+        }
+        if not project_types:
+            return None
+        if len(project_types) == 1:
+            return next(iter(project_types))
+        return "mixed"
+
+    diagnostics: list[dict] = []
+    for employee_id in employee_ids:
+        employee_allocations = allocations_by_employee.get(employee_id, [])
+        employee_timesheets = timesheets_by_employee.get(employee_id, [])
+        allocation_percent = round(
+            sum(float(allocation.allocation_percentage or 0.0) for allocation in employee_allocations),
+            2,
+        )
+        allocation_project_type = _allocation_project_type(employee_allocations)
+        employee_hours = hours_by_employee.get(
+            employee_id,
+            {"total": 0.0, "billable": 0.0, "non_billable": 0.0},
+        )
+        billable_hours = round(employee_hours["billable"], 2)
+        classification = classification_map.get(employee_id)
+
+        project_type_missing = any(
+            row.project_id != "bench" and _project_type_for(row.project_id) is None
+            for row in employee_timesheets
+        )
+
+        if billable_hours > 0 and classification != "bench":
+            diagnosis = "OK"
+        elif project_type_missing:
+            diagnosis = "PROJECT_TYPE_MISSING"
+        elif allocation_percent > 0 and not employee_timesheets:
+            diagnosis = "ALLOCATED_BUT_NO_TIMESHEET"
+        elif employee_timesheets and billable_hours <= 0:
+            diagnosis = "TIMESHEET_EXISTS_BUT_NOT_BILLABLE"
+        else:
+            diagnosis = "CORRECTLY_BENCH"
+
+        summary[diagnosis] += 1
+        diagnostics.append({
+            "employee_id": employee_id,
+            "employee_name": employee_name_map.get(employee_id, "Unknown"),
+            "allocation_percent": allocation_percent,
+            "allocation_project_type": allocation_project_type,
+            "billable_hours": billable_hours,
+            "classification": classification,
+            "diagnosis": diagnosis,
+        })
+
+    diagnostics.sort(
+        key=lambda row: (
+            diagnosis_order.get(row["diagnosis"], 99),
+            row["employee_name"].lower(),
+        )
+    )
+
+    return {
+        "period": period,
+        "branch_location_id": branch_location_id,
+        "total_employees": len(employee_ids),
+        "summary": summary,
+        "employees": diagnostics,
     }

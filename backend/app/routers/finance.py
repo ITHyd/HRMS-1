@@ -3,6 +3,10 @@ from fastapi.responses import PlainTextResponse
 
 from app.middleware.auth_middleware import CurrentUser, get_current_user
 from app.schemas.finance import FinanceUploadConfirmRequest
+from app.services.excel_utilisation_service import (
+    get_excel_finance_billable,
+    get_excel_finance_upload_history,
+)
 from app.services.finance_service import (
     confirm_finance_upload,
     get_finance_billable,
@@ -58,12 +62,20 @@ async def confirm_upload(
 @router.get("/billable")
 async def list_finance_billable(
     period: str = Query(..., description="Period in YYYY-MM format"),
+    data_source: str = Query("hrms", pattern="^(hrms|excel)$"),
     version: int | None = Query(None, description="Version number (defaults to latest)"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: CurrentUser = Depends(get_current_user),
 ):
     """List finance billable entries for a period, with optional version filter."""
+    if data_source == "excel":
+        return await get_excel_finance_billable(
+            period=period,
+            branch_location_id=user.branch_location_id,
+            page=page,
+            page_size=page_size,
+        )
     return await get_finance_billable(
         period=period,
         branch_location_id=user.branch_location_id,
@@ -75,7 +87,10 @@ async def list_finance_billable(
 
 @router.get("/uploads")
 async def list_upload_history(
+    data_source: str = Query("hrms", pattern="^(hrms|excel)$"),
     user: CurrentUser = Depends(get_current_user),
 ):
     """List all finance upload history for the branch."""
+    if data_source == "excel":
+        return await get_excel_finance_upload_history(user.branch_location_id)
     return await get_upload_history(user.branch_location_id)

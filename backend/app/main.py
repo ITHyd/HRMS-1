@@ -6,8 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
 from app.routers import (
-    admin, alerts, analytics, audit, auth, availability, dashboard, employees, export_data,
-    finance, hrms_sync, integration, notifications, org, projects, search, timesheets, utilisation,
+    admin, alerts, analytics, audit, auth, availability, dashboard, employees, excel_utilisation,
+    export_data, finance, hrms_sync, integration, notifications, org, projects, search, timesheets,
+    utilisation,
 )
 
 
@@ -18,8 +19,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Branch Command Center API",
-    description="API for the Branch Head Command Center",
+    title="Workforce Intelligence Hub API",
+    description="API for the Workforce Intelligence Hub",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -50,6 +51,7 @@ app.include_router(availability.router)
 app.include_router(integration.router)
 app.include_router(projects.router)
 app.include_router(search.router)
+app.include_router(excel_utilisation.router)
 
 
 @app.get("/health")

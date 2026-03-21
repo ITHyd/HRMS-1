@@ -8,10 +8,9 @@ from app.models.employee import Employee
 from app.models.employee_project import EmployeeProject
 from app.models.project import Project
 from app.models.project_allocation import ProjectAllocation
-from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
 from app.models.reporting_relationship import ReportingRelationship
-from app.models.reporting_relationship import ReportingRelationship
+from app.services.billable_hours_service import get_effective_timesheet_entries
 
 
 CORPORATE_LEVELS = {"c-suite", "vp"}
@@ -57,12 +56,11 @@ async def get_executive_dashboard(
         ).to_list()
         client_proj_ids = {str(p.id) for p in client_projects}
         if client_proj_ids:
-            client_ts = await TimesheetEntry.find(
-                TimesheetEntry.branch_location_id == branch_location_id,
-                TimesheetEntry.period == period,
-                TimesheetEntry.status != "rejected",
-                {"project_id": {"$in": list(client_proj_ids)}},
-            ).to_list()
+            client_ts = await get_effective_timesheet_entries(
+                period=period,
+                branch_location_id=branch_location_id,
+                project_ids=client_proj_ids,
+            )
             client_emp_ids = {e.employee_id for e in client_ts}
             snapshots = [s for s in snapshots if s.employee_id in client_emp_ids]
         else:
@@ -76,12 +74,12 @@ async def get_executive_dashboard(
     total_billable_pct = 0.0
 
     for s in snapshots:
-        if s.classification == "fully_billed":
+        if s.classification in ("fully_billed", "partially_billed"):
             billable_count += 1
-        elif s.classification == "partially_billed":
-            non_billable_count += 1
-        else:
+        elif s.classification == "bench":
             bench_count += 1
+        else:
+            non_billable_count += 1
         total_util += s.utilisation_percent
         total_billable_pct += s.billable_percent
 
@@ -91,15 +89,12 @@ async def get_executive_dashboard(
     # Top consuming projects: aggregate TimesheetEntry by project for the period
     # Only include timesheet entries from branch-level employees (not corporate)
     branch_emp_ids = [s.employee_id for s in snapshots]
-    entry_filters: list = [
-        TimesheetEntry.branch_location_id == branch_location_id,
-        TimesheetEntry.period == period,
-        TimesheetEntry.status != "rejected",
-        {"employee_id": {"$in": branch_emp_ids}},
-    ]
-    if client_proj_ids is not None:
-        entry_filters.append({"project_id": {"$in": list(client_proj_ids)}})
-    entries = await TimesheetEntry.find(*entry_filters).to_list()
+    entries = await get_effective_timesheet_entries(
+        period=period,
+        branch_location_id=branch_location_id,
+        employee_ids=branch_emp_ids,
+        project_ids=client_proj_ids if client_proj_ids is not None else None,
+    )
 
     project_hours: dict[str, float] = defaultdict(float)
     project_members: dict[str, set] = defaultdict(set)
@@ -134,19 +129,21 @@ async def get_executive_dashboard(
     over_allocated_count = sum(1 for s in snapshots if s.utilisation_percent > 100)
     fully_allocated_non_over = sum(
         1 for s in snapshots
-        if s.classification == "fully_billed" and s.utilisation_percent <= 100
+        if s.classification in ("fully_billed", "partially_billed") and s.utilisation_percent <= 100
     )
     resource_availability = {
-        "available": bench_count + non_billable_count,
+        "available": bench_count,
         "fully_allocated": fully_allocated_non_over,
         "over_allocated": over_allocated_count,
     }
 
-    # Classification breakdown
+    # Classification breakdown — keep granular counts for the breakdown chart
+    fully_billed_count = sum(1 for s in snapshots if s.classification == "fully_billed")
+    partially_billed_count = sum(1 for s in snapshots if s.classification == "partially_billed")
     classification_breakdown = []
     for cls_name, cls_count in [
-        ("fully_billed", billable_count),
-        ("partially_billed", non_billable_count),
+        ("fully_billed", fully_billed_count),
+        ("partially_billed", partially_billed_count),
         ("bench", bench_count),
     ]:
         pct = round(cls_count / total_active * 100, 2) if total_active > 0 else 0.0
@@ -275,12 +272,11 @@ async def get_resource_dashboard(
     emp_ids = [s.employee_id for s in page_snapshots]
 
     # Get timesheet entries for these employees to derive project hours
-    ts_entries = await TimesheetEntry.find(
-        TimesheetEntry.branch_location_id == branch_location_id,
-        TimesheetEntry.period == period,
-        TimesheetEntry.status != "rejected",
-        {"employee_id": {"$in": emp_ids}},
-    ).to_list()
+    ts_entries = await get_effective_timesheet_entries(
+        period=period,
+        branch_location_id=branch_location_id,
+        employee_ids=emp_ids,
+    )
 
     # Resolve project names
     ts_project_ids = {e.project_id for e in ts_entries}
@@ -361,22 +357,26 @@ async def get_project_dashboard(
     branch_emp_ids = [str(e.id) for e in branch_employees]
 
     # Fetch timesheet entries for the period (only branch-level employees)
-    ts_filters: list = [
-        TimesheetEntry.branch_location_id == branch_location_id,
-        TimesheetEntry.period == period,
-        TimesheetEntry.status != "rejected",
-        {"employee_id": {"$in": branch_emp_ids}},
-    ]
-    if project_id:
-        ts_filters.append(TimesheetEntry.project_id == project_id)
+    client_proj_ids = None
     if client_name:
         client_projects = await Project.find(
             {"client_name": {"$regex": client_name, "$options": "i"}, "is_deleted": {"$ne": True}}
         ).to_list()
         client_proj_ids = [str(p.id) for p in client_projects]
-        ts_filters.append({"project_id": {"$in": client_proj_ids}})
 
-    entries = await TimesheetEntry.find(*ts_filters).to_list()
+    if project_id and client_proj_ids is not None:
+        project_ids = [project_id] if project_id in client_proj_ids else []
+    elif project_id:
+        project_ids = [project_id]
+    else:
+        project_ids = client_proj_ids
+
+    entries = await get_effective_timesheet_entries(
+        period=period,
+        branch_location_id=branch_location_id,
+        employee_ids=branch_emp_ids,
+        project_ids=project_ids,
+    )
 
     # Group by project
     project_data: dict[str, dict] = defaultdict(
@@ -602,11 +602,10 @@ async def get_resource_allocation_dashboard(
     ).to_list()
 
     # 3. Timesheet hours per employee-project → billable vs non-billable
-    ts_entries = await TimesheetEntry.find(
-        TimesheetEntry.period == period,
-        TimesheetEntry.status != "rejected",
-        {"employee_id": {"$in": branch_emp_ids}},
-    ).to_list()
+    ts_entries = await get_effective_timesheet_entries(
+        period=period,
+        employee_ids=branch_emp_ids,
+    )
 
     # employee_id → project_id → {billable, non_billable}
     emp_proj_hours: dict[str, dict[str, dict[str, float]]] = defaultdict(

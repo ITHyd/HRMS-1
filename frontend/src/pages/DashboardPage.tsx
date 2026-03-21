@@ -1,30 +1,32 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts"
-import { SlidersHorizontal, Search, X } from "lucide-react"
+import { SlidersHorizontal, Search, X, Upload } from "lucide-react"
 import { PeriodSelector } from "@/components/shared/PeriodSelector"
 import { ExecutiveOverview } from "@/components/dashboard/ExecutiveOverview"
 import { ClassificationDonut } from "@/components/dashboard/ClassificationDonut"
 import { UtilisationTrendChart } from "@/components/dashboard/UtilisationTrendChart"
 import { TopProjectsChart } from "@/components/dashboard/TopProjectsChart"
-import { ProjectHealthTable } from "@/components/dashboard/ProjectHealthTable"
 import { ResourceAllocationTable } from "@/components/dashboard/ResourceAllocationTable"
+import { ExcelUploadModal } from "@/components/dashboard/ExcelUploadModal"
+import { DataSourceToggle } from "@/components/shared/DataSourceToggle"
 import { SelectDropdown } from "@/components/shared/SelectDropdown"
 import {
   getExecutiveDashboard,
-  getProjectDashboard,
   getResourceAllocationDashboard,
 } from "@/api/dashboard"
+import { getExcelDashboard, getExcelResources } from "@/api/excelUtilisation"
 import { listProjectClients } from "@/api/projects"
+import { useDataSourceStore } from "@/store/dataSourceStore"
 import { useOrgChartStore } from "@/store/orgChartStore"
-import type { ExecutiveDashboard, ResourceAllocationEntry, ProjectDashboardEntry } from "@/types/dashboard"
+import { useReportPeriodStore } from "@/store/reportPeriodStore"
+import type { ExecutiveDashboard, ResourceAllocationEntry } from "@/types/dashboard"
 
-type TabKey = "executive" | "resources" | "projects"
+type TabKey = "executive" | "resources"
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "executive", label: "Executive" },
   { key: "resources", label: "Resources" },
-  { key: "projects", label: "Projects" },
 ]
 
 const CLASSIFICATION_OPTIONS = [
@@ -46,27 +48,27 @@ const AVAILABILITY_LABELS: Record<string, string> = {
   over_allocated: "Over Allocated",
 }
 
-function getCurrentPeriod(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-}
-
 
 export function DashboardPage() {
+  const dataSource = useDataSourceStore((s) => s.dataSource)
+  const selectedPeriod = useReportPeriodStore((s) => s.selectedPeriod)
+  const setSelectedPeriod = useReportPeriodStore((s) => s.setSelectedPeriod)
   const setDrawerPeriod = useOrgChartStore((s) => s.setDrawerPeriod)
-  const [selectedPeriod, setSelectedPeriod] = useState(() => {
-    const p = getCurrentPeriod()
-    return p
-  })
+  const setDrawerDataSource = useOrgChartStore((s) => s.setDrawerDataSource)
   const [activeTab, setActiveTab] = useState<TabKey>("executive")
   const [loading, setLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
 
   // Keep drawer period in sync with dashboard period
   useEffect(() => {
     setDrawerPeriod(selectedPeriod)
     return () => setDrawerPeriod(null)
   }, [selectedPeriod, setDrawerPeriod])
+
+  useEffect(() => {
+    setDrawerDataSource(dataSource)
+  }, [dataSource, setDrawerDataSource])
 
   // Filter state
   const [searchInput, setSearchInput] = useState("")
@@ -99,38 +101,55 @@ export function DashboardPage() {
     listProjectClients().then(setClientOptions).catch(() => {})
   }, [])
 
-  // Projects tab state
-  const [projectEntries, setProjectEntries] = useState<ProjectDashboardEntry[]>([])
-
-  const fetchExecutiveData = useCallback(async (period: string, client?: string) => {
+  const fetchExecutiveData = useCallback(async (period: string, client?: string, source: "hrms" | "excel" = "hrms") => {
     setLoading(true)
     try {
-      const data = await getExecutiveDashboard({ period, client_name: client || undefined })
+      let data: ExecutiveDashboard
+      if (source === "excel") {
+        data = await getExcelDashboard(period)
+      } else {
+        data = await getExecutiveDashboard({ period, client_name: client || undefined })
+      }
       setExecutiveData(data)
-    } catch (err) {
-      console.error("Failed to load executive dashboard:", err)
-      setExecutiveData(null)
+    } catch (err: any) {
+      if (source === "excel" && err?.response?.status === 404) {
+        setExecutiveData(null)
+      } else {
+        console.error("Failed to load executive dashboard:", err)
+        setExecutiveData(null)
+      }
     } finally {
       setLoading(false)
     }
   }, [])
 
   const fetchResourceData = useCallback(
-    async (period: string, search?: string, classification?: string, client?: string, page?: number, pageSize?: number) => {
+    async (period: string, search?: string, classification?: string, client?: string, page?: number, pageSize?: number, source: "hrms" | "excel" = "hrms") => {
       setLoading(true)
       try {
-        const data = await getResourceAllocationDashboard({
-          period,
-          search: search || undefined,
-          classification: classification || undefined,
-          client_name: client || undefined,
-          page: page || 1,
-          page_size: pageSize || 20,
-        })
+        let data
+        if (source === "excel") {
+          data = await getExcelResources({
+            period,
+            search: search || undefined,
+            classification: classification || undefined,
+            page: page || 1,
+            page_size: pageSize || 20,
+          })
+        } else {
+          data = await getResourceAllocationDashboard({
+            period,
+            search: search || undefined,
+            classification: classification || undefined,
+            client_name: client || undefined,
+            page: page || 1,
+            page_size: pageSize || 20,
+          })
+        }
         setResourceEntries(data.entries)
         setResourceTotal(data.total)
       } catch (err) {
-        console.error("Failed to load resource allocation dashboard:", err)
+        console.error("Failed to load resource dashboard:", err)
         setResourceEntries([])
         setResourceTotal(0)
       } finally {
@@ -140,29 +159,13 @@ export function DashboardPage() {
     []
   )
 
-  const fetchProjectData = useCallback(async (period: string, client?: string) => {
-    setLoading(true)
-    try {
-      const data = await getProjectDashboard({ period, client_name: client || undefined, page_size: 100 })
-      setProjectEntries(data.projects)
-    } catch (err) {
-      console.error("Failed to load project dashboard:", err)
-      setProjectEntries([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
     switch (activeTab) {
       case "executive":
-        fetchExecutiveData(selectedPeriod, clientFilter)
+        fetchExecutiveData(selectedPeriod, clientFilter, dataSource)
         break
       case "resources":
-        fetchResourceData(selectedPeriod, searchQuery, classificationFilter, clientFilter, resourcePage, resourcePageSize)
-        break
-      case "projects":
-        fetchProjectData(selectedPeriod, clientFilter)
+        fetchResourceData(selectedPeriod, searchQuery, classificationFilter, clientFilter, resourcePage, resourcePageSize, dataSource)
         break
     }
   }, [
@@ -170,12 +173,12 @@ export function DashboardPage() {
     selectedPeriod,
     fetchExecutiveData,
     fetchResourceData,
-    fetchProjectData,
     searchQuery,
     classificationFilter,
     clientFilter,
     resourcePage,
     resourcePageSize,
+    dataSource,
   ])
 
   const resetFilters = () => {
@@ -195,18 +198,6 @@ export function DashboardPage() {
     resetFilters()
     setShowFilters(false)
   }
-
-  // Client-side filtered projects (search is client-side for this tab)
-  const filteredProjects = searchQuery
-    ? projectEntries.filter((p) => {
-        const q = searchQuery.toLowerCase()
-        return (
-          p.project_name.toLowerCase().includes(q) ||
-          (p.client_name || "").toLowerCase().includes(q) ||
-          (p.members || []).some((m) => m.employee_name.toLowerCase().includes(q))
-        )
-      })
-    : projectEntries
 
   // Resource availability chart
   const availabilityData = executiveData
@@ -230,6 +221,7 @@ export function DashboardPage() {
     : []
 
   return (
+    <>
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -240,7 +232,17 @@ export function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {clientOptions.length > 0 && (
+          <DataSourceToggle />
+          {dataSource === "excel" && (
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="cursor-pointer inline-flex items-center gap-1.5 h-8 rounded-md border px-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Upload
+            </button>
+          )}
+          {clientOptions.length > 0 && dataSource === "hrms" && (
             <SelectDropdown
               value={clientFilter}
               onChange={(v) => { setClientFilter(v); setResourcePage(1) }}
@@ -295,11 +297,7 @@ export function DashboardPage() {
               <div className="relative w-56">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
-                  placeholder={
-                    activeTab === "resources"
-                      ? "Search name, project, client..."
-                      : "Search project, client, member..."
-                  }
+                  placeholder="Search name, project, client..."
                   value={searchInput}
                   onChange={(e) => handleSearchInput(e.target.value)}
                   className="w-full h-8 rounded-md border border-input bg-transparent pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -407,7 +405,20 @@ export function DashboardPage() {
 
           {activeTab === "executive" && !executiveData && (
             <div className="p-6 text-center text-muted-foreground">
-              No executive data available for this period. Run an HRMS sync first.
+              {dataSource === "excel" ? (
+                <div className="space-y-3">
+                  <p>No Excel data for this period.</p>
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="cursor-pointer inline-flex items-center gap-1.5 px-4 py-2 rounded-md border text-sm font-medium hover:bg-muted transition-colors"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload Excel Report
+                  </button>
+                </div>
+              ) : (
+                "No executive data available for this period. Run an HRMS sync first."
+              )}
             </div>
           )}
 
@@ -422,13 +433,31 @@ export function DashboardPage() {
               onPageSizeChange={(size) => { setResourcePageSize(size); setResourcePage(1) }}
             />
           )}
-
-          {/* Projects Tab */}
-          {activeTab === "projects" && (
-            <ProjectHealthTable projects={filteredProjects} />
-          )}
         </>
       )}
     </div>
+    {showUploadModal && (
+      <ExcelUploadModal
+        onClose={() => setShowUploadModal(false)}
+        onUploaded={() => {
+          if (dataSource === "excel") {
+            if (activeTab === "resources") {
+              fetchResourceData(
+                selectedPeriod,
+                searchQuery,
+                classificationFilter,
+                clientFilter,
+                resourcePage,
+                resourcePageSize,
+                "excel"
+              )
+            } else {
+              fetchExecutiveData(selectedPeriod, clientFilter, "excel")
+            }
+          }
+        }}
+      />
+    )}
+    </>
   )
 }

@@ -2,9 +2,16 @@ import client from "./client"
 import type { EmployeeDetail, EmployeeMasterEntry } from "@/types/employee"
 import type { SearchResult } from "@/types/api"
 
-export async function getEmployee(id: string, period?: string): Promise<EmployeeDetail> {
-  const res = await client.get<EmployeeDetail>(`/employees/${id}`, {
-    params: period ? { period } : undefined,
+export async function getEmployee(
+  id: string,
+  period?: string,
+  dataSource?: "hrms" | "excel"
+): Promise<EmployeeDetail> {
+  const res = await client.get<EmployeeDetail>(`/employees/${encodeURIComponent(id)}`, {
+    params: {
+      ...(period ? { period } : {}),
+      ...(dataSource ? { data_source: dataSource } : {}),
+    },
   })
   return res.data
 }
@@ -44,7 +51,7 @@ export async function getEmployeeDepartments(): Promise<
   return res.data
 }
 
-export async function getHrmsStatus(): Promise<{ total: number; synced: boolean }> {
-  const res = await client.get<{ total: number; synced: boolean }>("/employees/status")
+export async function getHrmsStatus(): Promise<{ total: number; synced: boolean; branch_mapped?: boolean }> {
+  const res = await client.get<{ total: number; synced: boolean; branch_mapped?: boolean }>("/employees/status")
   return res.data
 }

@@ -1,23 +1,21 @@
 import calendar
-from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Optional
-
-from bson import ObjectId
 
 from app.models.capacity_config import CapacityConfig
 from app.models.employee import Employee
 from app.models.employee_capacity_override import EmployeeCapacityOverride
-from app.models.employee_project import EmployeeProject
 from app.models.finance_billable import FinanceBillable
-from app.models.project import Project
-from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
 from app.schemas.utilisation import (
     UtilisationSnapshotResponse,
     UtilisationSummary,
 )
 from app.services import audit_service
+from app.services.billable_hours_service import (
+    get_effective_timesheet_entries,
+    summarise_hours_by_employee,
+)
 
 
 async def get_or_create_capacity_config(branch_location_id: str) -> CapacityConfig:
@@ -201,50 +199,15 @@ async def compute_utilisation(
     employee_ids = [str(e.id) for e in employees]
     emp_map = {str(e.id): e for e in employees}
 
-    # Auto-detect bench: employees whose only projects have passed end_date
-    now_dt = datetime.now(timezone.utc)
-    active_assignments = await EmployeeProject.find(
-        {"employee_id": {"$in": employee_ids}},
-        EmployeeProject.is_deleted != True,
-    ).to_list()
-
-    if active_assignments:
-        proj_ids_in_use = list({a.project_id for a in active_assignments})
-        live_projects = await Project.find(
-            {"_id": {"$in": [ObjectId(p) for p in proj_ids_in_use if ObjectId.is_valid(p)]}},
-            Project.is_deleted != True,
-        ).to_list()
-        live_proj_ids = {
-            str(p.id) for p in live_projects
-            if not p.end_date or p.end_date.replace(tzinfo=None) >= now_dt.replace(tzinfo=None)
-        }
-        emp_live_projs: dict[str, set] = defaultdict(set)
-        for a in active_assignments:
-            if a.project_id in live_proj_ids:
-                emp_live_projs[a.employee_id].add(a.project_id)
-        # Employees with no live project are forced to bench
-        forced_bench_ids = {eid for eid in employee_ids if not emp_live_projs.get(eid)}
-    else:
-        forced_bench_ids = set(employee_ids)
-
-    # Aggregate timesheet entries for the period (any status except rejected)
-    entries = await TimesheetEntry.find(
-        TimesheetEntry.branch_location_id == branch_location_id,
-        TimesheetEntry.period == period,
-        TimesheetEntry.status != "rejected",
-        {"employee_id": {"$in": employee_ids}},
-    ).to_list()
-
-    # Group by employee
-    hours_by_emp: dict[str, dict] = defaultdict(
-        lambda: {"total": 0.0, "billable": 0.0, "non_billable": 0.0}
+    # Canonical realised-hours source:
+    # SUM(timesheet_entries.hours) for the period where is_billable=True,
+    # status != rejected, and the row has not been soft-deleted.
+    entries = await get_effective_timesheet_entries(
+        period=period,
+        branch_location_id=branch_location_id,
+        employee_ids=employee_ids,
     )
-    for entry in entries:
-        hours_by_emp[entry.employee_id]["total"] += entry.hours
-        if entry.is_billable:
-            hours_by_emp[entry.employee_id]["billable"] += entry.hours
-        else:
-            hours_by_emp[entry.employee_id]["non_billable"] += entry.hours
+    hours_by_emp = summarise_hours_by_employee(entries)
 
     # Fetch finance billable records for cross-reference
     finance_records = await FinanceBillable.find(
@@ -302,19 +265,17 @@ async def compute_utilisation(
         utilisation_percent = (total_hours / capacity * 100) if capacity > 0 else 0.0
         billable_percent = (billable_hours / capacity * 100) if capacity > 0 else 0.0
 
-        # Classify — forced bench if all assigned projects have passed end_date
-        if eid in forced_bench_ids:
+        # Classification is based only on realised billable work for the period.
+        # Allocation percentages are display-only and are not used here.
+        if billable_hours <= 0:
             classification = "bench"
             bench_count += 1
         elif billable_percent >= config.partial_billing_threshold:
             classification = "fully_billed"
             fully_billed_count += 1
-        elif billable_percent >= config.bench_threshold_percent:
+        else:
             classification = "partially_billed"
             partially_billed_count += 1
-        else:
-            classification = "bench"
-            bench_count += 1
 
         total_util += utilisation_percent
         total_billable_pct += billable_percent

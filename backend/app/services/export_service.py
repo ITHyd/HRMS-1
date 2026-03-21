@@ -14,8 +14,8 @@ from app.models.finance_billable import FinanceBillable
 from app.models.location import Location
 from app.models.project import Project
 from app.models.reporting_relationship import ReportingRelationship
-from app.models.timesheet_entry import TimesheetEntry
 from app.models.utilisation_snapshot import UtilisationSnapshot
+from app.services.billable_hours_service import get_effective_timesheet_entries
 
 
 async def export_team_report(location_id: str) -> bytes:
@@ -246,11 +246,11 @@ async def export_project_utilisation(location_id: str, period: str) -> bytes:
     ).to_list()
     branch_emp_ids = [str(e.id) for e in branch_employees]
 
-    entries = await TimesheetEntry.find(
-        TimesheetEntry.branch_location_id == location_id,
-        TimesheetEntry.period == period,
-        {"employee_id": {"$in": branch_emp_ids}},
-    ).to_list()
+    entries = await get_effective_timesheet_entries(
+        period=period,
+        branch_location_id=location_id,
+        employee_ids=branch_emp_ids,
+    )
 
     # Aggregate by project
     proj_data: dict[str, dict] = defaultdict(lambda: {

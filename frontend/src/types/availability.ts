@@ -48,6 +48,8 @@ export interface AvailableEmployee {
 }
 
 export interface BenchPoolResponse {
+  period?: string | null
+  data_source?: "hrms" | "excel"
   employees: AvailableEmployee[]
   total: number
   bench_count: number

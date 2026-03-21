@@ -39,9 +39,23 @@ async def get_employees(
 async def get_hrms_status(
     user: CurrentUser = Depends(get_current_user),
 ):
-    """Return whether HRMS data has been synced (employee count > 0)."""
-    total = await Employee.find_all().count()
-    return {"total": total, "synced": total > 0}
+    """Return whether HRMS data is available for the current user's branch."""
+    if not user.branch_location_id or user.branch_location_id == "pending_sync":
+        return {
+            "total": 0,
+            "synced": False,
+            "branch_mapped": False,
+        }
+
+    total = await Employee.find(
+        Employee.location_id == user.branch_location_id,
+        Employee.is_deleted != True,
+    ).count()
+    return {
+        "total": total,
+        "synced": total > 0,
+        "branch_mapped": True,
+    }
 
 
 @router.get("/departments")
@@ -67,9 +81,15 @@ async def search(
 async def get_employee(
     employee_id: str,
     period: str = Query(None, description="Period in YYYY-MM format for utilisation data", pattern=r"^\d{4}-\d{2}$"),
+    data_source: str = Query(None, description="Optional source context: hrms or excel"),
     user: CurrentUser = Depends(get_current_user),
 ):
-    result = await get_employee_detail(employee_id, user.branch_location_id, period=period)
+    result = await get_employee_detail(
+        employee_id,
+        user.branch_location_id,
+        period=period,
+        data_source=data_source,
+    )
     if not result:
         raise HTTPException(status_code=404, detail="Employee not found")
     return result

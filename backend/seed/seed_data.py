@@ -1,5 +1,5 @@
 """
-Seed data generator for Branch Command Center — DEMO mode.
+Seed data generator for Workforce Intelligence Hub — DEMO mode.
 Creates ~80 employees across 4 locations with realistic org hierarchy.
 
 Usage: cd backend && python -m seed.seed_data

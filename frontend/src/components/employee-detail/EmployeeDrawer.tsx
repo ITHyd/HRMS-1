@@ -45,6 +45,7 @@ export function EmployeeDrawer() {
   const closeDrawer = useOrgChartStore((s) => s.closeDrawer)
   const focusEmployee = useOrgChartStore((s) => s.focusEmployee)
   const drawerPeriod = useOrgChartStore((s) => s.drawerPeriod)
+  const drawerDataSource = useOrgChartStore((s) => s.drawerDataSource)
   const loggedInUser = useAuthStore((s) => s.user)
   const [employee, setEmployee] = useState<EmployeeDetail | null>(null)
   const [chain, setChain] = useState<Record<string, unknown>[]>([])
@@ -54,47 +55,44 @@ export function EmployeeDrawer() {
 
   useEffect(() => {
     if (!selectedId || !isOpen) return
-    let isActive = true
-    queueMicrotask(() => {
-      if (!isActive) return
-      setLoading(true)
-      setError(null)
-      setEmployee(null)
-      setChain([])
-      setTimeline(null)
+    let cancelled = false
 
-      const loadEmployee = async () => {
-        try {
-          const emp = await getEmployee(selectedId, drawerPeriod ?? undefined)
-          if (isActive) setEmployee(emp)
-        } catch (err) {
-          console.error("Failed to load employee:", err)
-          if (isActive) setError("Failed to load employee details")
-        }
+    setLoading(true)
+    setError(null)
+    setEmployee(null)
+    setChain([])
+    setTimeline(null)
 
-        try {
-          const chainRes = await getReportingChain(selectedId)
-          if (isActive) setChain(chainRes.chain || [])
-        } catch (err) {
-          console.error("Failed to load chain:", err)
-        }
+    const load = async () => {
+      const [empResult, chainResult, timelineResult] = await Promise.allSettled([
+        getEmployee(selectedId, drawerPeriod ?? undefined, drawerDataSource),
+        getReportingChain(selectedId),
+        getEmployeeTimeline(selectedId),
+      ])
 
-        try {
-          const tl = await getEmployeeTimeline(selectedId)
-          if (isActive) setTimeline(tl)
-        } catch (err) {
-          console.error("Failed to load timeline:", err)
-        }
+      if (cancelled) return
 
-        if (isActive) setLoading(false)
+      if (empResult.status === "fulfilled") {
+        setEmployee(empResult.value)
+      } else {
+        console.error("Failed to load employee:", empResult.reason)
+        setError("Failed to load employee details")
       }
 
-      void loadEmployee()
-    })
-    return () => {
-      isActive = false
+      if (chainResult.status === "fulfilled") {
+        setChain(chainResult.value.chain || [])
+      }
+
+      if (timelineResult.status === "fulfilled") {
+        setTimeline(timelineResult.value)
+      }
+
+      setLoading(false)
     }
-  }, [selectedId, isOpen, drawerPeriod])
+
+    void load()
+    return () => { cancelled = true }
+  }, [selectedId, isOpen, drawerPeriod, drawerDataSource])
 
   if (!isOpen) return null
 

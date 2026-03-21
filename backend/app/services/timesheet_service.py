@@ -13,6 +13,10 @@ from app.models.timesheet_entry import TimesheetEntry
 from app.models.timesheet_period_lock import TimesheetPeriodLock
 from app.models.user import User
 from app.services import audit_service
+from app.services.billable_hours_service import (
+    get_effective_timesheet_entries,
+    summarise_hours,
+)
 
 
 async def create_entry(data: dict, user) -> dict:
@@ -163,7 +167,7 @@ async def list_entries(
     page_size: int = 50,
 ) -> dict:
     """Paginated listing of timesheet entries with employee and project name lookups."""
-    filters = {}
+    filters = {"is_deleted": {"$ne": True}}
 
     if branch_location_id:
         filters["branch_location_id"] = branch_location_id
@@ -236,15 +240,20 @@ async def list_entries(
 
     # Compute summary stats across ALL matching entries (not just paginated page)
     # Use aggregation pipeline for efficiency
-    base_filters = {}
-    if branch_location_id:
-        base_filters["branch_location_id"] = branch_location_id
     if period:
-        base_filters["period"] = period
+        all_period_entries = await get_effective_timesheet_entries(
+            period=period,
+            branch_location_id=branch_location_id,
+        )
+    else:
+        base_filters = {"is_deleted": {"$ne": True}, "status": {"$ne": "rejected"}}
+        if branch_location_id:
+            base_filters["branch_location_id"] = branch_location_id
+        all_period_entries = await TimesheetEntry.find(base_filters).to_list()
 
-    all_period_entries = await TimesheetEntry.find(base_filters).to_list()
-    total_hours = sum(e.hours for e in all_period_entries)
-    billable_hours = sum(e.hours for e in all_period_entries if e.is_billable)
+    totals = summarise_hours(all_period_entries)
+    total_hours = totals["total"]
+    billable_hours = totals["billable"]
     unique_employees = len({e.employee_id for e in all_period_entries})
     unique_projects = len({e.project_id for e in all_period_entries})
 

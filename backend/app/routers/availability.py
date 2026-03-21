@@ -3,12 +3,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.middleware.auth_middleware import CurrentUser, get_current_user
 from app.schemas.availability import SkillTagRequest
 from app.services import availability_service
+from app.services.excel_utilisation_service import (
+    get_excel_bench_pool,
+    get_excel_designations,
+)
 
 router = APIRouter(prefix="/availability", tags=["Availability"])
 
 
 @router.get("/bench")
 async def get_bench_pool(
+    period: str = Query(None, description="Period in YYYY-MM format for Excel mode"),
     skill: str = Query(None, description="Filter by skill name"),
     location: str = Query(None, description="Filter by location code"),
     classification: str = Query(None, description="Filter by classification (bench | partially_billed)"),
@@ -16,11 +21,26 @@ async def get_bench_pool(
     utilisation_min: float = Query(None, ge=0, le=100, description="Min utilisation %"),
     utilisation_max: float = Query(None, ge=0, le=100, description="Max utilisation %"),
     search: str = Query(None, description="Search by employee name or designation"),
+    data_source: str = Query("hrms", pattern="^(hrms|excel)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     user: CurrentUser = Depends(get_current_user),
 ):
     """Get bench pool - employees classified as bench or partially billed."""
+    if data_source == "excel":
+        return await get_excel_bench_pool(
+            branch_location_id=user.branch_location_id,
+            period=period,
+            skill_filter=skill,
+            location_filter=location,
+            classification_filter=classification,
+            designation_filter=designation,
+            utilisation_min=utilisation_min,
+            utilisation_max=utilisation_max,
+            search=search,
+            page=page,
+            page_size=page_size,
+        )
     return await availability_service.get_bench_pool(
         branch_location_id=user.branch_location_id,
         skill_filter=skill,
@@ -45,9 +65,13 @@ async def get_locations(
 
 @router.get("/designations")
 async def get_designations(
+    period: str = Query(None, description="Period in YYYY-MM format for Excel mode"),
+    data_source: str = Query("hrms", pattern="^(hrms|excel)$"),
     user: CurrentUser = Depends(get_current_user),
 ):
     """List distinct designations for bench/available employees."""
+    if data_source == "excel":
+        return await get_excel_designations(user.branch_location_id, period=period)
     return await availability_service.get_bench_designations(user.branch_location_id)
 
 

@@ -1,6 +1,6 @@
-# Branch Command Center
+# Workforce Intelligence Hub
 
-A full-stack application for managing organizational structure, employees, and branch analytics. Features an interactive org chart, employee search, data import/export, and an audit log.
+A full-stack application for workforce planning, utilisation tracking, project visibility, and branch-level operational intelligence. Features dashboards, employee and project management, HRMS sync, data import/export, and audit tracking.
 
 ## Tech Stack
 

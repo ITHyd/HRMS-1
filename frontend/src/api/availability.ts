@@ -14,12 +14,18 @@ export async function getLocations(): Promise<
   return res.data
 }
 
-export async function getDesignations(): Promise<string[]> {
-  const res = await client.get<string[]>("/availability/designations")
+export async function getDesignations(
+  period?: string,
+  dataSource: "hrms" | "excel" = "hrms"
+): Promise<string[]> {
+  const res = await client.get<string[]>("/availability/designations", {
+    params: { data_source: dataSource, period },
+  })
   return res.data
 }
 
 export async function getBenchPool(params: {
+  period?: string
   skill?: string
   location?: string
   classification?: string
@@ -27,6 +33,7 @@ export async function getBenchPool(params: {
   utilisation_min?: number
   utilisation_max?: number
   search?: string
+  data_source?: "hrms" | "excel"
   page?: number
   page_size?: number
 }): Promise<BenchPoolResponse> {

@@ -148,8 +148,11 @@ async def employee_timeline(
     """Return month-by-month project timeline for an employee."""
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
+    MAX_PERIOD = "2026-02"
     if not to_period:
-        to_period = now.strftime("%Y-%m")
+        to_period = min(now.strftime("%Y-%m"), MAX_PERIOD)
+    if to_period > MAX_PERIOD:
+        to_period = MAX_PERIOD
     if not from_period:
         # Default: 12 months back
         y, m = now.year, now.month - 11

@@ -91,8 +91,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             className="h-11 w-11 shrink-0 rounded-lg object-cover"
           />
           <div className="whitespace-nowrap">
-            <h1 className="text-base font-bold text-sidebar-primary leading-tight">nxzen</h1>
-            <p className="text-xs text-sidebar-foreground/50">Branch Command</p>
+            <h1 className="text-base font-bold text-sidebar-primary leading-tight">Workforce</h1>
+            <p className="text-xs text-sidebar-foreground/50">Intelligence Hub</p>
           </div>
         </div>
         <button

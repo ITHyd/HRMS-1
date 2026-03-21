@@ -27,6 +27,8 @@ from app.models.dynamics_export import DynamicsExport
 from app.models.attendance_summary import AttendanceSummary
 from app.models.project_allocation import ProjectAllocation
 from app.models.hrms_holiday import HrmsHoliday
+from app.models.excel_utilisation import ExcelUtilisationReport
+from app.models.excel_upload_log import ExcelUploadLog
 
 ALL_MODELS = [
     Employee,
@@ -54,6 +56,8 @@ ALL_MODELS = [
     AttendanceSummary,
     ProjectAllocation,
     HrmsHoliday,
+    ExcelUtilisationReport,
+    ExcelUploadLog,
 ]
 
 
