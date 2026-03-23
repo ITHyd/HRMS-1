@@ -7,8 +7,6 @@ import { WorkforceOverview } from "@/components/analytics/WorkforceOverview"
 import { ClientBreakdownChart } from "@/components/analytics/DeptBreakdownChart"
 import { LevelPyramid } from "@/components/analytics/LevelPyramid"
 import { TrendLineChart } from "@/components/analytics/TrendLineChart"
-import { SpanOfControl } from "@/components/analytics/SpanOfControl"
-import { CrossReportingView } from "@/components/analytics/CrossReportingView"
 import { ProjectOverview } from "@/components/analytics/ProjectOverview"
 import { useDataSourceStore } from "@/store/dataSourceStore"
 import { useOrgChartStore } from "@/store/orgChartStore"
@@ -101,11 +99,6 @@ export function AnalyticsPage() {
       </div>
 
       <TrendLineChart data={data.monthly_trend} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SpanOfControl data={data.span_of_control} />
-        <CrossReportingView data={data.cross_reports} />
-      </div>
 
       <ProjectOverview
         projects={data.projects}

@@ -61,3 +61,29 @@ export async function getExcelUploadHistory(): Promise<ExcelUploadLog[]> {
   const res = await client.get<ExcelUploadLog[]>("/excel-utilisation/uploads")
   return res.data
 }
+
+export interface ExcelProjectsResponse {
+  projects: import("@/types/project").ProjectBrief[]
+  total: number
+  active_count: number
+  completed_count: number
+  on_hold_count: number
+  period: string
+  data_source: string
+  clients: string[]
+}
+
+export async function getExcelProjects(params: {
+  search?: string
+  client_name?: string
+  page?: number
+  page_size?: number
+}): Promise<ExcelProjectsResponse> {
+  const res = await client.get<ExcelProjectsResponse>("/excel-utilisation/projects", { params })
+  return res.data
+}
+
+export async function getExcelProjectDetail(projectId: string): Promise<import("@/types/project").ProjectDetail & { period: string; data_source: string }> {
+  const res = await client.get(`/excel-utilisation/projects/${projectId}`)
+  return res.data
+}

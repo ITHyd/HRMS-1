@@ -7,6 +7,8 @@ import { StatusBadge } from "@/components/shared/StatusBadge"
 import { PeriodSelector, getCurrentPeriod } from "@/components/shared/PeriodSelector"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import { getProjectDetail } from "@/api/projects"
+import { getExcelProjectDetail } from "@/api/excelUtilisation"
+import { useDataSourceStore } from "@/store/dataSourceStore"
 import { ArrowLeft, Users, Clock, CalendarDays, Briefcase, ChevronDown, ChevronRight } from "lucide-react"
 import type { ProjectDetail } from "@/types/project"
 
@@ -15,6 +17,7 @@ export function ProjectDetailPage() {
   const navigate = useNavigate()
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
   const setDrawerPeriod = useOrgChartStore((s) => s.setDrawerPeriod)
+  const dataSource = useDataSourceStore((s) => s.dataSource)
   const [project, setProject] = useState<ProjectDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,14 +32,18 @@ export function ProjectDetailPage() {
     if (!projectId) return
     setLoading(true)
     setError(null)
-    getProjectDetail(projectId, selectedPeriod)
+    const fetcher =
+      dataSource === "excel"
+        ? getExcelProjectDetail(projectId)
+        : getProjectDetail(projectId, selectedPeriod)
+    fetcher
       .then(setProject)
       .catch((err) => {
         console.error("Failed to load project:", err)
         setError("Project not found")
       })
       .finally(() => setLoading(false))
-  }, [projectId, selectedPeriod])
+  }, [projectId, selectedPeriod, dataSource])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -63,7 +70,9 @@ export function ProjectDetailPage() {
           <span className="group-hover:underline">Back to Projects</span>
         </button>
         <div className="flex h-48 items-center justify-center text-muted-foreground">
-          {error || "Project not found"}
+          {dataSource === "excel" && error
+            ? "No March 2026 inter-company data for this project"
+            : error || "Project not found"}
         </div>
       </div>
     )
@@ -123,7 +132,11 @@ export function ProjectDetailPage() {
       {/* Period Selector + Stats */}
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-muted-foreground">Monthly Progress</p>
-        <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
+        {dataSource === "excel" ? (
+          <span className="text-sm text-muted-foreground bg-muted px-3 py-1 rounded-md">March 2026</span>
+        ) : (
+          <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -149,9 +162,13 @@ export function ProjectDetailPage() {
                 <Briefcase className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Worked Days</p>
+                <p className="text-xs text-muted-foreground">
+                  {dataSource === "excel" ? "Allocated Days" : "Worked Days"}
+                </p>
                 <p className="text-xl font-semibold tabular-nums">
-                  {project.worked_days > 0 ? project.worked_days : "-"}
+                  {dataSource === "excel"
+                    ? (project.planned_days > 0 ? project.planned_days : "-")
+                    : (project.worked_days > 0 ? project.worked_days : "-")}
                 </p>
               </div>
             </div>
@@ -194,7 +211,7 @@ export function ProjectDetailPage() {
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium">
-              {project.planned_days > 0 ? "Allocation Progress" : "Timeline Progress"}
+              {dataSource === "excel" ? "Avg Allocation" : project.planned_days > 0 ? "Allocation Progress" : "Timeline Progress"}
             </p>
             <span className={`text-lg font-semibold tabular-nums ${
               project.progress_percent >= 80
@@ -217,7 +234,7 @@ export function ProjectDetailPage() {
             }`}
           />
 
-          {project.planned_days > 0 ? (
+          {project.planned_days > 0 && dataSource !== "excel" ? (
             /* Allocation-based calculation */
             <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-3 text-center">
               <div>
@@ -233,6 +250,22 @@ export function ProjectDetailPage() {
                 <p className="text-sm font-semibold tabular-nums">
                   {project.worked_days} ÷ {project.planned_days} × 100
                 </p>
+              </div>
+            </div>
+          ) : dataSource === "excel" ? (
+            /* Excel inter-company: show avg allocation % */
+            <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-3 text-center">
+              <div>
+                <p className="text-[11px] text-muted-foreground">Allocated Days</p>
+                <p className="text-sm font-semibold tabular-nums">{project.planned_days}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">Team Size</p>
+                <p className="text-sm font-semibold tabular-nums">{project.member_count}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">Avg Allocation</p>
+                <p className="text-sm font-semibold tabular-nums">{project.progress_percent}%</p>
               </div>
             </div>
           ) : startDate && endDate ? (() => {
@@ -304,14 +337,16 @@ export function ProjectDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {project.members.map((member) => (
+                  {project.members.map((member) => {
+                    const isMatched = !member.employee_id.startsWith("unmatched:")
+                    return (
                     <tr
                       key={member.employee_id}
-                      onClick={() => selectEmployee(member.employee_id)}
-                      className="border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer group"
+                      onClick={() => isMatched && selectEmployee(member.employee_id)}
+                      className={`border-b last:border-0 transition-colors ${isMatched ? "hover:bg-muted/50 cursor-pointer group" : ""}`}
                     >
                       <td className="py-2.5 px-3">
-                        <span className="font-medium text-foreground group-hover:underline">
+                        <span className={`font-medium text-foreground ${isMatched ? "group-hover:underline" : "text-muted-foreground"}`}>
                           {member.employee_name}
                         </span>
                       </td>
@@ -361,7 +396,7 @@ export function ProjectDetailPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>

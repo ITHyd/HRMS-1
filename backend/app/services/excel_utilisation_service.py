@@ -381,6 +381,66 @@ async def parse_and_store_excel(
     }
 
 
+async def _get_intercompany_rows_as_utilisation(
+    period: str,
+    branch_location_id: str,
+) -> list["ExcelUtilisationReport"]:
+    """
+    For periods with no YTPL availability upload (e.g. 2026-03),
+    synthesise virtual ExcelUtilisationReport rows from inter-company
+    ProjectAllocation records so the Excel toggle still works.
+    """
+    allocations = await ProjectAllocation.find(
+        ProjectAllocation.period == period,
+        ProjectAllocation.source_system == "intercompany_excel",
+        ProjectAllocation.is_deleted != True,
+    ).to_list()
+
+    if not allocations:
+        return []
+
+    # Aggregate per employee (sum allocation %)
+    from collections import defaultdict as _dd
+    emp_alloc: dict[str, float] = _dd(float)
+    emp_name: dict[str, str] = {}
+    for alloc in allocations:
+        emp_alloc[alloc.employee_id] += alloc.allocation_percentage
+        emp_name[alloc.employee_id] = alloc.employee_name
+
+    # Load employees to get branch filter
+    emp_ids = list(emp_alloc.keys())
+    employees = await Employee.find(
+        {"_id": {"$in": [ObjectId(eid) for eid in emp_ids if ObjectId.is_valid(eid)]}},
+        Employee.location_id == branch_location_id,
+        Employee.is_active == True,
+    ).to_list()
+    branch_emp_ids = {str(e.id) for e in employees}
+
+    now = datetime.now(timezone.utc)
+    virtual_rows = []
+    for emp_id, total_alloc_pct in emp_alloc.items():
+        if emp_id not in branch_emp_ids:
+            continue
+        utilisation_percent = round(min(100.0, total_alloc_pct), 2)
+        availability_percent = round(max(0.0, 100.0 - utilisation_percent), 2)
+        virtual_rows.append(
+            ExcelUtilisationReport(
+                branch_location_id=branch_location_id,
+                upload_batch_id="intercompany_synthetic",
+                uploaded_at=now,
+                uploaded_by="system",
+                filename="Inter-company sheet",
+                employee_name=emp_name.get(emp_id, emp_id),
+                employee_id=emp_id,
+                period=period,
+                availability_percent=availability_percent,
+                utilisation_percent=utilisation_percent,
+                classification=_classify(availability_percent),
+            )
+        )
+    return virtual_rows
+
+
 async def get_excel_dashboard(
     period: str,
     branch_location_id: str,
@@ -389,6 +449,10 @@ async def get_excel_dashboard(
         ExcelUtilisationReport.branch_location_id == branch_location_id,
         ExcelUtilisationReport.period == period,
     ).to_list()
+
+    if not rows:
+        # Fall back to inter-company allocation data for this period
+        rows = await _get_intercompany_rows_as_utilisation(period, branch_location_id)
 
     if not rows:
         return None
@@ -456,6 +520,32 @@ async def get_excel_dashboard(
             }
         )
 
+    # Top consuming projects from inter-company allocations for this period
+    ic_allocations = await ProjectAllocation.find(
+        ProjectAllocation.period == period,
+        ProjectAllocation.source_system == "intercompany_excel",
+        ProjectAllocation.is_deleted != True,
+    ).to_list()
+    project_headcount: dict[str, dict] = {}
+    for alloc in ic_allocations:
+        key = alloc.project_id
+        if key not in project_headcount:
+            project_headcount[key] = {
+                "project_name": alloc.project_name,
+                "client_name": alloc.client_name,
+                "employee_count": 0,
+                "total_hours": 0.0,
+            }
+        project_headcount[key]["employee_count"] += 1
+        project_headcount[key]["total_hours"] += alloc.allocated_days * 8.0
+    top_consuming_projects = sorted(
+        [{"name": v["project_name"], "client_name": v["client_name"],
+          "employee_count": v["employee_count"], "total_hours": round(v["total_hours"], 1)}
+         for v in project_headcount.values()],
+        key=lambda x: x["employee_count"],
+        reverse=True,
+    )[:10]
+
     return {
         "period": period,
         "data_source": "excel",
@@ -465,7 +555,7 @@ async def get_excel_dashboard(
         "bench_count": bench_count,
         "overall_utilisation_percent": avg_util,
         "overall_billable_percent": round(100 - avg_avail, 2),
-        "top_consuming_projects": [],
+        "top_consuming_projects": top_consuming_projects,
         "resource_availability": resource_availability,
         "classification_breakdown": classification_breakdown,
         "trend": trend,
@@ -484,6 +574,10 @@ async def get_excel_resource_rows(
         ExcelUtilisationReport.branch_location_id == branch_location_id,
         ExcelUtilisationReport.period == period,
     ).to_list()
+
+    if not rows:
+        # Fall back to inter-company allocation data for this period
+        rows = await _get_intercompany_rows_as_utilisation(period, branch_location_id)
 
     if not rows:
         return {"period": period, "data_source": "excel", "entries": [], "total": 0}
@@ -1474,3 +1568,190 @@ async def get_upload_history(branch_location_id: str) -> list[dict]:
         }
         for log in logs
     ]
+
+
+async def get_excel_project_detail(project_id: str) -> Optional[dict]:
+    """
+    Return a ProjectDetail-shaped dict for an inter-company project (2026-03).
+    Members come from ProjectAllocation records with source_system='intercompany_excel'.
+    """
+    PERIOD = "2026-03"
+
+    # Fetch the project
+    project = await Project.find_one(
+        {"_id": ObjectId(project_id)} if ObjectId.is_valid(project_id) else {"_id": project_id},
+        Project.is_deleted != True,
+    )
+    if not project:
+        return None
+
+    allocations = await ProjectAllocation.find(
+        ProjectAllocation.project_id == project_id,
+        ProjectAllocation.period == PERIOD,
+        ProjectAllocation.source_system == "intercompany_excel",
+        ProjectAllocation.is_deleted != True,
+    ).to_list()
+
+    if not allocations:
+        return None
+
+    # Load matched employees for extra info
+    real_emp_ids = [
+        ObjectId(a.employee_id)
+        for a in allocations
+        if ObjectId.is_valid(a.employee_id) and not a.employee_id.startswith("unmatched:")
+    ]
+    employees_by_id: dict[str, Employee] = {}
+    if real_emp_ids:
+        emps = await Employee.find({"_id": {"$in": real_emp_ids}}).to_list()
+        employees_by_id = {str(e.id): e for e in emps}
+
+    # Reporting relationships for line managers
+    emp_id_strs = list(employees_by_id.keys())
+    reporting_rels = (
+        await ReportingRelationship.find(
+            {"employee_id": {"$in": emp_id_strs}},
+            ReportingRelationship.type == "PRIMARY",
+            ReportingRelationship.is_deleted != True,
+        ).to_list()
+        if emp_id_strs
+        else []
+    )
+    manager_ids = [r.manager_id for r in reporting_rels]
+    managers = (
+        await Employee.find(
+            {"_id": {"$in": [ObjectId(mid) for mid in manager_ids if ObjectId.is_valid(mid)]}}
+        ).to_list()
+        if manager_ids
+        else []
+    )
+    manager_name_by_id = {str(m.id): m.name for m in managers}
+    line_manager_by_emp: dict[str, str] = {
+        r.employee_id: manager_name_by_id.get(r.manager_id, "No Manager")
+        for r in reporting_rels
+    }
+
+    members = []
+    total_allocated_days = 0.0
+    for alloc in allocations:
+        emp = employees_by_id.get(alloc.employee_id)
+        total_allocated_days += alloc.allocated_days
+        members.append({
+            "employee_id": alloc.employee_id,
+            "employee_name": alloc.employee_name,
+            "line_manager": line_manager_by_emp.get(alloc.employee_id, "No Manager"),
+            "designation": emp.designation if emp else "Employee",
+            "department": "",
+            "location": "",
+            "location_code": "",
+            "role_in_project": "Consultant",
+            "assigned_at": None,
+            "allocation_percentage": alloc.allocation_percentage,
+            "allocated_days": alloc.allocated_days,
+            "worked_days": None,
+        })
+
+    # Sort by allocation % desc
+    members.sort(key=lambda m: m["allocation_percentage"] or 0, reverse=True)
+
+    member_count = len(members)
+    avg_alloc_pct = round(
+        sum(m["allocation_percentage"] or 0 for m in members) / member_count, 1
+    ) if member_count else 0.0
+
+    return {
+        "id": str(project.id),
+        "name": project.name,
+        "status": project.status,
+        "project_type": project.project_type,
+        "client_name": project.client_name or "",
+        "description": project.description,
+        "start_date": f"{PERIOD}-01",
+        "end_date": f"{PERIOD}-31",
+        "planned_days": round(total_allocated_days, 1),
+        "worked_days": 0,
+        "progress_percent": avg_alloc_pct,
+        "member_count": member_count,
+        "members": members,
+        "period": PERIOD,
+        "data_source": "excel",
+    }
+
+
+async def get_excel_projects(
+    branch_location_id: str,
+    search: Optional[str] = None,
+    client_name: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    """
+    Return project list from inter-company Excel allocations (2026-03 only).
+    Shape mirrors the HRMS listProjects response so the frontend table works unchanged.
+    """
+    PERIOD = "2026-03"
+
+    allocations = await ProjectAllocation.find(
+        ProjectAllocation.period == PERIOD,
+        ProjectAllocation.source_system == "intercompany_excel",
+        ProjectAllocation.is_deleted != True,
+    ).to_list()
+
+    # Group by project_id
+    project_map: dict[str, dict] = {}
+    for alloc in allocations:
+        pid = alloc.project_id
+        if pid not in project_map:
+            project_map[pid] = {
+                "id": pid,
+                "name": alloc.project_name,
+                "client_name": alloc.client_name or "",
+                "status": "ACTIVE",
+                "project_type": "client",
+                "member_count": 0,
+                "total_allocated_days": 0.0,
+                "start_date": f"{PERIOD}-01",
+                "end_date": None,
+                "planned_days": 0,
+                "worked_days": 0,
+                "progress_percent": 0.0,
+            }
+        project_map[pid]["member_count"] += 1
+        project_map[pid]["total_allocated_days"] += alloc.allocated_days
+
+    projects = list(project_map.values())
+
+    # Filters
+    if search:
+        sl = search.lower()
+        projects = [p for p in projects if sl in p["name"].lower() or sl in (p["client_name"] or "").lower()]
+    if client_name:
+        projects = [p for p in projects if p["client_name"] == client_name]
+
+    # Sort by member count desc
+    projects.sort(key=lambda p: p["member_count"], reverse=True)
+
+    # Derive progress from allocated days (treat capacity as 21 days * members)
+    for p in projects:
+        capacity = p["member_count"] * 21.0
+        p["worked_days"] = round(p["total_allocated_days"], 1)
+        p["planned_days"] = round(capacity, 1)
+        p["progress_percent"] = round(min(100.0, p["total_allocated_days"] / capacity * 100), 1) if capacity else 0.0
+
+    total = len(projects)
+    start = (page - 1) * page_size
+    page_slice = projects[start: start + page_size]
+
+    # Unique clients for filter options
+    clients = sorted({p["client_name"] for p in projects if p["client_name"]})
+
+    return {
+        "projects": page_slice,
+        "total": total,
+        "active_count": total,
+        "completed_count": 0,
+        "on_hold_count": 0,
+        "period": PERIOD,
+        "data_source": "excel",
+        "clients": clients,
+    }

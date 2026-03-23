@@ -5,8 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { PeriodSelector } from "@/components/shared/PeriodSelector"
+import { DataSourceToggle } from "@/components/shared/DataSourceToggle"
 import { Progress } from "@/components/ui/progress"
 import { listProjects, listProjectClients } from "@/api/projects"
+import { getExcelProjects } from "@/api/excelUtilisation"
+import { useDataSourceStore } from "@/store/dataSourceStore"
 import {
   FolderKanban,
   FolderCheck,
@@ -26,6 +29,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 export function ProjectListPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const dataSource = useDataSourceStore((s) => s.dataSource)
   const [projects, setProjects] = useState<ProjectBrief[]>([])
   const [total, setTotal] = useState(0)
   const [activeCount, setActiveCount] = useState(0)
@@ -39,7 +43,7 @@ export function ProjectListPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   })
 
-  // Filters — pre-filled from URL params (e.g. ?client_name=ENWL from Match Projects)
+  // Filters
   const [showFilters, setShowFilters] = useState(() => !!searchParams.get("client_name"))
   const [search, setSearch] = useState("")
   const [searchInput, setSearchInput] = useState("")
@@ -48,35 +52,56 @@ export function ProjectListPage() {
   const [clientFilter, setClientFilter] = useState(() => searchParams.get("client_name") ?? "")
   const [clients, setClients] = useState<string[]>([])
 
+  // Reset filters when toggling data source
   useEffect(() => {
-    listProjectClients().then(setClients).catch(() => setClients([]))
-  }, [])
+    setSearch(""); setSearchInput(""); setProjectType(""); setStatus(""); setClientFilter(""); setPage(1)
+  }, [dataSource])
+
+  useEffect(() => {
+    if (dataSource === "hrms") {
+      listProjectClients().then(setClients).catch(() => setClients([]))
+    }
+  }, [dataSource])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listProjects({
-        search: search || undefined,
-        project_type: projectType || undefined,
-        status: status || undefined,
-        client_name: clientFilter || undefined,
-        period: selectedPeriod,
-        page,
-        page_size: pageSize,
-      })
-      setProjects(data.projects)
-      setTotal(data.total)
-      setActiveCount(data.active_count)
-      setCompletedCount(data.completed_count)
-      setOnHoldCount(data.on_hold_count)
+      if (dataSource === "excel") {
+        const data = await getExcelProjects({
+          search: search || undefined,
+          client_name: clientFilter || undefined,
+          page,
+          page_size: pageSize,
+        })
+        setProjects(data.projects)
+        setTotal(data.total)
+        setActiveCount(data.active_count)
+        setCompletedCount(0)
+        setOnHoldCount(0)
+        setClients(data.clients)
+      } else {
+        const data = await listProjects({
+          search: search || undefined,
+          project_type: projectType || undefined,
+          status: status || undefined,
+          client_name: clientFilter || undefined,
+          period: selectedPeriod,
+          page,
+          page_size: pageSize,
+        })
+        setProjects(data.projects)
+        setTotal(data.total)
+        setActiveCount(data.active_count)
+        setCompletedCount(data.completed_count)
+        setOnHoldCount(data.on_hold_count)
+      }
     } catch (err) {
       console.error("Failed to load projects:", err)
-      setProjects([])
-      setTotal(0)
+      setProjects([]); setTotal(0)
     } finally {
       setLoading(false)
     }
-  }, [search, projectType, status, clientFilter, selectedPeriod, page, pageSize])
+  }, [search, projectType, status, clientFilter, selectedPeriod, page, pageSize, dataSource])
 
   useEffect(() => {
     fetchData()
@@ -123,14 +148,19 @@ export function ProjectListPage() {
         <div>
           <h2 className="text-lg font-semibold">Project Master</h2>
           <p className="text-sm text-muted-foreground">
-            View all projects assigned to your branch
+            {dataSource === "excel"
+              ? "Inter-company projects · March 2026"
+              : "View all projects assigned to your branch"}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <PeriodSelector
-            value={selectedPeriod}
-            onChange={(p) => { setSelectedPeriod(p); setPage(1) }}
-          />
+          <DataSourceToggle />
+          {dataSource === "hrms" && (
+            <PeriodSelector
+              value={selectedPeriod}
+              onChange={(p) => { setSelectedPeriod(p); setPage(1) }}
+            />
+          )}
           <Button
             variant={showFilters ? "default" : "outline"}
             size="sm"
@@ -197,6 +227,7 @@ export function ProjectListPage() {
                   className="w-full h-8 rounded-md border border-input bg-transparent pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
+              {dataSource === "hrms" && (<>
               <SelectDropdown
                 value={projectType}
                 onChange={(v) => { setProjectType(v); setPage(1) }}
@@ -220,7 +251,7 @@ export function ProjectListPage() {
                 placeholder="All Status"
                 maxVisible={5}
               />
-              <SelectDropdown
+              </>)}              <SelectDropdown
                 value={clientFilter}
                 onChange={(v) => { setClientFilter(v); setPage(1) }}
                 options={[

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { Link } from "react-router-dom"
 import { Sheet, SheetHeader, SheetTitle, SheetContent } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -320,7 +321,12 @@ export function EmployeeDrawer() {
                     </h3>
                     <div className="space-y-3">
                       {employee.projects.map((proj) => (
-                        <div key={proj.id} className="rounded-lg border p-3">
+                        <Link
+                          key={proj.id}
+                          to={`/projects/${proj.id}`}
+                          onClick={closeDrawer}
+                          className="block rounded-lg border p-3 hover:bg-accent transition-colors"
+                        >
                           <div className="flex items-center justify-between mb-1">
                             <p className="text-sm font-medium">{proj.name}</p>
                             <div className="flex gap-1">
@@ -359,7 +365,7 @@ export function EmployeeDrawer() {
                             {new Date(proj.start_date).toLocaleDateString()}
                             {proj.end_date && ` — ${new Date(proj.end_date).toLocaleDateString()}`}
                           </p>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   </div>

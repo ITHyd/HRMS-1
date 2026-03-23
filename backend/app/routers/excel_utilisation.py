@@ -5,6 +5,8 @@ from app.services.excel_utilisation_service import (
     get_excel_dashboard,
     get_excel_timesheets,
     get_excel_resource_rows,
+    get_excel_projects,
+    get_excel_project_detail,
     get_upload_history,
     parse_and_store_excel,
 )
@@ -98,3 +100,33 @@ async def excel_timesheets(
 async def list_uploads(user: CurrentUser = Depends(get_current_user)):
     """List Excel upload history for this branch."""
     return await get_upload_history(user.branch_location_id)
+
+
+@router.get("/projects/{project_id}")
+async def excel_project_detail(
+    project_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Return project detail from inter-company Excel data (2026-03)."""
+    detail = await get_excel_project_detail(project_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return detail
+
+
+@router.get("/projects")
+async def excel_projects(
+    search: str = Query(None),
+    client_name: str = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Return project list from inter-company Excel data (2026-03)."""
+    return await get_excel_projects(
+        branch_location_id=user.branch_location_id,
+        search=search,
+        client_name=client_name,
+        page=page,
+        page_size=page_size,
+    )
