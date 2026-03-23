@@ -75,6 +75,28 @@ async def init_db():
         finance_cfg.status = "active"
         await finance_cfg.save()
 
+    # Patch HRMS base_url to always match settings (fixes stale DB values after URL changes)
+    hrms_cfg = await IntegrationConfig.find_one(
+        IntegrationConfig.integration_type == "hrms",
+    )
+    if hrms_cfg and isinstance(hrms_cfg.config, dict):
+        changed = False
+        if hrms_cfg.config.get("base_url") != settings.HRMS_BASE_URL:
+            hrms_cfg.config["base_url"] = settings.HRMS_BASE_URL
+            changed = True
+        # Ensure auth fields are present (may be missing from older seed)
+        if not hrms_cfg.config.get("auth_mode"):
+            hrms_cfg.config["auth_mode"] = "password_grant"
+            changed = True
+        if not hrms_cfg.config.get("secret_ref"):
+            hrms_cfg.config["secret_ref"] = "NXZEN_MANAGER"
+            changed = True
+        if not hrms_cfg.config.get("hr_id"):
+            hrms_cfg.config["hr_id"] = 1
+            changed = True
+        if changed:
+            await hrms_cfg.save()
+
 
 async def close_db():
     pass

@@ -12,6 +12,7 @@ import type { ProjectBrief, ProjectDetail } from "@/types/project"
 import type { SkillTag, SkillCatalogEntry } from "@/types/availability"
 import { useOrgChartStore } from "@/store/orgChartStore"
 import { useNotificationStore } from "@/store/notificationStore"
+import type { NotificationSummary } from "@/api/notifications"
 
 // ─── constants ─────────────────────────────────────────────────────────────
 const COL_W = 44
@@ -416,6 +417,7 @@ function EmployeeDrawer({ emp, skills, onClose }: { emp: DrawerEmployee; skills:
 function GanttChart({
   projects, ganttStart, weeks, months, numWeeks,
   details, loadingDetailId, onLoadDetail,
+  notifDismissed, notifSummary, notifDismiss,
 }: {
   projects: ProjectBrief[]
   ganttStart: Date
@@ -425,6 +427,9 @@ function GanttChart({
   details: Record<string, ProjectDetail>
   loadingDetailId: string | null
   onLoadDetail: (id: string) => void
+  notifDismissed: Set<string>
+  notifSummary: NotificationSummary | null
+  notifDismiss: (type: string, id: string) => void
 }) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [hoveredBarId, setHoveredBarId] = useState<string | null>(null)
@@ -1022,6 +1027,7 @@ export function ProjectTimelinePage() {
             <GanttChart
               projects={projects} ganttStart={ganttStart} weeks={weeks} months={months} numWeeks={numWeeks}
               details={details} loadingDetailId={loadingDetailId} onLoadDetail={loadDetailForId}
+              notifDismissed={notifDismissed} notifSummary={notifSummary} notifDismiss={notifDismiss}
             />
           )}
           <p className="text-xs text-muted-foreground">

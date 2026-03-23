@@ -20,6 +20,11 @@ from app.models.skill_catalog import SkillCatalog
 from app.models.integration_config import IntegrationConfig
 from app.models.sync_log import SyncLog
 from app.models.dynamics_export import DynamicsExport
+from app.models.attendance_summary import AttendanceSummary
+from app.models.project_allocation import ProjectAllocation
+from app.models.hrms_holiday import HrmsHoliday
+from app.models.excel_utilisation import ExcelUtilisationReport
+from app.models.excel_upload_log import ExcelUploadLog
 
 __all__ = [
     "Employee",
@@ -44,4 +49,9 @@ __all__ = [
     "IntegrationConfig",
     "SyncLog",
     "DynamicsExport",
+    "AttendanceSummary",
+    "ProjectAllocation",
+    "HrmsHoliday",
+    "ExcelUtilisationReport",
+    "ExcelUploadLog",
 ]

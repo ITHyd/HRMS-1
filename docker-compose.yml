@@ -1,0 +1,47 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "20777:27017"
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    environment:
+      MONGODB_URL: mongodb://mongo:27017
+      DATABASE_NAME: branch_command_center
+      JWT_SECRET: branch-cmd-center-dev-secret-key-2025
+      HRMS_BASE_URL: http://149.102.158.71:2342
+      HRMS_SYNC_MONTHS_BACKFILL: "6"
+      HRMS_DEMO_USERS: vikram.patel@company.com
+      HRMS_LIVE_DOMAINS: nxzen.com
+      HRMS_SECRET_NXZEN_MANAGER_USERNAME: hr@nxzen.com
+      HRMS_SECRET_NXZEN_MANAGER_PASSWORD: "123"
+      SKILLS_BASE_URL: http://skills.nxzen.com/
+      SKILLS_USERNAME: hr@nxzen.com
+      SKILLS_PASSWORD: "123"
+    volumes:
+      # Mount your Excel utilisation report here:
+      - C:\Users\sahit\Downloads\Utilisation Report 6th March 2026.xlsx:/data/utilisation.xlsx:ro
+    ports:
+      - "4445:8001"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "4444:80"
+
+volumes:
+  mongo_data:

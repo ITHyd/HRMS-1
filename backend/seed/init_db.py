@@ -59,8 +59,6 @@ INTEGRATION_CONFIGS = [
         "config": {
             "provider": "nxzen_hrms",
             "base_url": "http://149.102.158.71:2342",
-            "auth_mode": "password_grant",
-            "secret_ref": "NXZEN_MANAGER",
             "hr_id": 1,
             "sync_scope": {
                 "months_backfill": 6,

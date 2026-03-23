@@ -18,7 +18,7 @@ export interface SyncLogEntry {
   records_processed: number
   records_succeeded: number
   records_failed: number
-  error_details: Array<{ message: string }>
+  error_details: Array<{ message: string; record?: string; error?: string }>
   started_at: string
   completed_at?: string
   triggered_by: string

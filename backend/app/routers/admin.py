@@ -92,7 +92,9 @@ async def _seed_live():
         ("hrms", "HRMS Connector", "active", {
             "provider": "nxzen_hrms",
             "base_url": "http://149.102.158.71:2342",
-            "auth_mode": "password_grant", "secret_ref": "NXZEN_MANAGER", "hr_id": 1,
+            "auth_mode": "password_grant",
+            "secret_ref": "NXZEN_MANAGER",
+            "hr_id": 1,
             "sync_scope": {"months_backfill": 6, "manual_only": True},
             "mode": {"demo_users": ["vikram.patel@company.com"],
                      "live_domains": ["nxzen.com"],

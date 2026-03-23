@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
@@ -65,6 +66,14 @@ async def trigger_sync(
         msg = str(e)
         status = 404 if "not found" in msg.lower() else 400
         raise HTTPException(status_code=status, detail=msg)
+    except httpx.HTTPStatusError as e:
+        status = e.response.status_code if e.response is not None else 502
+        raise HTTPException(
+            status_code=502,
+            detail=f"HRMS upstream request failed with HTTP {status}: {str(e)}",
+        )
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"HRMS upstream request failed: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 

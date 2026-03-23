@@ -1,6 +1,7 @@
 import client from "./client"
 import type {
   IntegrationConfig,
+  SyncLogEntry,
   SyncLogsResponse,
   DynamicsExport,
   DynamicsExportsResponse,

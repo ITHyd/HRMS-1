@@ -8,6 +8,16 @@ from app.services import hrms_sync_service
 from app.services import skills_sync_service
 
 
+async def _persist_sync_outcome(sync_log: SyncLog, cfg: IntegrationConfig) -> None:
+    sync_log.completed_at = datetime.now(timezone.utc)
+    await sync_log.save()
+
+    cfg.last_sync_at = sync_log.completed_at
+    cfg.last_sync_status = sync_log.status
+    cfg.updated_at = datetime.now(timezone.utc)
+    await cfg.save()
+
+
 async def list_integration_configs() -> list[dict]:
     """Return all IntegrationConfig documents."""
     configs = await IntegrationConfig.find_all().to_list()
@@ -181,90 +191,93 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
     )
     await sync_log.insert()
 
-    if cfg.integration_type == "hrms":
-        user_email = user.email  # already resolved fresh from DB by auth middleware
-        current_period = datetime.now(timezone.utc).strftime("%Y-%m")
-        mode_cfg = (cfg.config or {}).get("mode", {}) if isinstance(cfg.config, dict) else {}
+    try:
+        if cfg.integration_type == "hrms":
+            user_email = user.email  # already resolved fresh from DB by auth middleware
+            current_period = datetime.now(timezone.utc).strftime("%Y-%m")
+            mode_cfg = (cfg.config or {}).get("mode", {}) if isinstance(cfg.config, dict) else {}
 
-        if hrms_sync_service.is_live_sync_enabled_for_user(user_email, mode_cfg):
-            # Login once, reuse token for both sync steps
-            hrms_token = await hrms_sync_service.get_auth_token(str(cfg.id))
+            if hrms_sync_service.is_live_sync_enabled_for_user(user_email, mode_cfg):
+                # Login once, reuse token for both sync steps.
+                hrms_token = await hrms_sync_service.get_auth_token(str(cfg.id))
 
-            # Step 1: Sync master data (employees, locations, projects, departments)
-            master_result = await hrms_sync_service.sync_master_data(
-                token=hrms_token,
-                user_id=user.user_id,
-                integration_config_id=str(cfg.id),
-            )
-            # Step 2: Sync live data (attendance, timesheets, allocations, holidays)
-            live_result = await hrms_sync_service.trigger_live_sync(
-                period=current_period,
-                user_id=user.user_id,
-                integration_config_id=str(cfg.id),
-                token=hrms_token,
-            )
-            # Combine counts from both steps
-            master_status = master_result.get("status", "completed")
-            live_status = live_result.get("status", "completed")
-            hrms_result = {
-                "status": "failed" if "failed" in (master_status, live_status) else "completed",
-                "total_records": int(master_result.get("total_records", 0) or 0) + int(live_result.get("total_records", 0) or 0),
-                "imported_count": int(master_result.get("imported_count", 0) or 0) + int(live_result.get("imported_count", 0) or 0),
-                "error_count": int(master_result.get("error_count", 0) or 0) + int(live_result.get("error_count", 0) or 0),
-            }
+                # Step 1: Sync master data (employees, locations, projects, departments).
+                master_result = await hrms_sync_service.sync_master_data(
+                    token=hrms_token,
+                    user_id=user.user_id,
+                    integration_config_id=str(cfg.id),
+                )
+                # Step 2: Sync live data (attendance, timesheets, allocations, holidays).
+                live_result = await hrms_sync_service.trigger_live_sync(
+                    period=current_period,
+                    user_id=user.user_id,
+                    integration_config_id=str(cfg.id),
+                    token=hrms_token,
+                )
+                # Combine counts from both steps.
+                master_status = master_result.get("status", "completed")
+                live_status = live_result.get("status", "completed")
+                hrms_result = {
+                    "status": "failed" if "failed" in (master_status, live_status) else "completed",
+                    "total_records": int(master_result.get("total_records", 0) or 0) + int(live_result.get("total_records", 0) or 0),
+                    "imported_count": int(master_result.get("imported_count", 0) or 0) + int(live_result.get("imported_count", 0) or 0),
+                    "error_count": int(master_result.get("error_count", 0) or 0) + int(live_result.get("error_count", 0) or 0),
+                }
+            else:
+                hrms_result = await hrms_sync_service.trigger_sync(
+                    period=current_period,
+                    branch_location_id=user.branch_location_id,
+                    user_id=user.user_id,
+                )
+
+            sync_log.status = hrms_result.get("status", "completed")
+            sync_log.records_processed = int(hrms_result.get("total_records", 0) or 0)
+            sync_log.records_succeeded = int(hrms_result.get("imported_count", 0) or 0)
+            sync_log.records_failed = int(hrms_result.get("error_count", 0) or 0)
+            sync_log.error_details = []
+            if sync_log.records_failed:
+                sync_log.error_details.append(
+                    {"record": "hrms_sync", "error": f"{sync_log.records_failed} errors during sync"}
+                )
+        elif cfg.integration_type == "skills":
+            # Skills Portal sync
+            skills_result = await skills_sync_service.sync_skills_from_portal()
+
+            sync_log.status = "completed" if skills_result.get("success") else "failed"
+            # records_processed = skill catalog entries + employee skill records
+            catalog_count = skills_result.get("synced_count", 0)
+            emp_skills_count = skills_result.get("employee_skills_synced", 0)
+            sync_log.records_processed = catalog_count + emp_skills_count
+            sync_log.records_succeeded = catalog_count + emp_skills_count
+            sync_log.records_failed = 0
+            sync_log.error_details = []
+            if not skills_result.get("success"):
+                sync_log.records_processed = skills_result.get("total_count", 0)
+                sync_log.records_succeeded = 0
+                sync_log.records_failed = sync_log.records_processed
+                sync_log.error_details.append(
+                    {"record": "skills_sync", "error": skills_result.get("message", "Unknown error")}
+                )
         else:
-            hrms_result = await hrms_sync_service.trigger_sync(
-                period=current_period,
-                branch_location_id=user.branch_location_id,
-                user_id=user.user_id,
-            )
+            # Simulate sync completion with fake counts
+            sync_log.status = "completed"
+            sync_log.records_processed = 25
+            sync_log.records_succeeded = 24
+            sync_log.records_failed = 1
+            sync_log.error_details = [
+                {"record": "sample_record", "error": "Simulated validation error"}
+            ]
 
-        sync_log.status = hrms_result.get("status", "completed")
-        sync_log.records_processed = int(hrms_result.get("total_records", 0) or 0)
-        sync_log.records_succeeded = int(hrms_result.get("imported_count", 0) or 0)
-        sync_log.records_failed = int(hrms_result.get("error_count", 0) or 0)
-        sync_log.error_details = []
-        if sync_log.records_failed:
-            sync_log.error_details.append(
-                {"record": "hrms_sync", "error": f"{sync_log.records_failed} errors during sync"}
-            )
-    elif cfg.integration_type == "skills":
-        # Skills Portal sync
-        skills_result = await skills_sync_service.sync_skills_from_portal()
-
-        sync_log.status = "completed" if skills_result.get("success") else "failed"
-        # records_processed = skill catalog entries + employee skill records
-        catalog_count = skills_result.get("synced_count", 0)
-        emp_skills_count = skills_result.get("employee_skills_synced", 0)
-        sync_log.records_processed = catalog_count + emp_skills_count
-        sync_log.records_succeeded = catalog_count + emp_skills_count
-        sync_log.records_failed = 0
-        sync_log.error_details = []
-        if not skills_result.get("success"):
-            sync_log.records_processed = skills_result.get("total_count", 0)
-            sync_log.records_succeeded = 0
-            sync_log.records_failed = sync_log.records_processed
-            sync_log.error_details.append(
-                {"record": "skills_sync", "error": skills_result.get("message", "Unknown error")}
-            )
-    else:
-        # Simulate sync completion with fake counts
-        sync_log.status = "completed"
-        sync_log.records_processed = 25
-        sync_log.records_succeeded = 24
-        sync_log.records_failed = 1
-        sync_log.error_details = [
-            {"record": "sample_record", "error": "Simulated validation error"}
-        ]
-
-    sync_log.completed_at = datetime.now(timezone.utc)
-    await sync_log.save()
-
-    # Update the integration config with last sync info
-    cfg.last_sync_at = sync_log.completed_at
-    cfg.last_sync_status = sync_log.status
-    cfg.updated_at = datetime.now(timezone.utc)
-    await cfg.save()
+        await _persist_sync_outcome(sync_log, cfg)
+    except Exception as exc:
+        sync_log.status = "failed"
+        sync_log.records_failed = max(sync_log.records_failed, 1)
+        if not sync_log.error_details:
+            sync_log.error_details = [
+                {"record": f"{cfg.integration_type}_sync", "error": str(exc)}
+            ]
+        await _persist_sync_outcome(sync_log, cfg)
+        raise
 
     type_labels = {"hrms": "HRMS", "finance": "Finance", "skills": "Skills", "dynamics": "Dynamics"}
     type_label = type_labels.get(cfg.integration_type, cfg.integration_type)

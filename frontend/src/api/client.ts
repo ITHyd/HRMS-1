@@ -1,6 +1,8 @@
 import axios from "axios"
 
-const API_BASE = "http://localhost:8001"
+// In Docker the build sets VITE_API_BASE_URL=/api (nginx strips prefix → backend:8001)
+// In dev it falls back to direct http://localhost:8001
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8001"
 
 const client = axios.create({
   baseURL: API_BASE,
