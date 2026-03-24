@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from pathlib import Path
 
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
+
+from app.config import settings
 from app.middleware.auth_middleware import CurrentUser, get_current_user
+from app.models.user import User
 from app.services.excel_utilisation_service import (
     get_excel_dashboard,
     get_excel_timesheets,
@@ -8,7 +12,11 @@ from app.services.excel_utilisation_service import (
     get_excel_projects,
     get_excel_project_detail,
     get_upload_history,
+    get_employee_planned_worked_timeline,
+    get_branch_planned_vs_actual,
     parse_and_store_excel,
+    list_excel_employees,
+    run_configured_excel_reimport,
 )
 
 router = APIRouter(prefix="/excel-utilisation", tags=["Excel Utilisation"])
@@ -102,13 +110,35 @@ async def list_uploads(user: CurrentUser = Depends(get_current_user)):
     return await get_upload_history(user.branch_location_id)
 
 
+@router.get("/planned-vs-actual")
+async def planned_vs_actual(
+    period: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Return branch-level planned vs actual utilisation from Excel planned/worked sheets."""
+    data = await get_branch_planned_vs_actual(period, user.branch_location_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="No planned/worked data for this period")
+    return data
+
+
+@router.get("/employee/{employee_id}/timeline")
+async def employee_planned_worked_timeline(
+    employee_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Return month-by-month planned vs worked days for an employee from Excel sheets."""
+    return await get_employee_planned_worked_timeline(employee_id)
+
+
 @router.get("/projects/{project_id}")
 async def excel_project_detail(
     project_id: str,
+    period: str = Query(...),
     user: CurrentUser = Depends(get_current_user),
 ):
-    """Return project detail from inter-company Excel data (2026-03)."""
-    detail = await get_excel_project_detail(project_id)
+    """Return project detail from inter-company Excel data for the selected month."""
+    detail = await get_excel_project_detail(project_id, period, user.branch_location_id)
     if not detail:
         raise HTTPException(status_code=404, detail="Project not found")
     return detail
@@ -116,17 +146,58 @@ async def excel_project_detail(
 
 @router.get("/projects")
 async def excel_projects(
+    period: str = Query(...),
     search: str = Query(None),
     client_name: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     user: CurrentUser = Depends(get_current_user),
 ):
-    """Return project list from inter-company Excel data (2026-03)."""
+    """Return project list from inter-company Excel data for the selected month."""
     return await get_excel_projects(
         branch_location_id=user.branch_location_id,
+        period=period,
         search=search,
         client_name=client_name,
         page=page,
         page_size=page_size,
     )
+
+
+async def _run_reimport(branch_location_id: str, user_id: str):
+    """Background task: re-run unified Excel seed from the configured file path."""
+    await run_configured_excel_reimport(branch_location_id, user_id)
+
+
+@router.get("/employees")
+async def excel_employees(
+    period: str = Query("2026-03", pattern=r"^\d{4}-\d{2}$"),
+    search: str = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Return unmatched Excel employees (not in HRMS) for the Employee Master page."""
+    return await list_excel_employees(
+        branch_location_id=user.branch_location_id,
+        period=period,
+        search=search,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.post("/reimport")
+async def reimport_excel(
+    background_tasks: BackgroundTasks,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Trigger re-import of the Excel file from the configured server path."""
+    file_path = Path(settings.EXCEL_FILE_PATH)
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Excel file not found at configured path: {settings.EXCEL_FILE_PATH}",
+        )
+    background_tasks.add_task(_run_reimport, user.branch_location_id, user.user_id)
+    return {"status": "reimport_started", "file": str(file_path)}

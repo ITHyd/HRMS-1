@@ -2224,8 +2224,8 @@ async def _trigger_live_sync_impl(
             hrms_cfg.get("sync_scope", {}).get("months_backfill"),
             settings.HRMS_SYNC_MONTHS_BACKFILL,
         )
-    # Cap the anchor period at 2026-02 — March data is not ready yet.
-    MAX_SYNC_PERIOD = "2026-02"
+    # Cap the anchor period at 2026-03
+    MAX_SYNC_PERIOD = "2026-03"
     capped_period = period if period <= MAX_SYNC_PERIOD else MAX_SYNC_PERIOD
     periods = [p for p in _recent_periods(capped_period, max(1, months_backfill)) if p <= MAX_SYNC_PERIOD]
     if not periods:

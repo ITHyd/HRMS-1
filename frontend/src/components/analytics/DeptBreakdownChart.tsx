@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from "recharts"
 import type { ClientCount } from "@/types/analytics"
 
 const CLIENT_COLORS = [
@@ -32,6 +32,11 @@ export function ClientBreakdownChart({ data }: { data: ClientCount[] }) {
                   fill={CLIENT_COLORS[i % CLIENT_COLORS.length]}
                 />
               ))}
+              <LabelList
+                dataKey="count"
+                position="top"
+                className="fill-foreground text-xs font-medium"
+              />
             </Bar>
           </BarChart>
         </ResponsiveContainer>

@@ -13,6 +13,7 @@ class SyncLog(Document):
     records_succeeded: int = 0
     records_failed: int = 0
     error_details: list[dict] = []
+    detail_sections: list[dict] = []
     started_at: datetime
     completed_at: Optional[datetime] = None
     triggered_by: str = "system"

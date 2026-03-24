@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react"
+import { useSearchParams } from "react-router-dom"
 import { Card, CardContent } from "@/components/ui/card"
 import { Users, UserMinus, UserCheck, SlidersHorizontal, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -14,14 +15,15 @@ import { useReportPeriodStore } from "@/store/reportPeriodStore"
 import type { AvailableEmployee } from "@/types/availability"
 
 export function AvailabilityPage() {
+  const [searchParams] = useSearchParams()
   const dataSource = useDataSourceStore((s) => s.dataSource)
   const selectedPeriod = useReportPeriodStore((s) => s.selectedPeriod)
   const setSelectedPeriod = useReportPeriodStore((s) => s.setSelectedPeriod)
   const setDrawerPeriod = useOrgChartStore((s) => s.setDrawerPeriod)
   const setDrawerDataSource = useOrgChartStore((s) => s.setDrawerDataSource)
-  const [searchQuery, setSearchQuery] = useState("")
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") ?? "")
   const [skillFilter, setSkillFilter] = useState("")
-  const [classificationFilter, setClassificationFilter] = useState("")
+  const [classificationFilter, setClassificationFilter] = useState(() => searchParams.get("classification") ?? "")
   const [locationFilter, setLocationFilter] = useState("")
   const [designationFilter, setDesignationFilter] = useState("")
   const [utilisationMin, setUtilisationMin] = useState<number | undefined>()
@@ -39,6 +41,12 @@ export function AvailabilityPage() {
   useEffect(() => {
     setDrawerDataSource(dataSource)
   }, [dataSource, setDrawerDataSource])
+
+  useEffect(() => {
+    setSearchQuery(searchParams.get("search") ?? "")
+    setClassificationFilter(searchParams.get("classification") ?? "")
+    setPage(1)
+  }, [searchParams])
 
   useEffect(() => {
     return () => setDrawerPeriod(null)

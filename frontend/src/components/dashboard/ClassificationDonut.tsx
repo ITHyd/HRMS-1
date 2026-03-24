@@ -9,6 +9,7 @@ interface ClassificationEntry {
 
 interface ClassificationDonutProps {
   data: ClassificationEntry[]
+  onSliceClick?: (classification: string) => void
 }
 
 const CLASSIFICATION_COLORS: Record<string, string> = {
@@ -25,7 +26,7 @@ const LABEL_MAP: Record<string, string> = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function renderLabel(props: any) {
-  const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props
+  const { cx, cy, midAngle, innerRadius, outerRadius, percent, value } = props
   const RADIAN = Math.PI / 180
   const radius = innerRadius + (outerRadius - innerRadius) * 1.4
   const x = cx + radius * Math.cos(-midAngle * RADIAN)
@@ -42,18 +43,19 @@ function renderLabel(props: any) {
       dominantBaseline="central"
       fontSize={12}
     >
-      {`${(percent * 100).toFixed(1)}%`}
+      {`${value} • ${(percent * 100).toFixed(1)}%`}
     </text>
   )
 }
 
-export function ClassificationDonut({ data }: ClassificationDonutProps) {
+export function ClassificationDonut({ data, onSliceClick }: ClassificationDonutProps) {
   const chartData = data
     .filter((item) => item.count > 0)
     .map((item) => ({
       name: LABEL_MAP[item.classification] || item.classification,
       value: item.count,
       fill: CLASSIFICATION_COLORS[item.classification] || "#6b7280",
+      classification: item.classification,
     }))
 
   return (
@@ -75,7 +77,12 @@ export function ClassificationDonut({ data }: ClassificationDonutProps) {
               label={renderLabel}
             >
               {chartData.map((entry, index) => (
-                <Cell key={index} fill={entry.fill} />
+                <Cell
+                  key={index}
+                  fill={entry.fill}
+                  className={onSliceClick ? "cursor-pointer" : ""}
+                  onClick={() => onSliceClick?.(entry.classification)}
+                />
               ))}
             </Pie>
             <Tooltip
@@ -84,8 +91,10 @@ export function ClassificationDonut({ data }: ClassificationDonutProps) {
             <Legend
               verticalAlign="bottom"
               iconType="circle"
-              formatter={(value: string) => (
-                <span className="text-xs text-muted-foreground">{value}</span>
+              formatter={(value: string, _entry, index) => (
+                <span className="text-xs text-muted-foreground">
+                  {value} ({chartData[index]?.value ?? 0})
+                </span>
               )}
             />
           </PieChart>

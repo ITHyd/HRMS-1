@@ -25,6 +25,20 @@ export interface SyncLogEntry {
   retry_count: number
 }
 
+export interface SyncLogDetailSection {
+  label: string
+  color?: "green" | "red"
+  data: Record<string, string>
+}
+
+export interface SyncLogDetail extends SyncLogEntry {
+  integration_config_id?: string
+  config_name?: string
+  user_id?: string
+  parent_sync_id?: string
+  detail_sections?: SyncLogDetailSection[]
+}
+
 export interface SyncLogsResponse {
   logs: SyncLogEntry[]
   total: number

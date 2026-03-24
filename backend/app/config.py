@@ -36,4 +36,7 @@ class Settings(BaseSettings):
     SKILLS_USERNAME: str = ""
     SKILLS_PASSWORD: str = ""
 
+    # Excel file path for re-import trigger
+    EXCEL_FILE_PATH: str = "/data/utilisation.xlsx"
+
 settings = Settings()

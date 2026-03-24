@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts"
 import { SlidersHorizontal, Search, X, Upload } from "lucide-react"
@@ -15,7 +16,9 @@ import {
   getExecutiveDashboard,
   getResourceAllocationDashboard,
 } from "@/api/dashboard"
-import { getExcelDashboard, getExcelResources } from "@/api/excelUtilisation"
+import { getExcelDashboard, getExcelResources, getBranchPlannedVsActual } from "@/api/excelUtilisation"
+import type { PlannedVsActualData } from "@/api/excelUtilisation"
+import { PlannedVsActualCard } from "@/components/dashboard/PlannedVsActualCard"
 import { listProjectClients } from "@/api/projects"
 import { useDataSourceStore } from "@/store/dataSourceStore"
 import { useOrgChartStore } from "@/store/orgChartStore"
@@ -50,6 +53,8 @@ const AVAILABILITY_LABELS: Record<string, string> = {
 
 
 export function DashboardPage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const dataSource = useDataSourceStore((s) => s.dataSource)
   const selectedPeriod = useReportPeriodStore((s) => s.selectedPeriod)
   const setSelectedPeriod = useReportPeriodStore((s) => s.setSelectedPeriod)
@@ -88,6 +93,7 @@ export function DashboardPage() {
 
   // Executive tab state
   const [executiveData, setExecutiveData] = useState<ExecutiveDashboard | null>(null)
+  const [plannedVsActual, setPlannedVsActual] = useState<PlannedVsActualData | null>(null)
 
   // Resources tab state (combined resource + allocation)
   const [resourceEntries, setResourceEntries] = useState<ResourceAllocationEntry[]>([])
@@ -100,6 +106,23 @@ export function DashboardPage() {
   useEffect(() => {
     listProjectClients().then(setClientOptions).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab")
+    const classificationParam = searchParams.get("classification") ?? ""
+    const searchParam = searchParams.get("search") ?? ""
+
+    if (tabParam === "executive" || tabParam === "resources") {
+      setActiveTab(tabParam)
+    }
+    setClassificationFilter(classificationParam)
+    setSearchInput(searchParam)
+    setSearchQuery(searchParam)
+    if (classificationParam || searchParam) {
+      setShowFilters(true)
+    }
+    setResourcePage(1)
+  }, [searchParams])
 
   const fetchExecutiveData = useCallback(async (period: string, client?: string, source: "hrms" | "excel" = "hrms") => {
     setLoading(true)
@@ -118,9 +141,15 @@ export function DashboardPage() {
         console.error("Failed to load executive dashboard:", err)
         setExecutiveData(null)
       }
-    } finally {
-      setLoading(false)
     }
+    // Always try to load planned vs actual (independent of data source)
+    try {
+      const pva = await getBranchPlannedVsActual(period)
+      setPlannedVsActual(pva)
+    } catch {
+      setPlannedVsActual(null)
+    }
+    setLoading(false)
   }, [])
 
   const fetchResourceData = useCallback(
@@ -157,6 +186,63 @@ export function DashboardPage() {
       }
     },
     []
+  )
+
+  const openResourceFilter = useCallback(
+    (classification: string, search?: string) => {
+      const params = new URLSearchParams()
+      params.set("tab", "resources")
+      if (classification) params.set("classification", classification)
+      if (search) params.set("search", search)
+      navigate({ pathname: "/", search: params.toString() })
+    },
+    [navigate]
+  )
+
+  const handleExecutiveStatClick = useCallback(
+    (statKey: string) => {
+      switch (statKey) {
+        case "total_active":
+          navigate("/employees")
+          break
+        case "billable":
+          openResourceFilter("fully_billed")
+          break
+        case "standby":
+          navigate("/availability?classification=bench")
+          break
+        case "non_billable":
+          openResourceFilter("partially_billed")
+          break
+        default:
+          break
+      }
+    },
+    [navigate, openResourceFilter]
+  )
+
+  const handleClassificationClick = useCallback(
+    (classification: string) => {
+      if (classification === "bench") {
+        navigate("/availability?classification=bench")
+        return
+      }
+      openResourceFilter(classification)
+    },
+    [navigate, openResourceFilter]
+  )
+
+  const handleAvailabilityClick = useCallback(
+    (key: string) => {
+      if (key === "available") {
+        navigate("/availability?classification=bench")
+        return
+      }
+      if (key === "fully_allocated") {
+        openResourceFilter("fully_billed")
+      }
+    },
+    [navigate, openResourceFilter]
   )
 
   useEffect(() => {
@@ -203,16 +289,19 @@ export function DashboardPage() {
   const availabilityData = executiveData
     ? [
         {
+          key: "available",
           name: AVAILABILITY_LABELS.available,
           value: executiveData.resource_availability.available,
           fill: AVAILABILITY_COLORS.available,
         },
         {
+          key: "fully_allocated",
           name: AVAILABILITY_LABELS.fully_allocated,
           value: executiveData.resource_availability.fully_allocated,
           fill: AVAILABILITY_COLORS.fully_allocated,
         },
         {
+          key: "over_allocated",
           name: AVAILABILITY_LABELS.over_allocated,
           value: executiveData.resource_availability.over_allocated,
           fill: AVAILABILITY_COLORS.over_allocated,
@@ -348,10 +437,17 @@ export function DashboardPage() {
           {/* Executive Tab */}
           {activeTab === "executive" && executiveData && (
             <div className="space-y-6">
-              <ExecutiveOverview data={executiveData} />
+              <ExecutiveOverview data={executiveData} onStatClick={handleExecutiveStatClick} />
+
+              {plannedVsActual && (
+                <PlannedVsActualCard data={plannedVsActual} />
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ClassificationDonut data={executiveData.classification_breakdown} />
+                <ClassificationDonut
+                  data={executiveData.classification_breakdown}
+                  onSliceClick={handleClassificationClick}
+                />
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Resource Availability</CardTitle>
@@ -370,7 +466,12 @@ export function DashboardPage() {
                             dataKey="value"
                           >
                             {availabilityData.map((entry, index) => (
-                              <Cell key={index} fill={entry.fill} />
+                              <Cell
+                                key={index}
+                                fill={entry.fill}
+                                className={entry.key === "available" || entry.key === "fully_allocated" ? "cursor-pointer" : ""}
+                                onClick={() => handleAvailabilityClick(entry.key)}
+                              />
                             ))}
                           </Pie>
                           <Tooltip
@@ -382,8 +483,10 @@ export function DashboardPage() {
                           <Legend
                             verticalAlign="bottom"
                             iconType="circle"
-                            formatter={(value: string) => (
-                              <span className="text-xs text-muted-foreground">{value}</span>
+                            formatter={(value: string, _entry, index) => (
+                              <span className="text-xs text-muted-foreground">
+                                {value} ({availabilityData[index]?.value ?? 0})
+                              </span>
                             )}
                           />
                         </PieChart>

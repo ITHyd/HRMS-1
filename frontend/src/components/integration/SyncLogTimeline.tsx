@@ -3,19 +3,12 @@ import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { ArrowDown, ArrowUp, RefreshCw, Loader2, Clock, ChevronDown, ChevronUp } from "lucide-react"
 import { getSyncLogDetail } from "@/api/integration"
-import type { SyncLogEntry } from "@/types/integration"
+import type { SyncLogDetail, SyncLogEntry } from "@/types/integration"
 
 interface SyncLogTimelineProps {
   logs: SyncLogEntry[]
   onRetry: (syncLogId: string) => void
   retryingLogId?: string | null
-}
-
-interface SyncLogDetail extends SyncLogEntry {
-  integration_config_id?: string
-  config_name?: string
-  user_id?: string
-  parent_sync_id?: string
 }
 
 function formatDateTime(dateStr: string): string {
@@ -105,7 +98,7 @@ function MetadataToggle({ log }: { log: SyncLogEntry }) {
   if (detail) {
     detailData["Status"] = detail.status
     detailData["Direction"] = detail.direction
-    detailData["Triggered By"] = detail.triggered_by || "—"
+    detailData["Triggered By"] = detail.triggered_by || "-"
     if (detail.config_name) detailData["Config"] = detail.config_name
     detailData["Started"] = formatDateTime(detail.started_at)
     if (detail.completed_at) detailData["Completed"] = formatDateTime(detail.completed_at)
@@ -126,6 +119,8 @@ function MetadataToggle({ log }: { log: SyncLogEntry }) {
       errorData[key] = err.error || err.message || JSON.stringify(err)
     })
   }
+
+  const detailSections = detail?.detail_sections ?? []
 
   return (
     <div className="mt-2">
@@ -148,6 +143,14 @@ function MetadataToggle({ log }: { log: SyncLogEntry }) {
       {expanded && detail && (
         <div className="mt-1.5 space-y-1.5">
           <DetailsPanel label="Details" data={detailData} color="green" />
+          {detailSections.map((section, index) => (
+            <DetailsPanel
+              key={`${section.label}-${index}`}
+              label={section.label}
+              data={section.data}
+              color={section.color === "red" ? "red" : "green"}
+            />
+          ))}
           {hasErrors && (
             <DetailsPanel label="Errors" data={errorData} color="red" />
           )}

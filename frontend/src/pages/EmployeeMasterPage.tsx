@@ -2,9 +2,16 @@ import { useEffect, useState, useCallback, useRef } from "react"
 import { useSearchParams } from "react-router-dom"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { StatusBadge } from "@/components/shared/StatusBadge"
+import { DataSourceToggle } from "@/components/shared/DataSourceToggle"
+import { PeriodSelector } from "@/components/shared/PeriodSelector"
 import { useOrgChartStore } from "@/store/orgChartStore"
+import { useDataSourceStore } from "@/store/dataSourceStore"
+import { useReportPeriodStore } from "@/store/reportPeriodStore"
 import { listEmployees, getEmployeeDepartments } from "@/api/employees"
+import { listExcelEmployees } from "@/api/excelUtilisation"
+import type { ExcelEmployeeEntry } from "@/api/excelUtilisation"
 import {
   Users2,
   UserCheck,
@@ -41,10 +48,17 @@ export function EmployeeMasterPage() {
   const [searchParams] = useSearchParams()
   const urlDeptId = searchParams.get("department_id") || ""
 
+  const dataSource = useDataSourceStore((s) => s.dataSource)
+  const selectedPeriod = useReportPeriodStore((s) => s.selectedPeriod)
+  const setSelectedPeriod = useReportPeriodStore((s) => s.setSelectedPeriod)
   const [employees, setEmployees] = useState<EmployeeMasterEntry[]>([])
+  const [excelEmployees, setExcelEmployees] = useState<ExcelEmployeeEntry[]>([])
   const [total, setTotal] = useState(0)
   const [activeCount, setActiveCount] = useState(0)
   const [inactiveCount, setInactiveCount] = useState(0)
+  const [summaryTotal, setSummaryTotal] = useState(0)
+  const [summaryActiveCount, setSummaryActiveCount] = useState(0)
+  const [summaryInactiveCount, setSummaryInactiveCount] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [loading, setLoading] = useState(true)
@@ -61,34 +75,80 @@ export function EmployeeMasterPage() {
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([])
 
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
+  const setDrawerPeriod = useOrgChartStore((s) => s.setDrawerPeriod)
+  const setDrawerDataSource = useOrgChartStore((s) => s.setDrawerDataSource)
+
+  useEffect(() => {
+    setDrawerDataSource(dataSource)
+  }, [dataSource, setDrawerDataSource])
+
+  useEffect(() => {
+    setDrawerPeriod(dataSource === "excel" ? selectedPeriod : null)
+    return () => setDrawerPeriod(null)
+  }, [dataSource, selectedPeriod, setDrawerPeriod])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listEmployees({
-        search: search || undefined,
-        department_id: departmentId || undefined,
-        level: level || undefined,
-        is_active: statusFilter === "" ? undefined : statusFilter === "active",
-        page,
-        page_size: pageSize,
-      })
-      setEmployees(data.employees)
-      setTotal(data.total)
-      setActiveCount(data.active_count)
-      setInactiveCount(data.inactive_count)
+      if (dataSource === "excel") {
+        const data = await listExcelEmployees({
+          period: selectedPeriod,
+          search: search || undefined,
+          page,
+          page_size: pageSize,
+        })
+        setExcelEmployees(data.employees)
+        setTotal(data.total)
+        setActiveCount(data.active_count)
+        setInactiveCount(data.inactive_count)
+        setSummaryTotal(data.overall_total ?? data.total)
+        setSummaryActiveCount(data.overall_active_count ?? data.active_count)
+        setSummaryInactiveCount(data.overall_inactive_count ?? data.inactive_count)
+      } else {
+        const data = await listEmployees({
+          search: search || undefined,
+          department_id: departmentId || undefined,
+          level: level || undefined,
+          is_active: statusFilter === "" ? undefined : statusFilter === "active",
+          page,
+          page_size: pageSize,
+        })
+        setEmployees(data.employees)
+        setTotal(data.total)
+        setActiveCount(data.active_count)
+        setInactiveCount(data.inactive_count)
+        setSummaryTotal(data.total)
+        setSummaryActiveCount(data.active_count)
+        setSummaryInactiveCount(data.inactive_count)
+      }
     } catch (err) {
       console.error("Failed to load employees:", err)
       setEmployees([])
+      setExcelEmployees([])
       setTotal(0)
+      setSummaryTotal(0)
+      setSummaryActiveCount(0)
+      setSummaryInactiveCount(0)
     } finally {
       setLoading(false)
     }
-  }, [search, departmentId, level, statusFilter, page, pageSize])
+  }, [dataSource, selectedPeriod, search, departmentId, level, statusFilter, page, pageSize])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  useEffect(() => {
+    setPage(1)
+  }, [dataSource, selectedPeriod])
+
+  useEffect(() => {
+    if (dataSource !== "excel") return
+    setDepartmentId("")
+    setLevel("")
+    setStatusFilter("")
+    setShowFilters(false)
+  }, [dataSource])
 
   useEffect(() => {
     getEmployeeDepartments().then(setDepartments).catch(console.error)
@@ -104,9 +164,13 @@ export function EmployeeMasterPage() {
     }, 300)
   }
 
-  const resetFilters = () => {
+  const clearSearch = () => {
     setSearchInput("")
     setSearch("")
+    setPage(1)
+  }
+
+  const resetFilters = () => {
     setDepartmentId("")
     setLevel("")
     setStatusFilter("")
@@ -120,17 +184,18 @@ export function EmployeeMasterPage() {
   }
 
   const activeFilterCount = [
-    search,
     departmentId,
     level,
     statusFilter,
   ].filter(Boolean).length
 
   const summaryCards = [
-    { title: "Total Employees", value: total, icon: Users2, color: "text-blue-600", bgColor: "bg-blue-50", filterKey: "" },
-    { title: "Active", value: activeCount, icon: UserCheck, color: "text-green-600", bgColor: "bg-green-50", filterKey: "active" },
-    { title: "Inactive", value: inactiveCount, icon: UserX, color: "text-red-600", bgColor: "bg-red-50", filterKey: "inactive" },
+    { title: "Total Employees", value: summaryTotal, icon: Users2, color: "text-blue-600", bgColor: "bg-blue-50", filterKey: "" },
+    { title: "Active", value: summaryActiveCount, icon: UserCheck, color: "text-green-600", bgColor: "bg-green-50", filterKey: "active" },
+    { title: "Inactive", value: summaryInactiveCount, icon: UserX, color: "text-red-600", bgColor: "bg-red-50", filterKey: "inactive" },
   ]
+
+  const tableRows = dataSource === "excel" ? excelEmployees : employees
 
   return (
     <div className="space-y-6 p-6">
@@ -139,23 +204,33 @@ export function EmployeeMasterPage() {
         <div>
           <h2 className="text-lg font-semibold">Employee Master</h2>
           <p className="text-sm text-muted-foreground">
-            View all HRMS-synced employees in your branch
+            {dataSource === "excel"
+              ? `Excel employees for ${selectedPeriod}, with HRMS details filled only when Excel leaves a field blank`
+              : "View all HRMS-synced employees in your branch"}
           </p>
         </div>
-        <Button
-          variant={showFilters ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowFilters((v) => !v)}
-          className="h-8 text-xs relative"
-        >
-          <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
-          Filters
-          {activeFilterCount > 0 && (
-            <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
-              {activeFilterCount}
-            </span>
+        <div className="flex items-center gap-2">
+          <DataSourceToggle />
+          {dataSource === "excel" && (
+            <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
           )}
-        </Button>
+          {dataSource === "hrms" && (
+            <Button
+              variant={showFilters ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowFilters((v) => !v)}
+              className="h-8 text-xs relative"
+            >
+              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -163,12 +238,13 @@ export function EmployeeMasterPage() {
         {summaryCards.map((card) => (
           <Card
             key={card.title}
-            className={`cursor-pointer transition-all hover:shadow-md ${
-              statusFilter === card.filterKey && card.filterKey !== ""
+            className={`${dataSource === "hrms" ? "cursor-pointer hover:shadow-md" : ""} transition-all ${
+              dataSource === "hrms" && statusFilter === card.filterKey && card.filterKey !== ""
                 ? "ring-2 ring-primary"
                 : ""
             }`}
             onClick={() => {
+              if (dataSource !== "hrms") return
               if (card.filterKey === "") {
                 resetFilters()
               } else {
@@ -193,20 +269,40 @@ export function EmployeeMasterPage() {
         ))}
       </div>
 
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[240px] max-w-xl">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={
+                  dataSource === "excel"
+                    ? "Search employee, email, designation, department..."
+                    : "Search employee, email, or designation..."
+                }
+                value={searchInput}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            {searchInput && (
+              <button
+                onClick={clearSearch}
+                className="cursor-pointer inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-3 w-3" />
+                Clear Search
+              </button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Collapsible Filters */}
-      {showFilters && (
+      {showFilters && dataSource === "hrms" && (
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-4 flex-wrap">
-              <div className="relative w-56">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <input
-                  placeholder="Search name, email, designation..."
-                  value={searchInput}
-                  onChange={(e) => handleSearchInput(e.target.value)}
-                  className="w-full h-8 rounded-md border border-input bg-transparent pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-              </div>
               <SelectDropdown
                 options={[
                   { value: "", label: "All Departments" },
@@ -231,7 +327,7 @@ export function EmployeeMasterPage() {
                   className="cursor-pointer inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 >
                   <X className="h-3 w-3" />
-                  Clear
+                  Clear Filters
                 </button>
               )}
             </div>
@@ -262,16 +358,18 @@ export function EmployeeMasterPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {employees.length === 0 ? (
+                  {tableRows.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                        {activeFilterCount > 0
+                        {dataSource === "excel"
+                          ? "No Excel employees found for this period"
+                          : activeFilterCount > 0
                           ? "No employees match the current filters"
                           : "No employees found"}
                       </td>
                     </tr>
                   ) : (
-                    employees.map((emp) => (
+                    tableRows.map((emp) => (
                       <tr
                         key={emp.id}
                         onClick={() => selectEmployee(emp.id)}

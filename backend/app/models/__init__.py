@@ -25,6 +25,7 @@ from app.models.project_allocation import ProjectAllocation
 from app.models.hrms_holiday import HrmsHoliday
 from app.models.excel_utilisation import ExcelUtilisationReport
 from app.models.excel_upload_log import ExcelUploadLog
+from app.models.employee_planned_worked import EmployeePlannedWorked
 
 __all__ = [
     "Employee",
@@ -54,4 +55,5 @@ __all__ = [
     "HrmsHoliday",
     "ExcelUtilisationReport",
     "ExcelUploadLog",
+    "EmployeePlannedWorked",
 ]

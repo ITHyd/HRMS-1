@@ -21,12 +21,14 @@ import re
 import secrets
 from collections import defaultdict
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Callable, Optional
 from urllib.parse import unquote
 
 import openpyxl
 from bson import ObjectId
 
+from app.config import settings
 from app.models.department import Department
 from app.models.employee import Employee
 from app.models.employee_project import EmployeeProject
@@ -47,6 +49,7 @@ YTPL_SHEET_NAMES = ["Availability Report - YTPL", "Availability Report - NGL"]
 EXCEL_TIMESHEET_PROJECT_ID = "excel-utilisation-report"
 EXCEL_TIMESHEET_PROJECT_NAME = "Excel Utilisation Report"
 EXCEL_EMPLOYEE_PREFIX = "excel:"
+DEFAULT_PLANNED_WORKED_DAYS = 20.0
 
 
 def _classify(availability_pct: float) -> str:
@@ -55,6 +58,38 @@ def _classify(availability_pct: float) -> str:
     if availability_pct <= 70:
         return "partially_billed"
     return "bench"
+
+
+def _parse_remarks_availability(text) -> Optional[float]:
+    """
+    Parse availability fraction (0.0–1.0) from a free-text Remarks cell.
+    Returns None if the employee should be skipped (e.g. maternity/accident).
+    """
+    if text is None:
+        return None
+    t = str(text).strip().lower()
+    if not t:
+        return None
+    # Skip — not available
+    if any(kw in t for kw in ("not available", "maternity", "accident")):
+        return None
+    # Fully billed
+    if "fully billed" in t or "100% billed" in t:
+        return 0.0
+    # Fully available / bench
+    if "fully available" in t or "100% available" in t:
+        return 1.0
+    if any(kw in t for kw in ("cannot be billed", "corporate", "released", "awaiting", "will be released", "blocked")):
+        return 1.0
+    # "X% available for billing"
+    m = re.search(r"(\d+(?:\.\d+)?)\s*%\s*available", t)
+    if m:
+        return float(m.group(1)) / 100.0
+    # "X% billed" → availability = 1 - X%
+    m = re.search(r"(\d+(?:\.\d+)?)\s*%\s*billed", t)
+    if m:
+        return 1.0 - float(m.group(1)) / 100.0
+    return None
 
 
 def _normalise_text(value) -> str:
@@ -80,6 +115,22 @@ def _excel_employee_ref(employee_name: str) -> str:
 
 def _decode_excel_employee_ref(employee_ref: str) -> str:
     return unquote(employee_ref[len(EXCEL_EMPLOYEE_PREFIX):]) if employee_ref.startswith(EXCEL_EMPLOYEE_PREFIX) else employee_ref
+
+
+def _has_excel_value(value) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    return True
+
+
+def _prefer_excel_value(excel_value, fallback_value, default):
+    if _has_excel_value(excel_value):
+        return excel_value
+    if _has_excel_value(fallback_value):
+        return fallback_value
+    return default
 
 
 def _header_period(cell_value) -> Optional[str]:
@@ -173,23 +224,131 @@ def _derived_billable_hours(period: str, utilisation_percent: float, classificat
     return _derived_total_hours(period, utilisation_percent)
 
 
-def _build_employee_maps(employees: list[Employee]) -> tuple[dict[str, Employee], dict[str, Employee]]:
+def _meaningful_tokens(name: str) -> set[str]:
+    """Extract meaningful tokens (words ≥3 chars) from a name, stripping onsite/offshore."""
+    cleaned = name.lower().strip()
+    cleaned = re.sub(r"\s*[-(]?\s*(onsite|offshore)\s*[)]?\s*$", "", cleaned)
+    return {w for w in re.split(r"[^a-z]+", cleaned) if len(w) >= 3}
+
+
+def _token_signature(name: str) -> str:
+    return " ".join(sorted(_meaningful_tokens(name)))
+
+
+def _build_employee_maps(
+    employees: list[Employee],
+) -> tuple[dict[str, Employee], dict[str, Employee], dict[str, list[Employee]], dict[str, Employee]]:
     exact: dict[str, Employee] = {}
     normalised: dict[str, Employee] = {}
+    token_index: dict[str, list[Employee]] = {}
+    token_signature_map: dict[str, Employee] = {}
     for employee in employees:
         exact.setdefault(employee.name.strip().lower(), employee)
         normalised.setdefault(_normalise_name(employee.name), employee)
-    return exact, normalised
+        signature = _token_signature(employee.name)
+        if signature and signature not in token_signature_map:
+            token_signature_map[signature] = employee
+        for token in _meaningful_tokens(employee.name):
+            token_index.setdefault(token, []).append(employee)
+    return exact, normalised, token_index, token_signature_map
+
+
+def _fuzzy_match_employee(
+    excel_name: str,
+    token_index: dict[str, list[Employee]],
+    threshold: float = 0.6,
+) -> Optional[Employee]:
+    """Score candidates by token overlap; return best match above threshold."""
+    query_tokens = _meaningful_tokens(excel_name)
+    if not query_tokens:
+        return None
+    candidates: dict[str, tuple[Employee, int]] = {}
+    for token in query_tokens:
+        for emp in token_index.get(token, []):
+            eid = str(emp.id)
+            if eid not in candidates:
+                candidates[eid] = (emp, 0)
+            candidates[eid] = (emp, candidates[eid][1] + 1)
+
+    best_emp: Optional[Employee] = None
+    best_score = 0.0
+    for emp, common in candidates.values():
+        emp_tokens = _meaningful_tokens(emp.name)
+        denom = max(len(query_tokens), len(emp_tokens))
+        score = common / denom if denom else 0.0
+        if score > best_score:
+            best_score = score
+            best_emp = emp
+
+    return best_emp if best_score >= threshold else None
+
+
+def _resolve_employee_override(
+    employee_name: str,
+    overrides: dict[str, Optional[str]],
+    emp_by_id: dict[str, Employee],
+) -> tuple[bool, Optional[Employee]]:
+    if employee_name not in overrides:
+        return False, None
+    override_id = overrides[employee_name]
+    if override_id is None:
+        return True, None
+    if override_id in emp_by_id:
+        return True, emp_by_id[override_id]
+    return False, None
+
+
+def _unique_token_candidate(
+    employee_name: str,
+    token_index: dict[str, list[Employee]],
+) -> Optional[Employee]:
+    query_tokens = _meaningful_tokens(employee_name)
+    if not query_tokens:
+        return None
+    candidate_ids: set[str] = set()
+    candidate_map: dict[str, Employee] = {}
+    for token in query_tokens:
+        for employee in token_index.get(token, []):
+            employee_id = str(employee.id)
+            candidate_ids.add(employee_id)
+            candidate_map[employee_id] = employee
+    if len(candidate_ids) == 1:
+        candidate = candidate_map[next(iter(candidate_ids))]
+        candidate_tokens = _meaningful_tokens(candidate.name)
+        if query_tokens.issubset(candidate_tokens):
+            return candidate
+    return None
 
 
 def _resolve_employee_from_maps(
     employee_name: str,
     exact_map: dict[str, Employee],
     normalised_map: dict[str, Employee],
+    token_index: Optional[dict[str, list[Employee]]] = None,
+    token_signature_map: Optional[dict[str, Employee]] = None,
 ) -> Optional[Employee]:
     exact_key = employee_name.strip().lower()
     normalised_key = _normalise_name(employee_name)
-    return exact_map.get(exact_key) or normalised_map.get(normalised_key)
+    result = exact_map.get(exact_key) or normalised_map.get(normalised_key)
+    if result is None and token_signature_map is not None:
+        result = token_signature_map.get(_token_signature(employee_name))
+    if result is None and token_index is not None:
+        result = _fuzzy_match_employee(employee_name, token_index, threshold=0.6)
+    if result is None and token_index is not None:
+        result = _unique_token_candidate(employee_name, token_index)
+    return result
+
+
+def _load_excel_match_overrides() -> dict[str, Optional[str]]:
+    overrides_path = Path(__file__).resolve().parent.parent.parent / "seed" / "match_overrides.json"
+    if not overrides_path.exists():
+        return {}
+    import json as _json
+    return _json.loads(overrides_path.read_text())
+
+
+def _explicit_unmatched_override_names(overrides: dict[str, Optional[str]]) -> set[str]:
+    return {name for name, employee_id in overrides.items() if employee_id is None}
 
 
 async def _build_employee_resolver(branch_location_id: str) -> Callable[[str], Optional[Employee]]:
@@ -197,16 +356,108 @@ async def _build_employee_resolver(branch_location_id: str) -> Callable[[str], O
         Employee.location_id == branch_location_id,
         Employee.is_active == True,
     ).to_list()
-    branch_exact, branch_normalised = _build_employee_maps(branch_employees)
+    all_active_employees = await Employee.find(
+        Employee.is_active == True,
+    ).to_list()
+    branch_exact, branch_normalised, branch_token_index, branch_token_signature_map = _build_employee_maps(branch_employees)
+    global_exact, global_normalised, global_token_index, global_token_signature_map = _build_employee_maps(all_active_employees)
+    emp_by_id = {str(e.id): e for e in all_active_employees}
+
+    # Load manual overrides from seed/match_overrides.json if present
+    overrides = _load_excel_match_overrides()
 
     def resolve(employee_name: str) -> Optional[Employee]:
+        # Manual override takes priority
+        override_hit, override_employee = _resolve_employee_override(employee_name, overrides, emp_by_id)
+        if override_hit:
+            return override_employee
+        # Ignore stale override IDs and continue with live HRMS matching.
+        branch_exact_match = branch_exact.get(employee_name.strip().lower()) or branch_normalised.get(_normalise_name(employee_name))
+        if branch_exact_match is not None:
+            return branch_exact_match
+        branch_signature_match = branch_token_signature_map.get(_token_signature(employee_name))
+        if branch_signature_match is not None:
+            return branch_signature_match
         return _resolve_employee_from_maps(
             employee_name,
-            branch_exact,
-            branch_normalised,
+            global_exact,
+            global_normalised,
+            global_token_index,
+            global_token_signature_map,
         )
 
     return resolve
+
+
+def _effective_excel_employee_id(
+    row: ExcelUtilisationReport,
+    resolved_employee: Optional[Employee],
+    explicit_unmatched_names: Optional[set[str]] = None,
+) -> Optional[str]:
+    if explicit_unmatched_names and row.employee_name in explicit_unmatched_names:
+        return None
+    stored_id = row.employee_id if row.employee_id and not row.employee_id.startswith("unmatched:") else None
+    return stored_id or (str(resolved_employee.id) if resolved_employee else None)
+
+
+async def _enrich_excel_people(
+    rows: list[ExcelUtilisationReport],
+    branch_location_id: str,
+) -> list[dict]:
+    resolve_employee = await _build_employee_resolver(branch_location_id)
+    explicit_unmatched_names = _explicit_unmatched_override_names(_load_excel_match_overrides())
+
+    resolved_ids: list[str] = []
+    enriched_people: list[dict] = []
+    for row in rows:
+        resolved_employee = resolve_employee(row.employee_name)
+        resolved_employee_id = _effective_excel_employee_id(row, resolved_employee, explicit_unmatched_names)
+        if resolved_employee_id:
+            resolved_ids.append(resolved_employee_id)
+        enriched_people.append(
+            {
+                "row": row,
+                "resolved_employee_id": resolved_employee_id,
+            }
+        )
+
+    employee_map: dict[str, Employee] = {}
+    if resolved_ids:
+        employees = await Employee.find(
+            {"_id": {"$in": [ObjectId(employee_id) for employee_id in resolved_ids if ObjectId.is_valid(employee_id)]}}
+        ).to_list()
+        employee_map = {str(employee.id): employee for employee in employees}
+
+    dept_ids = {employee.department_id for employee in employee_map.values() if employee.department_id}
+    departments = (
+        await Department.find(
+            {"_id": {"$in": [ObjectId(dept_id) for dept_id in dept_ids if ObjectId.is_valid(dept_id)]}}
+        ).to_list()
+        if dept_ids
+        else []
+    )
+    dept_map = {str(department.id): department.name for department in departments}
+
+    location_ids = {employee.location_id for employee in employee_map.values() if employee.location_id}
+    locations = (
+        await Location.find(
+            {"_id": {"$in": [ObjectId(location_id) for location_id in location_ids if ObjectId.is_valid(location_id)]}}
+        ).to_list()
+        if location_ids
+        else []
+    )
+    location_map = {str(location.id): location for location in locations}
+
+    for person in enriched_people:
+        resolved_employee_id = person["resolved_employee_id"]
+        resolved_employee = employee_map.get(resolved_employee_id) if resolved_employee_id else None
+        department_name = dept_map.get(resolved_employee.department_id, "Unknown") if resolved_employee else "Unknown"
+        location = location_map.get(resolved_employee.location_id) if resolved_employee else None
+        person["resolved_employee"] = resolved_employee
+        person["department_name"] = department_name
+        person["location"] = location
+
+    return enriched_people
 
 
 def _build_excel_timesheet_entry(
@@ -279,6 +530,21 @@ async def parse_and_store_excel(
     if status_col is None:
         status_col = 3
 
+    # Detect "Revised Availability" and "Remarks" columns for fallback parsing
+    revised_avail_col: Optional[int] = None
+    remarks_col: Optional[int] = None
+    for col_index, cell in enumerate(header):
+        if col_index in month_col_map:
+            continue
+        value = _normalise_text(cell).lower()
+        if "revised" in value and "avail" in value:
+            revised_avail_col = col_index
+        elif value == "remarks":
+            remarks_col = col_index
+
+    # Determine the "current" period for fallback rows (latest month in the sheet)
+    fallback_period = max(month_col_map.values()) if month_col_map else "2026-03"
+
     batch_id = secrets.token_hex(8)
     now = datetime.now(timezone.utc)
     periods_found: set[str] = set()
@@ -312,12 +578,15 @@ async def parse_and_store_excel(
         department = practice or function_name
 
         resolved_employee = resolve_employee(employee_name)
-        employee_id = str(resolved_employee.id) if resolved_employee else None
-        total_rows += 1
-        if not employee_id:
+        if resolved_employee and resolved_employee.location_id != branch_location_id:
             continue
-        matched_rows += 1
+        employee_id = str(resolved_employee.id) if resolved_employee else f"unmatched:{_normalise_name(employee_name)}"
+        total_rows += 1
+        if resolved_employee:
+            matched_rows += 1
 
+        # --- Try month columns first (fractions per month) ---
+        row_had_month_data = False
         for col_index, period in month_col_map.items():
             if col_index >= len(row):
                 continue
@@ -333,6 +602,7 @@ async def parse_and_store_excel(
             availability_percent = round(max(0.0, min(100.0, availability_fraction * 100)), 2)
             utilisation_percent = round(100.0 - availability_percent, 2)
             periods_found.add(period)
+            row_had_month_data = True
 
             docs.append(
                 ExcelUtilisationReport(
@@ -351,6 +621,46 @@ async def parse_and_store_excel(
                     classification=_classify(availability_percent),
                 )
             )
+
+        if row_had_month_data:
+            continue
+
+        # --- Fallback: use "Revised Availability" col or parse "Remarks" text ---
+        availability_fraction: Optional[float] = None
+
+        if revised_avail_col is not None and revised_avail_col < len(row) and row[revised_avail_col] is not None:
+            try:
+                availability_fraction = float(row[revised_avail_col])
+            except (TypeError, ValueError):
+                pass
+
+        if availability_fraction is None and remarks_col is not None and remarks_col < len(row):
+            availability_fraction = _parse_remarks_availability(row[remarks_col])
+
+        if availability_fraction is None:
+            continue  # No usable availability data for this employee
+
+        availability_percent = round(max(0.0, min(100.0, availability_fraction * 100)), 2)
+        utilisation_percent = round(100.0 - availability_percent, 2)
+        periods_found.add(fallback_period)
+
+        docs.append(
+            ExcelUtilisationReport(
+                branch_location_id=branch_location_id,
+                upload_batch_id=batch_id,
+                uploaded_at=now,
+                uploaded_by=user_id,
+                filename=filename,
+                employee_name=employee_name,
+                employee_email=resolved_employee.email if resolved_employee else None,
+                employee_id=employee_id,
+                department=department,
+                period=fallback_period,
+                availability_percent=availability_percent,
+                utilisation_percent=utilisation_percent,
+                classification=_classify(availability_percent),
+            )
+        )
 
     periods = sorted(periods_found)
     if docs and periods:
@@ -441,23 +751,84 @@ async def _get_intercompany_rows_as_utilisation(
     return virtual_rows
 
 
-async def get_excel_dashboard(
+async def _get_combined_excel_rows_for_period(
     period: str,
     branch_location_id: str,
-) -> Optional[dict]:
+) -> list["ExcelUtilisationReport"]:
     rows = await ExcelUtilisationReport.find(
         ExcelUtilisationReport.branch_location_id == branch_location_id,
         ExcelUtilisationReport.period == period,
     ).to_list()
+    rows = _dedupe_latest_rows(rows)
 
-    if not rows:
-        # Fall back to inter-company allocation data for this period
-        rows = await _get_intercompany_rows_as_utilisation(period, branch_location_id)
+    intercompany_rows = await _get_intercompany_rows_as_utilisation(period, branch_location_id)
+    if not intercompany_rows:
+        return rows
+
+    existing_keys = {_normalise_employee_key(row.employee_name, row.employee_id) for row in rows}
+    for row in intercompany_rows:
+        key = _normalise_employee_key(row.employee_name, row.employee_id)
+        if key not in existing_keys:
+            rows.append(row)
+            existing_keys.add(key)
+    return rows
+
+
+async def _get_all_excel_employee_rows(branch_location_id: str) -> list["ExcelUtilisationReport"]:
+    rows = await ExcelUtilisationReport.find(
+        ExcelUtilisationReport.branch_location_id == branch_location_id,
+    ).to_list()
+    rows = _dedupe_latest_rows(rows)
+
+    intercompany_periods = sorted(
+        {
+            allocation.period
+            for allocation in await ProjectAllocation.find(
+                ProjectAllocation.source_system == "intercompany_excel",
+                ProjectAllocation.is_deleted != True,
+            ).to_list()
+        }
+    )
+    existing_keys = {_normalise_employee_key(row.employee_name, row.employee_id) for row in rows}
+    for period in intercompany_periods:
+        for row in await _get_intercompany_rows_as_utilisation(period, branch_location_id):
+            key = _normalise_employee_key(row.employee_name, row.employee_id)
+            if key not in existing_keys:
+                rows.append(row)
+                existing_keys.add(key)
+
+    return rows
+
+
+def _summarise_excel_people(enriched_people: list[dict]) -> tuple[int, int, int]:
+    unique_people: dict[str, tuple[Optional[Employee], ExcelUtilisationReport]] = {}
+    for person in enriched_people:
+        resolved_employee_id = person.get("resolved_employee_id")
+        resolved_employee = person.get("resolved_employee")
+        row = person.get("row")
+        if row is None:
+            continue
+        key = resolved_employee_id or _excel_employee_ref(row.employee_name)
+        unique_people.setdefault(key, (resolved_employee, row))
+
+    total = len(unique_people)
+    active_count = sum(
+        1
+        for resolved_employee, _row in unique_people.values()
+        if getattr(resolved_employee, "is_active", True)
+    )
+    inactive_count = total - active_count
+    return total, active_count, inactive_count
+
+
+async def get_excel_dashboard(
+    period: str,
+    branch_location_id: str,
+) -> Optional[dict]:
+    rows = await _get_combined_excel_rows_for_period(period, branch_location_id)
 
     if not rows:
         return None
-
-    rows = _dedupe_latest_rows(rows)
 
     total = len(rows)
     fully_billed = sum(1 for row in rows if row.classification == "fully_billed")
@@ -539,7 +910,7 @@ async def get_excel_dashboard(
         project_headcount[key]["employee_count"] += 1
         project_headcount[key]["total_hours"] += alloc.allocated_days * 8.0
     top_consuming_projects = sorted(
-        [{"name": v["project_name"], "client_name": v["client_name"],
+        [{"project_name": v["project_name"], "client_name": v["client_name"],
           "employee_count": v["employee_count"], "total_hours": round(v["total_hours"], 1)}
          for v in project_headcount.values()],
         key=lambda x: x["employee_count"],
@@ -570,34 +941,19 @@ async def get_excel_resource_rows(
     page: int = 1,
     page_size: int = 20,
 ) -> dict:
-    rows = await ExcelUtilisationReport.find(
-        ExcelUtilisationReport.branch_location_id == branch_location_id,
-        ExcelUtilisationReport.period == period,
-    ).to_list()
-
-    if not rows:
-        # Fall back to inter-company allocation data for this period
-        rows = await _get_intercompany_rows_as_utilisation(period, branch_location_id)
+    rows = await _get_combined_excel_rows_for_period(period, branch_location_id)
 
     if not rows:
         return {"period": period, "data_source": "excel", "entries": [], "total": 0}
 
-    rows = _dedupe_latest_rows(rows)
-
-    resolve_employee = await _build_employee_resolver(branch_location_id)
-    enriched_people = []
-    for row in rows:
-        resolved_employee = resolve_employee(row.employee_name)
-        resolved_employee_id = row.employee_id or (str(resolved_employee.id) if resolved_employee else None)
-        enriched_people.append({
-            "row": row,
-            "resolved_employee": resolved_employee,
-            "resolved_employee_id": resolved_employee_id,
-            "display_name": resolved_employee.name if resolved_employee else row.employee_name,
-            "derived_available_days": round(_working_days_in_period(period) * row.availability_percent / 100, 1),
-            "derived_total_hours": _derived_total_hours(period, row.utilisation_percent),
-            "derived_billable_hours": _derived_billable_hours(period, row.utilisation_percent, row.classification),
-        })
+    enriched_people = await _enrich_excel_people(rows, branch_location_id)
+    for person in enriched_people:
+        row = person["row"]
+        resolved_employee = person.get("resolved_employee")
+        person["display_name"] = resolved_employee.name if resolved_employee else row.employee_name
+        person["derived_available_days"] = round(_working_days_in_period(period) * row.availability_percent / 100, 1)
+        person["derived_total_hours"] = _derived_total_hours(period, row.utilisation_percent)
+        person["derived_billable_hours"] = _derived_billable_hours(period, row.utilisation_percent, row.classification)
 
     if classification:
         enriched_people = [person for person in enriched_people if person["row"].classification == classification]
@@ -608,6 +964,7 @@ async def get_excel_resource_rows(
         await ProjectAllocation.find(
             ProjectAllocation.period == period,
             {"employee_id": {"$in": resolved_employee_ids}},
+            ProjectAllocation.source_system == "intercompany_excel",
             ProjectAllocation.is_deleted != True,
         ).to_list()
         if resolved_employee_ids
@@ -737,10 +1094,11 @@ async def get_excel_timesheets(
     deduped_rows = _dedupe_latest_rows(rows)
 
     resolve_employee = await _build_employee_resolver(branch_location_id)
+    explicit_unmatched_names = _explicit_unmatched_override_names(_load_excel_match_overrides())
     all_entries = []
     for row in deduped_rows:
         resolved_employee = resolve_employee(row.employee_name)
-        resolved_employee_id = row.employee_id or (str(resolved_employee.id) if resolved_employee else None)
+        resolved_employee_id = _effective_excel_employee_id(row, resolved_employee, explicit_unmatched_names)
         all_entries.append(_build_excel_timesheet_entry(row, resolved_employee_id))
 
     if employee_id:
@@ -797,10 +1155,11 @@ def deduped_rows_to_entries(
     resolve_employee: Callable[[str], Optional[Employee]],
     period: str,
 ) -> list[dict]:
+    explicit_unmatched_names = _explicit_unmatched_override_names(_load_excel_match_overrides())
     entries = []
     for row in rows:
         resolved_employee = resolve_employee(row.employee_name)
-        resolved_employee_id = row.employee_id or (str(resolved_employee.id) if resolved_employee else None)
+        resolved_employee_id = _effective_excel_employee_id(row, resolved_employee, explicit_unmatched_names)
         entry = _build_excel_timesheet_entry(row, resolved_employee_id)
         entry["billable_hours"] = _derived_billable_hours(period, row.utilisation_percent, row.classification)
         entries.append(entry)
@@ -815,11 +1174,7 @@ async def get_excel_analytics(
     if not target_period:
         return None
 
-    rows = await ExcelUtilisationReport.find(
-        ExcelUtilisationReport.branch_location_id == branch_location_id,
-        ExcelUtilisationReport.period == target_period,
-    ).to_list()
-    rows = _dedupe_latest_rows(rows)
+    rows = await _get_combined_excel_rows_for_period(target_period, branch_location_id)
     if not rows:
         return None
 
@@ -948,6 +1303,7 @@ async def get_excel_analytics(
         await ProjectAllocation.find(
             ProjectAllocation.period == target_period,
             {"employee_id": {"$in": employee_ids}},
+            ProjectAllocation.source_system == "intercompany_excel",
             ProjectAllocation.is_deleted != True,
         ).to_list()
         if employee_ids
@@ -1057,18 +1413,13 @@ async def get_excel_bench_pool(
             "avg_bench_days": None,
         }
 
-    rows = await ExcelUtilisationReport.find(
-        ExcelUtilisationReport.branch_location_id == branch_location_id,
-        ExcelUtilisationReport.period == target_period,
-    ).to_list()
-    rows = _dedupe_latest_rows(rows)
+    rows = await _get_combined_excel_rows_for_period(target_period, branch_location_id)
     rows = [row for row in rows if row.classification in {"bench", "partially_billed"}]
 
     if classification_filter in {"bench", "partially_billed"}:
         rows = [row for row in rows if row.classification == classification_filter]
 
-    employee_ids = [row.employee_id for row in rows if row.employee_id]
-    if not employee_ids:
+    if not rows:
         return {
             "period": target_period,
             "data_source": "excel",
@@ -1079,41 +1430,40 @@ async def get_excel_bench_pool(
             "avg_bench_days": None,
         }
 
-    employees = await Employee.find(
-        {"_id": {"$in": [ObjectId(employee_id) for employee_id in employee_ids if ObjectId.is_valid(employee_id)]}}
-    ).to_list()
-    employee_map = {str(employee.id): employee for employee in employees}
-    row_map = {row.employee_id: row for row in rows if row.employee_id in employee_map}
-    employee_ids = list(row_map.keys())
+    enriched_people = await _enrich_excel_people(rows, branch_location_id)
 
-    dept_ids = list({employee.department_id for employee in employees if employee.department_id})
-    loc_ids = list({employee.location_id for employee in employees if employee.location_id})
+    def bench_employee_ref(person: dict) -> str:
+        row = person["row"]
+        resolved_employee_id = person.get("resolved_employee_id")
+        if resolved_employee_id:
+            return resolved_employee_id
+        if row.employee_id and row.employee_id.startswith("unmatched:"):
+            return row.employee_id
+        return _excel_employee_ref(row.employee_name)
 
-    departments = (
-        await Department.find(
-            {"_id": {"$in": [ObjectId(department_id) for department_id in dept_ids if ObjectId.is_valid(department_id)]}}
-        ).to_list()
-        if dept_ids
+    matched_employee_ids = sorted(
+        {
+            person["resolved_employee_id"]
+            for person in enriched_people
+            if person.get("resolved_employee_id") and person.get("resolved_employee") is not None
+        }
+    )
+    allocation_employee_refs = sorted({bench_employee_ref(person) for person in enriched_people})
+
+    all_skills = (
+        await EmployeeSkill.find({"employee_id": {"$in": matched_employee_ids}}).to_list()
+        if matched_employee_ids
         else []
     )
-    dept_map = {str(department.id): department.name for department in departments}
-
-    locations = (
-        await Location.find(
-            {"_id": {"$in": [ObjectId(location_id) for location_id in loc_ids if ObjectId.is_valid(location_id)]}}
-        ).to_list()
-        if loc_ids
-        else []
-    )
-    loc_map = {str(location.id): f"{location.city}, {location.country}" for location in locations}
-    loc_code_map = {str(location.id): location.code for location in locations}
-
-    all_skills = await EmployeeSkill.find({"employee_id": {"$in": employee_ids}}).to_list()
     skills_by_emp: dict[str, list[EmployeeSkill]] = defaultdict(list)
     for skill in all_skills:
         skills_by_emp[skill.employee_id].append(skill)
 
-    assignments = await EmployeeProject.find({"employee_id": {"$in": employee_ids}}).to_list()
+    assignments = (
+        await EmployeeProject.find({"employee_id": {"$in": matched_employee_ids}}).to_list()
+        if matched_employee_ids
+        else []
+    )
     project_ids = list({assignment.project_id for assignment in assignments if assignment.project_id})
     projects = (
         await Project.find(
@@ -1154,8 +1504,9 @@ async def get_excel_bench_pool(
 
     allocations = await ProjectAllocation.find(
         {
-            "employee_id": {"$in": employee_ids},
+            "employee_id": {"$in": allocation_employee_refs},
             "allocated_days": {"$gt": 0},
+            "source_system": "intercompany_excel",
         }
     ).sort(-ProjectAllocation.period).to_list()
 
@@ -1179,22 +1530,24 @@ async def get_excel_bench_pool(
     bench_count = 0
     partial_count = 0
 
-    for employee_id in employee_ids:
-        employee = employee_map.get(employee_id)
-        row = row_map.get(employee_id)
-        if not employee or not row:
-            continue
+    for person in enriched_people:
+        row = person["row"]
+        resolved_employee = person.get("resolved_employee")
+        location = person.get("location")
+        employee_ref = bench_employee_ref(person)
+        designation = _prefer_excel_value(None, getattr(resolved_employee, "designation", None), "-")
+        location_code = getattr(location, "code", "")
 
-        if location_filter and loc_code_map.get(employee.location_id, "") != location_filter:
+        if location_filter and location_code != location_filter:
             continue
-        if designation_filter and employee.designation.lower() != designation_filter.lower():
+        if designation_filter and designation.lower() != designation_filter.lower():
             continue
         if utilisation_min is not None and row.utilisation_percent < utilisation_min:
             continue
         if utilisation_max is not None and row.utilisation_percent > utilisation_max:
             continue
 
-        employee_skills = skills_by_emp.get(employee_id, [])
+        employee_skills = skills_by_emp.get(employee_ref, [])
         if skill_filter:
             skill_names = [skill.skill_name.lower() for skill in employee_skills]
             if skill_filter.lower() not in skill_names:
@@ -1202,7 +1555,7 @@ async def get_excel_bench_pool(
 
         if search:
             search_lower = search.lower()
-            if search_lower not in employee.name.lower() and search_lower not in employee.designation.lower():
+            if search_lower not in row.employee_name.lower() and search_lower not in designation.lower():
                 continue
 
         if row.classification == "bench":
@@ -1223,14 +1576,14 @@ async def get_excel_bench_pool(
             for skill in employee_skills
         ]
 
-        employee_assignments = assignments_by_emp.get(employee_id, [])
+        employee_assignments = assignments_by_emp.get(employee_ref, [])
         active_projects = [
             assignment
             for assignment in employee_assignments
             if assignment["status"] in ("ACTIVE", "ON_HOLD") and not assignment.get("is_deleted")
         ]
 
-        alloc_history = alloc_last_by_emp.get(employee_id, [])
+        alloc_history = alloc_last_by_emp.get(employee_ref, [])
         if alloc_history:
             last_projects = []
             for alloc_record in alloc_history[:3]:
@@ -1239,7 +1592,7 @@ async def get_excel_bench_pool(
                         "project_id": alloc_record["project_id"],
                         "project_name": alloc_record["project_name"],
                         "status": "COMPLETED",
-                        "role": employee_project_role.get((employee_id, alloc_record["project_id"]), ""),
+                        "role": employee_project_role.get((employee_ref, alloc_record["project_id"]), ""),
                         "end_date": alloc_record["end_date"],
                         "client_name": alloc_record["client_name"],
                         "period": alloc_record["period"],
@@ -1262,7 +1615,7 @@ async def get_excel_bench_pool(
             except Exception:
                 bench_duration_days = None
 
-        available_from = available_from_map.get(employee_id)
+        available_from = available_from_map.get(employee_ref)
         if row.classification == "bench" and not active_projects:
             available_from = today_str
         elif available_from is None:
@@ -1270,11 +1623,11 @@ async def get_excel_bench_pool(
 
         results.append(
             {
-                "employee_id": employee_id,
-                "employee_name": employee.name,
-                "designation": employee.designation,
-                "department": dept_map.get(employee.department_id, row.department or "Unknown"),
-                "location": loc_map.get(employee.location_id, "Unknown"),
+                "employee_id": employee_ref,
+                "employee_name": row.employee_name,
+                "designation": designation,
+                "department": _prefer_excel_value(row.department, person.get("department_name"), "Unknown"),
+                "location": f"{location.city}, {location.country}" if location else "Excel Import",
                 "skills": skill_responses,
                 "utilisation_percent": row.utilisation_percent,
                 "classification": row.classification,
@@ -1440,17 +1793,32 @@ async def get_excel_employee_detail(
 ) -> Optional[dict]:
     employee_name = _decode_excel_employee_ref(employee_ref)
 
-    query_filters = [ExcelUtilisationReport.branch_location_id == requester_branch_location_id]
-    if period:
-        query_filters.append(ExcelUtilisationReport.period == period)
-    query_filters.append(ExcelUtilisationReport.employee_name == employee_name)
-
-    rows = await ExcelUtilisationReport.find(*query_filters).sort(-ExcelUtilisationReport.uploaded_at).to_list()
-    if not rows and period:
-        rows = await ExcelUtilisationReport.find(
+    # Handle "unmatched:<norm_name>" refs — query by employee_id directly
+    if employee_name.startswith("unmatched:"):
+        query_filters = [
             ExcelUtilisationReport.branch_location_id == requester_branch_location_id,
-            ExcelUtilisationReport.employee_name == employee_name,
-        ).sort(-ExcelUtilisationReport.period, -ExcelUtilisationReport.uploaded_at).to_list()
+            ExcelUtilisationReport.employee_id == employee_name,
+        ]
+        if period:
+            query_filters.append(ExcelUtilisationReport.period == period)
+        rows = await ExcelUtilisationReport.find(*query_filters).sort(-ExcelUtilisationReport.uploaded_at).to_list()
+        if not rows and period:
+            rows = await ExcelUtilisationReport.find(
+                ExcelUtilisationReport.branch_location_id == requester_branch_location_id,
+                ExcelUtilisationReport.employee_id == employee_name,
+            ).sort(-ExcelUtilisationReport.period, -ExcelUtilisationReport.uploaded_at).to_list()
+    else:
+        query_filters = [ExcelUtilisationReport.branch_location_id == requester_branch_location_id]
+        if period:
+            query_filters.append(ExcelUtilisationReport.period == period)
+        query_filters.append(ExcelUtilisationReport.employee_name == employee_name)
+
+        rows = await ExcelUtilisationReport.find(*query_filters).sort(-ExcelUtilisationReport.uploaded_at).to_list()
+        if not rows and period:
+            rows = await ExcelUtilisationReport.find(
+                ExcelUtilisationReport.branch_location_id == requester_branch_location_id,
+                ExcelUtilisationReport.employee_name == employee_name,
+            ).sort(-ExcelUtilisationReport.period, -ExcelUtilisationReport.uploaded_at).to_list()
 
     if not rows:
         return None
@@ -1461,17 +1829,53 @@ async def get_excel_employee_detail(
     total_hours = _derived_total_hours(latest_row.period, latest_row.utilisation_percent)
     billable_hours = _derived_billable_hours(latest_row.period, latest_row.utilisation_percent, latest_row.classification)
 
+    # Check if this employee belongs to another branch
+    stored_id = latest_row.employee_id
+    is_other_branch = False
+    real_employee: Optional[Employee] = None
+    if stored_id and not stored_id.startswith("unmatched:") and ObjectId.is_valid(stored_id):
+        real_employee = await Employee.get(stored_id)
+        if real_employee and real_employee.location_id != requester_branch_location_id:
+            is_other_branch = True
+
+    if is_other_branch and real_employee:
+        loc = await Location.get(real_employee.location_id)
+        dept = await Department.get(real_employee.department_id)
+        return {
+            "id": str(real_employee.id),
+            "name": real_employee.name,
+            "designation": real_employee.designation,
+            "department": dept.name if dept else "Unknown",
+            "department_id": real_employee.department_id,
+            "level": real_employee.level,
+            "location_id": real_employee.location_id,
+            "location_code": loc.code if loc else "UNK",
+            "location_city": loc.city if loc else "Unknown",
+            "photo_url": real_employee.photo_url,
+            "is_active": real_employee.is_active,
+            "join_date": None,
+            "tenure_months": None,
+            "managers": [],
+            "reporting_chain": [],
+            "direct_reports": [],
+            "projects": [],
+            "skills": [],
+            "is_own_branch": False,
+            "is_other_branch": True,
+            "data_source": "excel",
+        }
+
     return {
         "id": employee_ref,
         "name": latest_row.employee_name,
         "email": latest_row.employee_email,
-        "designation": "Imported From Excel Report",
+        "designation": latest_row.department or "YTPL Employee",
         "department": latest_row.department or "Unknown",
         "department_id": "",
         "level": "unknown",
         "location_id": requester_branch_location_id,
-        "location_code": "XLS",
-        "location_city": "Excel Import",
+        "location_code": "YTPL",
+        "location_city": "Not in system",
         "photo_url": None,
         "is_active": True,
         "join_date": None,
@@ -1498,6 +1902,7 @@ async def get_excel_employee_detail(
             "entry_count": 1,
         },
         "is_own_branch": True,
+        "is_unmatched": True,
         "excel_periods": periods,
         "data_source": "excel",
     }
@@ -1570,12 +1975,92 @@ async def get_upload_history(branch_location_id: str) -> list[dict]:
     ]
 
 
-async def get_excel_project_detail(project_id: str) -> Optional[dict]:
+def _normalise_project_lookup_key(
+    project_name: Optional[str],
+    client_name: Optional[str],
+) -> tuple[str, str]:
+    return (_normalise_name(project_name or ""), _normalise_name(client_name or ""))
+
+
+def _build_project_planned_worked_lookups(records) -> tuple[dict[tuple[str, str], dict], dict[str, dict]]:
+    exact_lookup: dict[tuple[str, str], dict] = {}
+    by_name_lookup: dict[str, dict] = {}
+    for rec in records:
+        exact_key = _normalise_project_lookup_key(rec.project_name, rec.client_name)
+        name_key = exact_key[0]
+
+        exact_bucket = exact_lookup.setdefault(
+            exact_key,
+            {"planned_days": 0.0, "worked_days": 0.0, "record_count": 0},
+        )
+        exact_bucket["planned_days"] += rec.planned_days
+        exact_bucket["worked_days"] += rec.worked_days
+        exact_bucket["record_count"] += 1
+
+        name_bucket = by_name_lookup.setdefault(
+            name_key,
+            {"planned_days": 0.0, "worked_days": 0.0, "record_count": 0},
+        )
+        name_bucket["planned_days"] += rec.planned_days
+        name_bucket["worked_days"] += rec.worked_days
+        name_bucket["record_count"] += 1
+
+    return exact_lookup, by_name_lookup
+
+
+def _resolve_project_planned_worked(
+    project_name: Optional[str],
+    client_name: Optional[str],
+    exact_lookup: dict[tuple[str, str], dict],
+    by_name_lookup: dict[str, dict],
+) -> Optional[dict]:
+    exact_key = _normalise_project_lookup_key(project_name, client_name)
+    summary = exact_lookup.get(exact_key)
+    if summary and summary["record_count"] > 0:
+        return summary
+
+    name_key = exact_key[0]
+    summary = by_name_lookup.get(name_key)
+    if summary and summary["record_count"] > 0:
+        return summary
+
+    return None
+
+
+def _finalise_excel_project_progress(
+    planned_worked_summary: Optional[dict],
+    member_count: int,
+    total_allocated_days: float,
+) -> tuple[float, float, float]:
+    if planned_worked_summary and planned_worked_summary["record_count"] > 0:
+        planned_days = round(planned_worked_summary["planned_days"], 1)
+        worked_days = round(planned_worked_summary["worked_days"], 1)
+        progress_percent = (
+            round(min(100.0, worked_days / planned_days * 100), 1)
+            if planned_days > 0
+            else 0.0
+        )
+        return planned_days, worked_days, progress_percent
+
+    capacity = member_count * 21.0
+    worked_days = round(total_allocated_days, 1)
+    planned_days = round(capacity, 1)
+    progress_percent = (
+        round(min(100.0, total_allocated_days / capacity * 100), 1)
+        if capacity
+        else 0.0
+    )
+    return planned_days, worked_days, progress_percent
+
+
+async def get_excel_project_detail(
+    project_id: str,
+    period: str,
+    branch_location_id: str,
+) -> Optional[dict]:
     """
-    Return a ProjectDetail-shaped dict for an inter-company project (2026-03).
-    Members come from ProjectAllocation records with source_system='intercompany_excel'.
+    Return a ProjectDetail-shaped dict for an inter-company Excel project for the selected month.
     """
-    PERIOD = "2026-03"
 
     # Fetch the project
     project = await Project.find_one(
@@ -1587,7 +2072,7 @@ async def get_excel_project_detail(project_id: str) -> Optional[dict]:
 
     allocations = await ProjectAllocation.find(
         ProjectAllocation.project_id == project_id,
-        ProjectAllocation.period == PERIOD,
+        ProjectAllocation.period == period,
         ProjectAllocation.source_system == "intercompany_excel",
         ProjectAllocation.is_deleted != True,
     ).to_list()
@@ -1596,6 +2081,7 @@ async def get_excel_project_detail(project_id: str) -> Optional[dict]:
         return None
 
     # Load matched employees for extra info
+    allocation_emp_ids = list({a.employee_id for a in allocations})
     real_emp_ids = [
         ObjectId(a.employee_id)
         for a in allocations
@@ -1633,9 +2119,44 @@ async def get_excel_project_detail(project_id: str) -> Optional[dict]:
 
     members = []
     total_allocated_days = 0.0
+
+    # Load planned/worked days for this project and period
+    from app.models.employee_planned_worked import EmployeePlannedWorked
+    all_pw_records = (
+        await EmployeePlannedWorked.find(
+            {"employee_id": {"$in": allocation_emp_ids}, "period": period},
+        ).to_list()
+        if allocation_emp_ids
+        else []
+    )
+    exact_pw_lookup, name_pw_lookup = _build_project_planned_worked_lookups(all_pw_records)
+    project_pw_summary = _resolve_project_planned_worked(
+        project.name,
+        project.client_name,
+        exact_pw_lookup,
+        name_pw_lookup,
+    )
+
+    target_exact_key = _normalise_project_lookup_key(project.name, project.client_name)
+    has_exact_project_pw = target_exact_key in exact_pw_lookup
+    pw_by_emp: dict[str, dict] = {}
+    for pw in all_pw_records:
+        pw_exact_key = _normalise_project_lookup_key(pw.project_name, pw.client_name)
+        if has_exact_project_pw:
+            if pw_exact_key != target_exact_key:
+                continue
+        elif pw_exact_key[0] != target_exact_key[0]:
+            continue
+
+        if pw.employee_id not in pw_by_emp:
+            pw_by_emp[pw.employee_id] = {"planned_days": 0.0, "worked_days": 0.0}
+        pw_by_emp[pw.employee_id]["planned_days"] += pw.planned_days
+        pw_by_emp[pw.employee_id]["worked_days"] += pw.worked_days
+
     for alloc in allocations:
         emp = employees_by_id.get(alloc.employee_id)
         total_allocated_days += alloc.allocated_days
+        pw = pw_by_emp.get(alloc.employee_id)
         members.append({
             "employee_id": alloc.employee_id,
             "employee_name": alloc.employee_name,
@@ -1647,8 +2168,8 @@ async def get_excel_project_detail(project_id: str) -> Optional[dict]:
             "role_in_project": "Consultant",
             "assigned_at": None,
             "allocation_percentage": alloc.allocation_percentage,
-            "allocated_days": alloc.allocated_days,
-            "worked_days": None,
+            "allocated_days": pw["planned_days"] if pw else alloc.allocated_days,
+            "worked_days": pw["worked_days"] if pw else None,
         })
 
     # Sort by allocation % desc
@@ -1659,6 +2180,14 @@ async def get_excel_project_detail(project_id: str) -> Optional[dict]:
         sum(m["allocation_percentage"] or 0 for m in members) / member_count, 1
     ) if member_count else 0.0
 
+    total_planned, total_worked, progress_percent = _finalise_excel_project_progress(
+        project_pw_summary,
+        member_count,
+        total_allocated_days,
+    )
+    if not project_pw_summary and total_planned > 0:
+        progress_percent = avg_alloc_pct if avg_alloc_pct > 0 else progress_percent
+
     return {
         "id": str(project.id),
         "name": project.name,
@@ -1666,36 +2195,46 @@ async def get_excel_project_detail(project_id: str) -> Optional[dict]:
         "project_type": project.project_type,
         "client_name": project.client_name or "",
         "description": project.description,
-        "start_date": f"{PERIOD}-01",
-        "end_date": f"{PERIOD}-31",
-        "planned_days": round(total_allocated_days, 1),
-        "worked_days": 0,
-        "progress_percent": avg_alloc_pct,
+        "start_date": _period_date(period),
+        "end_date": _period_end_date(period),
+        "planned_days": total_planned,
+        "worked_days": total_worked,
+        "progress_percent": progress_percent,
         "member_count": member_count,
         "members": members,
-        "period": PERIOD,
+        "period": period,
         "data_source": "excel",
     }
 
 
 async def get_excel_projects(
     branch_location_id: str,
+    period: str,
     search: Optional[str] = None,
     client_name: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
 ) -> dict:
     """
-    Return project list from inter-company Excel allocations (2026-03 only).
+    Return project list from inter-company Excel allocations for the selected month.
     Shape mirrors the HRMS listProjects response so the frontend table works unchanged.
     """
-    PERIOD = "2026-03"
-
     allocations = await ProjectAllocation.find(
-        ProjectAllocation.period == PERIOD,
+        ProjectAllocation.period == period,
         ProjectAllocation.source_system == "intercompany_excel",
         ProjectAllocation.is_deleted != True,
     ).to_list()
+
+    allocation_emp_ids = list({alloc.employee_id for alloc in allocations})
+    from app.models.employee_planned_worked import EmployeePlannedWorked
+    pw_records = (
+        await EmployeePlannedWorked.find(
+            {"employee_id": {"$in": allocation_emp_ids}, "period": period},
+        ).to_list()
+        if allocation_emp_ids
+        else []
+    )
+    exact_pw_lookup, name_pw_lookup = _build_project_planned_worked_lookups(pw_records)
 
     # Group by project_id
     project_map: dict[str, dict] = {}
@@ -1710,8 +2249,8 @@ async def get_excel_projects(
                 "project_type": "client",
                 "member_count": 0,
                 "total_allocated_days": 0.0,
-                "start_date": f"{PERIOD}-01",
-                "end_date": None,
+                "start_date": _period_date(period),
+                "end_date": _period_end_date(period),
                 "planned_days": 0,
                 "worked_days": 0,
                 "progress_percent": 0.0,
@@ -1731,12 +2270,22 @@ async def get_excel_projects(
     # Sort by member count desc
     projects.sort(key=lambda p: p["member_count"], reverse=True)
 
-    # Derive progress from allocated days (treat capacity as 21 days * members)
+    # Prefer planned/worked sheet totals; only fall back to allocation-derived capacity if the month has no Excel planned/worked rows.
     for p in projects:
-        capacity = p["member_count"] * 21.0
-        p["worked_days"] = round(p["total_allocated_days"], 1)
-        p["planned_days"] = round(capacity, 1)
-        p["progress_percent"] = round(min(100.0, p["total_allocated_days"] / capacity * 100), 1) if capacity else 0.0
+        summary = _resolve_project_planned_worked(
+            p["name"],
+            p["client_name"],
+            exact_pw_lookup,
+            name_pw_lookup,
+        )
+        planned_days, worked_days, progress_percent = _finalise_excel_project_progress(
+            summary,
+            p["member_count"],
+            p["total_allocated_days"],
+        )
+        p["planned_days"] = planned_days
+        p["worked_days"] = worked_days
+        p["progress_percent"] = progress_percent
 
     total = len(projects)
     start = (page - 1) * page_size
@@ -1751,7 +2300,525 @@ async def get_excel_projects(
         "active_count": total,
         "completed_count": 0,
         "on_hold_count": 0,
-        "period": PERIOD,
+        "period": period,
         "data_source": "excel",
         "clients": clients,
+    }
+
+
+async def _reimport_intercompany(file_path, branch_location_id: str) -> dict:
+    """
+    Re-run the inter-company sheet import inline (mirrors import_intercompany_excel seed).
+    Used by the /reimport endpoint triggered from the UI toggle.
+    """
+    import io as _io
+    import re as _re
+    from pathlib import Path as _Path
+
+    try:
+        import openpyxl as _openpyxl
+    except ImportError:
+        return {"error": "openpyxl not installed"}
+
+    PERIOD = "2026-03"
+    TARGET_SHEET = "Inter-company"
+    COMPANY_FILTER = {"YTPL"}
+    WORKING_DAYS = 21
+    HOURS_PER_DAY = 8.0
+    CAPACITY_HOURS = WORKING_DAYS * HOURS_PER_DAY
+
+    def _norm(v: str) -> str:
+        c = v.lower().strip()
+        c = _re.sub(r"\s*[-(]?\s*(onsite|offshore)\s*[)]?\s*$", "", c)
+        c = _re.sub(r"[^a-z0-9]+", "", c)
+        return c
+
+    def _parse_hours(v) -> float:
+        if v is None:
+            return 0.0
+        try:
+            return max(0.0, float(v))
+        except (TypeError, ValueError):
+            return 0.0
+
+    wb = _openpyxl.load_workbook(_io.BytesIO(_Path(file_path).read_bytes()), data_only=True)
+    if TARGET_SHEET not in wb.sheetnames:
+        return {"error": f"Sheet '{TARGET_SHEET}' not found"}
+
+    ws = wb[TARGET_SHEET]
+    rows = list(ws.iter_rows(values_only=True))
+
+    # Find header row with datetime month columns
+    header_row_idx, header, march_col = None, None, None
+    for idx, row in enumerate(rows[:10]):
+        for i, cell in enumerate(row or []):
+            if isinstance(cell, datetime) and cell.year == 2026 and cell.month == 3:
+                header_row_idx, header, march_col = idx, row, i
+                break
+        if march_col is not None:
+            break
+
+    if march_col is None:
+        return {"error": "March 2026 column not found"}
+
+    # Parse records
+    records = []
+    for row in rows[header_row_idx + 1:]:
+        if not row or len(row) <= march_col:
+            continue
+        name = str(row[1]).strip() if row[1] else ""
+        company = str(row[2]).strip() if row[2] else ""
+        client = str(row[4]).strip() if row[4] else ""
+        project = str(row[6]).strip() if row[6] else ""
+        if not name or not company or company.upper() not in COMPANY_FILTER:
+            continue
+        nl = name.lower().strip()
+        if nl.startswith(("tbc", "total", "sub-total")):
+            continue
+        hours = _parse_hours(row[march_col])
+        if hours <= 0:
+            continue
+        records.append({"name": name, "client": client, "project": project, "hours": hours})
+
+    # Load employees for this branch
+    employees = await Employee.find(
+        Employee.location_id == branch_location_id,
+        Employee.is_active == True,
+    ).to_list()
+    exact_map = {e.name.strip().lower(): e for e in employees}
+    norm_map = {_norm(e.name): e for e in employees}
+
+    now = datetime.now(timezone.utc)
+
+    # Upsert projects
+    project_cache: dict[tuple, Project] = {}
+    async def _get_proj(client: str, proj_name: str) -> Project:
+        key = (client, proj_name)
+        if key not in project_cache:
+            existing = await Project.find_one(
+                Project.name == proj_name, Project.client_name == client, Project.is_deleted != True
+            ) or await Project.find_one(Project.name == proj_name, Project.is_deleted != True)
+            if existing:
+                if not existing.client_name:
+                    existing.client_name = client
+                    existing.updated_at = now
+                    await existing.save()
+                project_cache[key] = existing
+            else:
+                p = Project(
+                    name=proj_name, client_name=client, status="ACTIVE", project_type="client",
+                    start_date=datetime(2026, 3, 1, tzinfo=timezone.utc), created_at=now, updated_at=now,
+                )
+                await p.insert()
+                project_cache[key] = p
+        return project_cache[key]
+
+    # Delete existing intercompany allocations for this period
+    await ProjectAllocation.find(
+        ProjectAllocation.period == PERIOD,
+        ProjectAllocation.source_system == "intercompany_excel",
+    ).delete()
+
+    # Pass 1: upsert all projects
+    for rec in records:
+        await _get_proj(rec["client"], rec["project"])
+
+    # Pass 2: store allocations
+    matched = unmatched = inserted = 0
+    for rec in records:
+        proj = await _get_proj(rec["client"], rec["project"])
+        proj_id = str(proj.id)
+        emp = exact_map.get(rec["name"].strip().lower()) or norm_map.get(_norm(rec["name"]))
+        hours = rec["hours"]
+        alloc_pct = round(min(100.0, hours / CAPACITY_HOURS * 100), 1)
+        avail_days = round(max(0.0, WORKING_DAYS - hours / HOURS_PER_DAY), 1)
+
+        if emp:
+            emp_id = str(emp.id)
+            matched += 1
+        else:
+            emp_id = f"unmatched:{_norm(rec['name'])}"
+            unmatched += 1
+
+        await ProjectAllocation(
+            employee_id=emp_id,
+            hrms_employee_id=getattr(emp, "hrms_employee_id", 0) or 0 if emp else 0,
+            employee_name=rec["name"] if not emp else emp.name,
+            project_id=proj_id,
+            hrms_project_id=getattr(proj, "hrms_project_id", 0) or 0,
+            project_name=proj.name,
+            client_name=proj.client_name,
+            period=PERIOD,
+            allocated_days=round(hours / HOURS_PER_DAY, 1),
+            allocation_percentage=alloc_pct,
+            total_working_days=WORKING_DAYS,
+            available_days=avail_days,
+            source_system="intercompany_excel",
+            source_id=f"intercompany:{PERIOD}:{emp_id}:{proj_id}",
+            created_at=now,
+            updated_at=now,
+        ).insert()
+        inserted += 1
+
+        if emp:
+            exists = await EmployeeProject.find_one(
+                EmployeeProject.employee_id == emp_id,
+                EmployeeProject.project_id == proj_id,
+            )
+            if not exists:
+                await EmployeeProject(
+                    employee_id=emp_id, project_id=proj_id, role_in_project="Consultant",
+                    start_date=datetime(2026, 3, 1, tzinfo=timezone.utc), created_at=now, updated_at=now,
+                ).insert()
+
+    return {
+        "projects": len(project_cache),
+        "allocations": inserted,
+        "matched_employees": matched,
+        "unmatched_employees": unmatched,
+    }
+
+
+async def run_configured_excel_reimport(branch_location_id: str, user_id: str) -> dict:
+    """Re-run the configured Excel import flow used by the UI and integration sync."""
+    from seed.seed_excel import import_planned_worked, update_workbook_employee_split
+
+    file_path = Path(settings.EXCEL_FILE_PATH)
+    if not file_path.exists():
+        return {
+            "status": "skipped",
+            "reason": f"Excel file not found at configured path: {settings.EXCEL_FILE_PATH}",
+            "file": str(file_path),
+        }
+
+    content = file_path.read_bytes()
+    filename = file_path.name
+    now = datetime.now(timezone.utc)
+
+    ytpl_result = await parse_and_store_excel(
+        file_content=content,
+        filename=filename,
+        branch_location_id=branch_location_id,
+        user_id=user_id,
+    )
+    if "error" in ytpl_result:
+        return {
+            "status": "failed",
+            "reason": ytpl_result["error"],
+            "file": str(file_path),
+        }
+
+    intercompany_result = await _reimport_intercompany(file_path, branch_location_id)
+
+    workbook = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+    planned_worked_result = await import_planned_worked(workbook, branch_location_id, filename, now)
+    workbook_update_path = await update_workbook_employee_split(file_path)
+
+    return {
+        "status": "completed",
+        "file": str(workbook_update_path),
+        "ytpl": ytpl_result,
+        "intercompany": intercompany_result,
+        "planned_worked": planned_worked_result,
+    }
+
+
+async def get_employee_planned_worked_timeline(employee_id: str) -> dict:
+    """
+    Return month-by-month planned vs worked days for an employee from the Excel sheets.
+    Aggregates across all projects per period.
+    """
+    from app.models.employee_planned_worked import EmployeePlannedWorked
+
+    if employee_id.startswith(EXCEL_EMPLOYEE_PREFIX):
+        employee_name = _decode_excel_employee_ref(employee_id)
+        records = await EmployeePlannedWorked.find(
+            EmployeePlannedWorked.employee_name == employee_name,
+        ).to_list()
+        utilisation_rows = await ExcelUtilisationReport.find(
+            ExcelUtilisationReport.employee_name == employee_name,
+        ).to_list()
+    else:
+        records = await EmployeePlannedWorked.find(
+            EmployeePlannedWorked.employee_id == employee_id,
+        ).to_list()
+        utilisation_rows = await ExcelUtilisationReport.find(
+            ExcelUtilisationReport.employee_id == employee_id,
+        ).to_list()
+
+    if not records:
+        # Try by unmatched key — shouldn't happen for real employees but fallback
+        return {"employee_id": employee_id, "timeline": []}
+
+    # Aggregate per period
+    period_data: dict[str, dict] = {}
+    for rec in records:
+        p = rec.period
+        if p not in period_data:
+            period_data[p] = {"planned_days": 0.0, "worked_days": 0.0, "projects": []}
+        period_data[p]["planned_days"] = round(period_data[p]["planned_days"] + rec.planned_days, 1)
+        period_data[p]["worked_days"] = round(period_data[p]["worked_days"] + rec.worked_days, 1)
+        if rec.project_name:
+            period_data[p]["projects"].append({
+                "project_name": rec.project_name,
+                "client_name": rec.client_name,
+                "planned_days": rec.planned_days,
+                "worked_days": rec.worked_days,
+            })
+
+    timeline = [
+        {
+            "period": period,
+            "planned_days": data["planned_days"],
+            "worked_days": data["worked_days"],
+            "utilisation_percent": round(
+                min(100.0, data["worked_days"] / data["planned_days"] * 100), 1
+            ) if data["planned_days"] > 0 else 0.0,
+            "projects": sorted(data["projects"], key=lambda x: x["planned_days"], reverse=True),
+        }
+        for period, data in sorted(period_data.items())
+    ]
+
+    return {"employee_id": employee_id, "timeline": timeline}
+
+
+async def get_branch_planned_vs_actual(period: str, branch_location_id: str) -> Optional[dict]:
+    """
+    Return branch-level planned vs actual utilisation for a given period.
+    Aggregates EmployeePlannedWorked records for employees in this branch.
+    """
+    from app.models.employee_planned_worked import EmployeePlannedWorked
+
+    # Get employee IDs for this branch
+    employees = await Employee.find(
+        Employee.location_id == branch_location_id,
+        Employee.is_active == True,
+    ).to_list()
+    emp_ids = [str(e.id) for e in employees]
+    if not emp_ids:
+        return None
+
+    records = await EmployeePlannedWorked.find(
+        {"employee_id": {"$in": emp_ids}, "period": period}
+    ).to_list()
+
+    if not records:
+        return None
+
+    total_planned = round(sum(r.planned_days for r in records), 1)
+    total_worked = round(sum(r.worked_days for r in records), 1)
+    unique_employees = len({r.employee_id for r in records})
+
+    # Per-project breakdown
+    proj_map: dict[str, dict] = {}
+    for r in records:
+        key = r.project_name or "Unassigned"
+        if key not in proj_map:
+            proj_map[key] = {"project_name": key, "client_name": r.client_name, "planned_days": 0.0, "worked_days": 0.0}
+        proj_map[key]["planned_days"] = round(proj_map[key]["planned_days"] + r.planned_days, 1)
+        proj_map[key]["worked_days"] = round(proj_map[key]["worked_days"] + r.worked_days, 1)
+
+    projects = sorted(proj_map.values(), key=lambda x: x["planned_days"], reverse=True)
+
+    planned_util_pct = round(total_planned / (unique_employees * 21) * 100, 1) if unique_employees else 0.0
+    actual_util_pct = round(total_worked / (unique_employees * 21) * 100, 1) if unique_employees else 0.0
+
+    return {
+        "period": period,
+        "total_planned_days": total_planned,
+        "total_worked_days": total_worked,
+        "employee_count": unique_employees,
+        "planned_utilisation_pct": planned_util_pct,
+        "actual_utilisation_pct": actual_util_pct,
+        "variance_pct": round(actual_util_pct - planned_util_pct, 1),
+        "projects": projects[:10],
+    }
+
+
+async def list_excel_employees(
+    branch_location_id: str,
+    period: str = "2026-03",
+    search: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    """Return unmatched Excel employees (not in HRMS) for the Employee Master page."""
+    rows = await ExcelUtilisationReport.find(
+        ExcelUtilisationReport.branch_location_id == branch_location_id,
+        ExcelUtilisationReport.period == period,
+    ).to_list()
+
+    rows = _dedupe_latest_rows(rows)
+
+    # Only unmatched employees
+    unmatched = [r for r in rows if r.employee_id and r.employee_id.startswith("unmatched:")]
+
+    if search:
+        sl = search.lower()
+        unmatched = [r for r in unmatched if sl in r.employee_name.lower() or sl in (r.department or "").lower()]
+
+    total = len(unmatched)
+    start = (page - 1) * page_size
+    page_rows = unmatched[start: start + page_size]
+
+    employees = []
+    for r in page_rows:
+        employees.append({
+            "id": r.employee_id,
+            "name": r.employee_name,
+            "email": r.employee_email or "-",
+            "designation": "-",
+            "department": r.department or "Unknown",
+            "level": "-",
+            "location": "Excel Import",
+            "join_date": None,
+            "is_active": True,
+            "classification": r.classification,
+            "utilisation_percent": r.utilisation_percent,
+            "availability_percent": r.availability_percent,
+        })
+
+    return {
+        "employees": employees,
+        "total": total,
+        "active_count": total,
+        "inactive_count": 0,
+    }
+
+
+async def get_employee_planned_worked_timeline(employee_id: str) -> dict:
+    """
+    Return month-by-month planned vs worked days for an employee from the Excel sheets.
+    Missing Excel values fall back to 20 days so the drawer never renders blank months as zero.
+    """
+    from app.models.employee_planned_worked import EmployeePlannedWorked
+
+    if employee_id.startswith(EXCEL_EMPLOYEE_PREFIX):
+        employee_name = _decode_excel_employee_ref(employee_id)
+        records = await EmployeePlannedWorked.find(
+            EmployeePlannedWorked.employee_name == employee_name,
+        ).to_list()
+        utilisation_rows = await ExcelUtilisationReport.find(
+            ExcelUtilisationReport.employee_name == employee_name,
+        ).to_list()
+    else:
+        records = await EmployeePlannedWorked.find(
+            EmployeePlannedWorked.employee_id == employee_id,
+        ).to_list()
+        utilisation_rows = await ExcelUtilisationReport.find(
+            ExcelUtilisationReport.employee_id == employee_id,
+        ).to_list()
+
+    if not records and not utilisation_rows:
+        return {"employee_id": employee_id, "timeline": []}
+
+    period_data: dict[str, dict] = {}
+    for rec in records:
+        period_bucket = period_data.setdefault(
+            rec.period,
+            {"planned_days": 0.0, "worked_days": 0.0, "projects": []},
+        )
+        period_bucket["planned_days"] = round(period_bucket["planned_days"] + rec.planned_days, 1)
+        period_bucket["worked_days"] = round(period_bucket["worked_days"] + rec.worked_days, 1)
+        if rec.project_name:
+            period_bucket["projects"].append(
+                {
+                    "project_name": rec.project_name,
+                    "client_name": rec.client_name,
+                    "planned_days": rec.planned_days,
+                    "worked_days": rec.worked_days,
+                }
+            )
+
+    for row in _dedupe_latest_rows(utilisation_rows):
+        period_data.setdefault(row.period, {"planned_days": 0.0, "worked_days": 0.0, "projects": []})
+
+    timeline = []
+    for period, data in sorted(period_data.items()):
+        planned_days = round(data["planned_days"], 1) if data["planned_days"] > 0 else DEFAULT_PLANNED_WORKED_DAYS
+        worked_days = round(data["worked_days"], 1) if data["worked_days"] > 0 else DEFAULT_PLANNED_WORKED_DAYS
+        timeline.append(
+            {
+                "period": period,
+                "planned_days": planned_days,
+                "worked_days": worked_days,
+                "utilisation_percent": round(min(100.0, worked_days / planned_days * 100), 1) if planned_days > 0 else 0.0,
+                "projects": sorted(data["projects"], key=lambda x: x["planned_days"], reverse=True),
+            }
+        )
+
+    return {"employee_id": employee_id, "timeline": timeline}
+
+
+async def list_excel_employees(
+    branch_location_id: str,
+    period: str = "2026-03",
+    search: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    """
+    Return Excel employees for the Employee Master page.
+    Excel remains the source of truth; HRMS only fills fields that Excel does not provide.
+    """
+    rows = await _get_combined_excel_rows_for_period(period, branch_location_id)
+    enriched_people = await _enrich_excel_people(rows, branch_location_id)
+    all_enriched_people = await _enrich_excel_people(
+        await _get_all_excel_employee_rows(branch_location_id),
+        branch_location_id,
+    )
+
+    if search:
+        search_lower = search.lower()
+        enriched_people = [
+            person
+            for person in enriched_people
+            if search_lower in person["row"].employee_name.lower()
+            or search_lower in str(_prefer_excel_value(person["row"].employee_email, getattr(person.get("resolved_employee"), "email", None), "")).lower()
+            or search_lower in str(_prefer_excel_value(None, getattr(person.get("resolved_employee"), "designation", None), "")).lower()
+            or search_lower in str(_prefer_excel_value(person["row"].department, person.get("department_name"), "")).lower()
+            or search_lower in str(_prefer_excel_value(None, getattr(person.get("resolved_employee"), "level", None), "")).lower()
+        ]
+
+    total = len(enriched_people)
+    active_count = sum(1 for person in enriched_people if getattr(person.get("resolved_employee"), "is_active", True))
+    inactive_count = total - active_count
+    overall_total, overall_active_count, overall_inactive_count = _summarise_excel_people(
+        all_enriched_people
+    )
+
+    start = (page - 1) * page_size
+    page_rows = enriched_people[start: start + page_size]
+
+    employees = []
+    for person in page_rows:
+        row = person["row"]
+        resolved_employee = person.get("resolved_employee")
+        location = person.get("location")
+        employee_ref = person["resolved_employee_id"] or row.employee_id or _excel_employee_ref(row.employee_name)
+        employees.append(
+            {
+                "id": employee_ref,
+                "name": row.employee_name,
+                "email": _prefer_excel_value(row.employee_email, getattr(resolved_employee, "email", None), "-"),
+                "designation": _prefer_excel_value(None, getattr(resolved_employee, "designation", None), "-"),
+                "department": _prefer_excel_value(row.department, person.get("department_name"), "Unknown"),
+                "level": _prefer_excel_value(None, getattr(resolved_employee, "level", None), "-"),
+                "location": f"{location.city}, {location.country}" if location else "Excel Import",
+                "join_date": getattr(resolved_employee, "join_date", None).isoformat() if getattr(resolved_employee, "join_date", None) else None,
+                "is_active": getattr(resolved_employee, "is_active", True),
+                "classification": row.classification,
+                "utilisation_percent": row.utilisation_percent,
+                "availability_percent": row.availability_percent,
+            }
+        )
+
+    return {
+        "employees": employees,
+        "total": total,
+        "active_count": active_count,
+        "inactive_count": inactive_count,
+        "overall_total": overall_total,
+        "overall_active_count": overall_active_count,
+        "overall_inactive_count": overall_inactive_count,
     }

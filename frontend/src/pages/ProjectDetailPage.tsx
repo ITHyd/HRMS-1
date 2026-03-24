@@ -9,8 +9,16 @@ import { useOrgChartStore } from "@/store/orgChartStore"
 import { getProjectDetail } from "@/api/projects"
 import { getExcelProjectDetail } from "@/api/excelUtilisation"
 import { useDataSourceStore } from "@/store/dataSourceStore"
-import { ArrowLeft, Users, Clock, CalendarDays, Briefcase, ChevronDown, ChevronRight } from "lucide-react"
+import { ArrowLeft, Users, Clock, CalendarDays, Briefcase } from "lucide-react"
 import type { ProjectDetail } from "@/types/project"
+
+function formatPeriodLabel(period: string) {
+  const [year, month] = period.split("-").map(Number)
+  return new Date(year, month - 1, 1).toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  })
+}
 
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -34,7 +42,7 @@ export function ProjectDetailPage() {
     setError(null)
     const fetcher =
       dataSource === "excel"
-        ? getExcelProjectDetail(projectId)
+        ? getExcelProjectDetail(projectId, selectedPeriod)
         : getProjectDetail(projectId, selectedPeriod)
     fetcher
       .then(setProject)
@@ -71,7 +79,7 @@ export function ProjectDetailPage() {
         </button>
         <div className="flex h-48 items-center justify-center text-muted-foreground">
           {dataSource === "excel" && error
-            ? "No March 2026 inter-company data for this project"
+            ? `No ${formatPeriodLabel(selectedPeriod)} inter-company data for this project`
             : error || "Project not found"}
         </div>
       </div>
@@ -82,7 +90,7 @@ export function ProjectDetailPage() {
   const endDate = project.end_date ? new Date(project.end_date) : null
   const durationDays =
     startDate && endDate
-      ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+      ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
       : null
 
   return (
@@ -132,11 +140,7 @@ export function ProjectDetailPage() {
       {/* Period Selector + Stats */}
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-muted-foreground">Monthly Progress</p>
-        {dataSource === "excel" ? (
-          <span className="text-sm text-muted-foreground bg-muted px-3 py-1 rounded-md">March 2026</span>
-        ) : (
-          <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
-        )}
+        <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -162,13 +166,9 @@ export function ProjectDetailPage() {
                 <Briefcase className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">
-                  {dataSource === "excel" ? "Allocated Days" : "Worked Days"}
-                </p>
+                <p className="text-xs text-muted-foreground">Worked Days</p>
                 <p className="text-xl font-semibold tabular-nums">
-                  {dataSource === "excel"
-                    ? (project.planned_days > 0 ? project.planned_days : "-")
-                    : (project.worked_days > 0 ? project.worked_days : "-")}
+                  {project.worked_days > 0 ? project.worked_days : "-"}
                 </p>
               </div>
             </div>
@@ -211,7 +211,7 @@ export function ProjectDetailPage() {
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium">
-              {dataSource === "excel" ? "Avg Allocation" : project.planned_days > 0 ? "Allocation Progress" : "Timeline Progress"}
+              {project.planned_days > 0 ? "Monthly Progress" : "Timeline Progress"}
             </p>
             <span className={`text-lg font-semibold tabular-nums ${
               project.progress_percent >= 80
@@ -234,7 +234,7 @@ export function ProjectDetailPage() {
             }`}
           />
 
-          {project.planned_days > 0 && dataSource !== "excel" ? (
+          {project.planned_days > 0 ? (
             /* Allocation-based calculation */
             <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-3 text-center">
               <div>
@@ -252,25 +252,9 @@ export function ProjectDetailPage() {
                 </p>
               </div>
             </div>
-          ) : dataSource === "excel" ? (
-            /* Excel inter-company: show avg allocation % */
-            <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-3 text-center">
-              <div>
-                <p className="text-[11px] text-muted-foreground">Allocated Days</p>
-                <p className="text-sm font-semibold tabular-nums">{project.planned_days}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-muted-foreground">Team Size</p>
-                <p className="text-sm font-semibold tabular-nums">{project.member_count}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-muted-foreground">Avg Allocation</p>
-                <p className="text-sm font-semibold tabular-nums">{project.progress_percent}%</p>
-              </div>
-            </div>
           ) : startDate && endDate ? (() => {
             const today = new Date()
-            const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+            const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
             const elapsedDays = Math.max(0, Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
             const remainingDays = Math.max(0, totalDays - elapsedDays)
             return (
@@ -330,7 +314,6 @@ export function ProjectDetailPage() {
                     <th className="py-2 px-3 font-medium border-l border-border">Line Manager</th>
                     <th className="py-2 px-3 font-medium border-l border-border">Designation</th>
                     <th className="py-2 px-3 font-medium border-l border-border">Department</th>
-                    <th className="py-2 px-3 font-medium border-l border-border">Role</th>
                     <th className="py-2 px-3 font-medium text-right border-l border-border">Alloc %</th>
                     <th className="py-2 px-3 font-medium text-right border-l border-border">Planned</th>
                     <th className="py-2 px-3 font-medium text-right border-l border-border">Worked</th>
@@ -358,11 +341,6 @@ export function ProjectDetailPage() {
                       </td>
                       <td className="py-2.5 px-3 text-muted-foreground border-l border-border">
                         {member.department}
-                      </td>
-                      <td className="py-2.5 px-3 border-l border-border">
-                        <Badge variant="outline" className="text-[10px] capitalize">
-                          {member.role_in_project}
-                        </Badge>
                       </td>
                       <td className="py-2.5 px-3 text-right border-l border-border">
                         {member.allocation_percentage != null ? (

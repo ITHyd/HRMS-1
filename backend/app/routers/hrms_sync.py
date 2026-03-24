@@ -12,6 +12,7 @@ from app.services.hrms_sync_service import (
     trigger_live_sync,
     trigger_sync,
 )
+from app.services.excel_utilisation_service import run_configured_excel_reimport
 
 router = APIRouter(prefix="/hrms-sync", tags=["HRMS Sync"])
 
@@ -41,6 +42,10 @@ async def trigger_hrms_sync(
         else:
             # Demo mode: keep existing mock behavior.
             result = await trigger_sync(data.period, user.branch_location_id, user.user_id)
+        if result.get("status") == "completed":
+            excel_result = await run_configured_excel_reimport(user.branch_location_id, user.user_id)
+            if excel_result.get("status") == "failed":
+                raise HTTPException(status_code=500, detail=f"HRMS sync completed but Excel refresh failed: {excel_result.get('reason')}")
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -67,6 +72,10 @@ async def trigger_master_data_sync(
             user_id=user.user_id,
             integration_config_id=str(cfg_doc.id) if cfg_doc else None,
         )
+        if result.get("status") == "completed":
+            excel_result = await run_configured_excel_reimport(user.branch_location_id, user.user_id)
+            if excel_result.get("status") == "failed":
+                raise HTTPException(status_code=500, detail=f"HRMS sync completed but Excel refresh failed: {excel_result.get('reason')}")
         return result
     except HTTPException:
         raise

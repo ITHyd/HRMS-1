@@ -4,6 +4,7 @@ from typing import Optional
 from app.models.integration_config import IntegrationConfig
 from app.models.sync_log import SyncLog
 from app.services import audit_service
+from app.services import excel_utilisation_service
 from app.services import hrms_sync_service
 from app.services import skills_sync_service
 
@@ -184,6 +185,7 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
         records_succeeded=0,
         records_failed=0,
         error_details=[],
+        detail_sections=[],
         started_at=now,
         triggered_by="manual",
         user_id=user.user_id,
@@ -235,10 +237,52 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
             sync_log.records_succeeded = int(hrms_result.get("imported_count", 0) or 0)
             sync_log.records_failed = int(hrms_result.get("error_count", 0) or 0)
             sync_log.error_details = []
+            sync_log.detail_sections = [
+                {
+                    "label": "HRMS Sync",
+                    "color": "green",
+                    "data": {
+                        "Period": current_period,
+                        "Status": str(hrms_result.get("status", "completed")),
+                        "Processed": str(hrms_result.get("total_records", 0) or 0),
+                        "Imported": str(hrms_result.get("imported_count", 0) or 0),
+                        "Errors": str(hrms_result.get("error_count", 0) or 0),
+                    },
+                }
+            ]
             if sync_log.records_failed:
                 sync_log.error_details.append(
                     {"record": "hrms_sync", "error": f"{sync_log.records_failed} errors during sync"}
                 )
+
+            if sync_log.status == "completed":
+                excel_result = await excel_utilisation_service.run_configured_excel_reimport(
+                    branch_location_id=user.branch_location_id,
+                    user_id=user.user_id,
+                )
+                if excel_result.get("status") == "failed":
+                    sync_log.status = "failed"
+                    sync_log.records_failed = max(sync_log.records_failed, 1)
+                    sync_log.error_details.append(
+                        {
+                            "record": "excel_reimport",
+                            "error": str(excel_result.get("reason") or "Configured Excel reimport failed"),
+                        }
+                    )
+                elif excel_result.get("status") == "completed":
+                    sync_log.detail_sections.append(
+                        {
+                            "label": "Excel Refresh",
+                            "color": "green",
+                            "data": {
+                                "Status": "completed",
+                                "File": str(excel_result.get("file", "-")),
+                                "Availability Rows": str(excel_result.get("ytpl", {}).get("rows_stored", 0) or 0),
+                                "Intercompany Allocations": str(excel_result.get("intercompany", {}).get("allocations", 0) or 0),
+                                "Planned/Worked Records": str(excel_result.get("planned_worked", {}).get("inserted", 0) or 0),
+                            },
+                        }
+                    )
         elif cfg.integration_type == "skills":
             # Skills Portal sync
             skills_result = await skills_sync_service.sync_skills_from_portal()
@@ -251,6 +295,7 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
             sync_log.records_succeeded = catalog_count + emp_skills_count
             sync_log.records_failed = 0
             sync_log.error_details = []
+            sync_log.detail_sections = []
             if not skills_result.get("success"):
                 sync_log.records_processed = skills_result.get("total_count", 0)
                 sync_log.records_succeeded = 0
@@ -267,6 +312,7 @@ async def trigger_manual_sync(config_id: str, user) -> dict:
             sync_log.error_details = [
                 {"record": "sample_record", "error": "Simulated validation error"}
             ]
+            sync_log.detail_sections = []
 
         await _persist_sync_outcome(sync_log, cfg)
     except Exception as exc:
@@ -420,6 +466,7 @@ async def get_sync_log_detail(sync_id: str) -> dict:
         "records_succeeded": log.records_succeeded,
         "records_failed": log.records_failed,
         "error_details": log.error_details,
+        "detail_sections": log.detail_sections,
         "started_at": log.started_at,
         "completed_at": log.completed_at,
         "triggered_by": log.triggered_by,

@@ -5,7 +5,7 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ]
 
-export const MAX_PERIOD = "2026-02"
+export const MAX_PERIOD = "2026-03"
 
 export function getCurrentPeriod(): string {
   const now = new Date()

@@ -204,6 +204,11 @@ async def get_branch_subtree(location_id: str, branch_head_id: str = None):
 
 async def get_reporting_chain(employee_id: str):
     """Walk upward from employee to CEO via PRIMARY relationships."""
+    from bson import ObjectId
+    # Non-ObjectId IDs (e.g. excel: prefixed) have no reporting chain
+    if not ObjectId.is_valid(employee_id):
+        return []
+
     all_rels = await ReportingRelationship.find(
         ReportingRelationship.type == "PRIMARY"
     ).to_list()

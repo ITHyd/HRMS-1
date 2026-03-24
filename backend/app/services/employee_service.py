@@ -28,6 +28,11 @@ async def get_employee_detail(
     if employee_id.startswith(EXCEL_EMPLOYEE_PREFIX):
         return await get_excel_employee_detail(employee_id, requester_branch_location_id, period=period)
 
+    # Treat unmatched: IDs as excel employee refs — query by stored employee_id
+    if employee_id.startswith("unmatched:"):
+        excel_ref = f"{EXCEL_EMPLOYEE_PREFIX}{employee_id}"
+        return await get_excel_employee_detail(excel_ref, requester_branch_location_id, period=period)
+
     emp = await Employee.get(employee_id)
     if not emp:
         return None

@@ -146,9 +146,13 @@ async def employee_timeline(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Return month-by-month project timeline for an employee."""
+    from bson import ObjectId
+    # Excel/unmatched IDs have no HRMS timeline
+    if not ObjectId.is_valid(employee_id):
+        return {"employee_id": employee_id, "from_period": from_period or "", "to_period": to_period or "", "timeline": []}
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
-    MAX_PERIOD = "2026-02"
+    MAX_PERIOD = "2026-03"
     if not to_period:
         to_period = min(now.strftime("%Y-%m"), MAX_PERIOD)
     if to_period > MAX_PERIOD:

@@ -45,9 +45,9 @@ export function NotificationBell() {
   const count = useMemo(() => {
     if (!summary) return 0
     let c = 0
-    // Bench: counts as 1 summary notification (not per employee)
-    const benchVisible = (summary.details.bench_long ?? []).filter((e) => !dismissed.has(`bench_long:${e.employee_id}`))
-    if (benchVisible.length > 0 && !dismissed.has("bench_long:_summary")) c++
+    // Bench: counts as 1 summary notification (not per employee) — hidden for now
+    // const benchVisible = (summary.details.bench_long ?? []).filter((e) => !dismissed.has(`bench_long:${e.employee_id}`))
+    // if (benchVisible.length > 0 && !dismissed.has("bench_long:_summary")) c++
     // Project ending: counts as 1 summary notification
     const projVisible = (summary.details.project_ending ?? []).filter((p) => !dismissed.has(`project_ending:${p.project_id}`))
     if (projVisible.length > 0 && !dismissed.has("project_ending:_summary")) c++
@@ -160,34 +160,9 @@ export function NotificationBell() {
                     })
                   }
 
-                  // Bench: single grouped notification
-                  const benchVisible = (summary?.details.bench_long ?? []).filter((e) => !dismissed.has(`bench_long:${e.employee_id}`))
-                  if (benchVisible.length > 0 && !dismissed.has("bench_long:_summary")) {
-                    const topNames = benchVisible.slice(0, 3).map((e) => e.employee_name)
-                    const remaining = benchVisible.length - topNames.length
-                    items.push({
-                      type: "bench_long", key: "_summary", dismissKey: "bench_long:_summary",
-                      ts: 0,
-                      node: (
-                        <div
-                          key="bench_summary"
-                          onClick={() => nav("/")}
-                          onContextMenu={(ev) => rightClick(ev, "bench_long", "_summary")}
-                          className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 cursor-pointer transition-colors"
-                          title="Right-click to dismiss"
-                        >
-                          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-destructive" />
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium">{benchVisible.length} employee{benchVisible.length !== 1 ? "s" : ""} on long bench</p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {topNames.join(", ")}{remaining > 0 ? ` and ${remaining} more` : ""} — benched for 2+ months. Consider reassignment or upskilling.
-                            </p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">Resources page →</p>
-                          </div>
-                        </div>
-                      ),
-                    })
-                  }
+                  // Bench notification hidden for now
+                  // const benchVisible = (summary?.details.bench_long ?? []).filter(...)
+                  // if (benchVisible.length > 0 ...) { items.push(...) }
 
                   // Project ending: single grouped notification
                   const projVisible = (summary?.details.project_ending ?? []).filter((p) => !dismissed.has(`project_ending:${p.project_id}`))

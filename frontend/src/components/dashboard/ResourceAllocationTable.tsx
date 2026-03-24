@@ -1,10 +1,9 @@
-import { useState, useMemo } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { Pagination } from "@/components/shared/Pagination"
 import { useOrgChartStore } from "@/store/orgChartStore"
-import { useNotificationStore } from "@/store/notificationStore"
-import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react"
+import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react"
 import type { ResourceAllocationEntry } from "@/types/dashboard"
 
 interface ResourceAllocationTableProps {
@@ -16,14 +15,24 @@ interface ResourceAllocationTableProps {
   onPageSizeChange?: (size: number) => void
 }
 
-type SortKey = "employee_name" | "line_manager" | "project_name" | "client_name" | "allocation_percentage" | "billable_hours" | "non_billable_hours" | "classification" | "available_days"
+type SortKey =
+  | "employee_name"
+  | "line_manager"
+  | "project_name"
+  | "client_name"
+  | "allocation_percentage"
+  | "billable_hours"
+  | "non_billable_hours"
+  | "classification"
+  | "available_days"
+
 type SortDir = "asc" | "desc"
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey | null; sortDir: SortDir }) {
-  if (sortKey !== col) return <ChevronsUpDown className="inline h-3 w-3 ml-1 opacity-30" />
+  if (sortKey !== col) return <ChevronsUpDown className="ml-1 inline h-3 w-3 opacity-30" />
   return sortDir === "asc"
-    ? <ChevronUp className="inline h-3 w-3 ml-1 opacity-80" />
-    : <ChevronDown className="inline h-3 w-3 ml-1 opacity-80" />
+    ? <ChevronUp className="ml-1 inline h-3 w-3 opacity-80" />
+    : <ChevronDown className="ml-1 inline h-3 w-3 opacity-80" />
 }
 
 export function ResourceAllocationTable({
@@ -35,44 +44,53 @@ export function ResourceAllocationTable({
   onPageSizeChange,
 }: ResourceAllocationTableProps) {
   const selectEmployee = useOrgChartStore((s) => s.selectEmployee)
-  const summary = useNotificationStore((s) => s.summary)
-  const dismissed = useNotificationStore((s) => s.dismissed)
-  const dismiss = useNotificationStore((s) => s.dismiss)
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; empId: string } | null>(null)
   const [sortKey, setSortKey] = useState<SortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>("asc")
 
-  const longBenchMap = useMemo(
-    () => new Map((summary?.details?.bench_long ?? []).map((e) => [e.employee_id, e])),
-    [summary]
-  )
-
   function handleSort(col: SortKey) {
     if (sortKey === col) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
-    } else {
-      setSortKey(col)
-      setSortDir("asc")
+      setSortDir((direction) => (direction === "asc" ? "desc" : "asc"))
+      return
     }
+    setSortKey(col)
+    setSortDir("asc")
   }
 
   const sorted = sortKey
     ? [...entries].sort((a, b) => {
         const av = a[sortKey] ?? ""
         const bv = b[sortKey] ?? ""
-        const cmp = typeof av === "number" && typeof bv === "number"
-          ? av - bv
-          : String(av).localeCompare(String(bv))
-        return sortDir === "asc" ? cmp : -cmp
+        const comparison =
+          typeof av === "number" && typeof bv === "number"
+            ? av - bv
+            : String(av).localeCompare(String(bv))
+        return sortDir === "asc" ? comparison : -comparison
       })
     : entries
 
+  const employeeGroupMeta = useMemo(() => {
+    const meta = new Map<number, { rowSpan: number; projectCount: number }>()
+    let index = 0
+    while (index < sorted.length) {
+      const employeeId = sorted[index].employee_id
+      let nextIndex = index + 1
+      while (nextIndex < sorted.length && sorted[nextIndex].employee_id === employeeId) {
+        nextIndex += 1
+      }
+      meta.set(index, {
+        rowSpan: nextIndex - index,
+        projectCount: nextIndex - index,
+      })
+      index = nextIndex
+    }
+    return meta
+  }, [sorted])
+
   function thClass(align?: "right") {
-    return `pb-2 pr-4 font-medium cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap${align === "right" ? " text-right" : ""}`
+    return `cursor-pointer select-none whitespace-nowrap pb-2 pr-4 font-medium transition-colors hover:text-foreground${align === "right" ? " text-right" : ""}`
   }
 
   return (
-    <>
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Resource Allocations</CardTitle>
@@ -106,7 +124,10 @@ export function ResourceAllocationTable({
                 <th className={thClass()} onClick={() => handleSort("classification")}>
                   Classification <SortIcon col="classification" sortKey={sortKey} sortDir={sortDir} />
                 </th>
-                <th className={`pb-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors text-right whitespace-nowrap`} onClick={() => handleSort("available_days")}>
+                <th
+                  className="cursor-pointer select-none whitespace-nowrap pb-2 text-right font-medium transition-colors hover:text-foreground"
+                  onClick={() => handleSort("available_days")}
+                >
                   Available Days <SortIcon col="available_days" sortKey={sortKey} sortDir={sortDir} />
                 </th>
               </tr>
@@ -119,74 +140,71 @@ export function ResourceAllocationTable({
                   </td>
                 </tr>
               ) : (
-                sorted.map((entry, idx) => (
-                  <tr
-                    key={`${entry.employee_id}-${entry.project_name ?? "bench"}-${idx}`}
-                    onClick={() => selectEmployee(entry.employee_id)}
-                    className="border-b last:border-0 hover:bg-muted/50 transition-colors cursor-pointer group"
-                  >
-                    <td className="py-2.5 pr-4">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-medium text-foreground group-hover:underline">
-                          {entry.employee_name}
-                        </span>
-                        {(() => {
-                          const info = longBenchMap.get(entry.employee_id)
-                          if (!info || dismissed.has(`bench_long:${entry.employee_id}`)) return null
-                          return (
-                            <span
-                              title={`On standby ${info.bench_days}+ days · Right-click to dismiss`}
-                              onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, empId: entry.employee_id }) }}
-                              className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 cursor-context-menu select-none"
-                            >
-                              ⚠ Long bench
+                sorted.map((entry, idx) => {
+                  const group = employeeGroupMeta.get(idx)
+                  return (
+                    <tr
+                      key={`${entry.employee_id}-${entry.project_name ?? "bench"}-${idx}`}
+                      onClick={() => selectEmployee(entry.employee_id)}
+                      className="cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/50 group"
+                    >
+                      {group && (
+                        <td className="py-2.5 pr-4 align-top" rowSpan={group.rowSpan}>
+                          <div className="flex flex-col gap-1">
+                            <span className="font-medium text-foreground group-hover:underline">
+                              {entry.employee_name}
                             </span>
-                          )
-                        })()}
-                      </div>
-                    </td>
-                    <td className="py-2.5 pr-4 text-muted-foreground">
-                      {entry.line_manager || "No Manager"}
-                    </td>
-                    <td className="py-2.5 pr-4 text-muted-foreground">
-                      {entry.project_name || "-"}
-                    </td>
-                    <td className="py-2.5 pr-4 text-muted-foreground">
-                      {entry.client_name || "-"}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
-                      {entry.allocation_percentage > 0 ? (
-                        <span
-                          className={
-                            entry.allocation_percentage >= 80
-                              ? "text-green-600 font-medium"
-                              : entry.allocation_percentage >= 40
-                              ? "text-amber-600 font-medium"
-                              : "text-red-600 font-medium"
-                          }
-                        >
-                          {entry.allocation_percentage.toFixed(1)}%
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
+                            {group.projectCount > 1 && (
+                              <span className="inline-flex w-fit items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                {group.projectCount} projects
+                              </span>
+                            )}
+                          </div>
+                        </td>
                       )}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
-                      {entry.billable_hours > 0 ? entry.billable_hours.toFixed(1) : "-"}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
-                      {entry.non_billable_hours > 0 ? entry.non_billable_hours.toFixed(1) : "-"}
-                    </td>
-                    <td className="py-2.5 pr-4">
-                      <StatusBadge status={entry.classification} />
-                    </td>
-                    <td className="py-2.5 text-right tabular-nums">
-                      {typeof entry.available_days === "number"
-                        ? entry.available_days.toFixed(1)
-                        : "-"}
-                    </td>
-                  </tr>
-                ))
+                      {group && (
+                        <td className="py-2.5 pr-4 align-top text-muted-foreground" rowSpan={group.rowSpan}>
+                          {entry.line_manager || "No Manager"}
+                        </td>
+                      )}
+                      <td className="py-2.5 pr-4 text-muted-foreground">
+                        {entry.project_name || "-"}
+                      </td>
+                      <td className="py-2.5 pr-4 text-muted-foreground">
+                        {entry.client_name || "-"}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">
+                        {entry.allocation_percentage > 0 ? (
+                          <span
+                            className={
+                              entry.allocation_percentage >= 80
+                                ? "font-medium text-green-600"
+                                : entry.allocation_percentage >= 40
+                                  ? "font-medium text-amber-600"
+                                  : "font-medium text-red-600"
+                            }
+                          >
+                            {entry.allocation_percentage.toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">
+                        {entry.billable_hours > 0 ? entry.billable_hours.toFixed(1) : "-"}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">
+                        {entry.non_billable_hours > 0 ? entry.non_billable_hours.toFixed(1) : "-"}
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        <StatusBadge status={entry.classification} />
+                      </td>
+                      <td className="py-2.5 text-right tabular-nums">
+                        {typeof entry.available_days === "number" ? entry.available_days.toFixed(1) : "-"}
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -201,21 +219,5 @@ export function ResourceAllocationTable({
         />
       </CardContent>
     </Card>
-
-    {ctxMenu && (
-      <div
-        className="fixed z-[200] rounded-md border bg-popover shadow-md py-1 min-w-[90px]"
-        style={{ left: ctxMenu.x, top: ctxMenu.y }}
-        onMouseLeave={() => setCtxMenu(null)}
-      >
-        <button
-          onClick={() => { dismiss("bench_long", ctxMenu.empId); setCtxMenu(null) }}
-          className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted transition-colors cursor-pointer"
-        >
-          Dismiss
-        </button>
-      </div>
-    )}
-  </>
   )
 }

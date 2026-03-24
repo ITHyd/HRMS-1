@@ -26,6 +26,14 @@ import type { ProjectBrief } from "@/types/project"
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
+function formatPeriodLabel(period: string) {
+  const [year, month] = period.split("-").map(Number)
+  return new Date(year, month - 1, 1).toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  })
+}
+
 export function ProjectListPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -68,6 +76,7 @@ export function ProjectListPage() {
     try {
       if (dataSource === "excel") {
         const data = await getExcelProjects({
+          period: selectedPeriod,
           search: search || undefined,
           client_name: clientFilter || undefined,
           page,
@@ -149,18 +158,16 @@ export function ProjectListPage() {
           <h2 className="text-lg font-semibold">Project Master</h2>
           <p className="text-sm text-muted-foreground">
             {dataSource === "excel"
-              ? "Inter-company projects · March 2026"
+              ? `Inter-company projects · ${formatPeriodLabel(selectedPeriod)}`
               : "View all projects assigned to your branch"}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <DataSourceToggle />
-          {dataSource === "hrms" && (
-            <PeriodSelector
-              value={selectedPeriod}
-              onChange={(p) => { setSelectedPeriod(p); setPage(1) }}
-            />
-          )}
+          <PeriodSelector
+            value={selectedPeriod}
+            onChange={(p) => { setSelectedPeriod(p); setPage(1) }}
+          />
           <Button
             variant={showFilters ? "default" : "outline"}
             size="sm"

@@ -37,17 +37,11 @@ fi
 # Import Excel file if mounted
 EXCEL_FILE="/data/utilisation.xlsx"
 if [ -f "$EXCEL_FILE" ]; then
-  echo "==> Importing Excel utilisation report (YTPL availability)..."
-  python -m seed.import_utilisation_excel \
+  echo "==> Running unified Excel seed..."
+  python -m seed.seed_excel \
     --file "$EXCEL_FILE" \
     --user-email manager@nxzen.com
-  echo "==> Excel availability import done."
-
-  echo "==> Importing Inter-company sheet (project allocations)..."
-  python -m seed.import_intercompany_excel \
-    --file "$EXCEL_FILE" \
-    --user-email manager@nxzen.com
-  echo "==> Inter-company import done."
+  echo "==> Excel seed done."
 else
   echo "==> No Excel file at $EXCEL_FILE, skipping import."
   echo "    Mount your file with: -v /path/to/file.xlsx:/data/utilisation.xlsx"
